@@ -1,11 +1,4 @@
-/**
-KMRS MOBILE 
-Version 2.7
-*/
 
-/**
-Default variable declarations 
-*/
 var ajax_url= krms_config.ApiUrl ;
 var dialog_title_default= krms_config.DialogDefaultTitle;
 var search_address;
