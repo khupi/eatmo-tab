@@ -91,7 +91,22 @@ MerchantCarousel = function(data){
 			    
 			  html +='</div>';			
 			  
-			html +='<h4>'+ val.restaurant_name +'</h4>';
+			
+			$has_estimation = false;
+			if ((typeof  val.delivery_estimation_raw !== "undefined") && ( val.delivery_estimation_raw !== null)) {
+				if(!empty(val.delivery_estimation_raw)){
+					$has_estimation = true;
+				}
+			}
+			
+			if($has_estimation){
+				html += '<ons-row>';
+			    html += '<ons-col vertical-align="top" width="55%" >'+ '<h4>'+ val.restaurant_name +'</h4>'  +'</ons-col>';
+			    html += '<ons-col vertical-align="top" class="text-right" width="45%" ><p style="margin-top:2px;"><ons-icon icon="md-time" size="12px" ></ons-icon>&nbsp;'+ val.delivery_estimation_raw+'</p></ons-col>';
+			    html += '</ons-row>';
+			} else {
+				html +='<h4>'+ val.restaurant_name +'</h4>';
+			}
 			
 			if(!empty(val.cuisine)){
 			html +='<p class="concat_text">'+ val.cuisine +'</p>';
@@ -337,7 +352,7 @@ restaurantListWithBanner = function(data, element){
 		   html+='<ons-col width="70%" vertical-align="center" class="is_rtl_text_right" >';
 			 html+='<h4>'+ val.restaurant_name +'</h4>';
 			 
-			 html+='<p class="concat_text">' ;
+			 html+='<p class="concat_text limit_description">' ;
 			 
 			    if(!empty(val.address)){
 			    	html+=val.address+'<br/>';
@@ -1057,6 +1072,8 @@ itemListSmall = function(data, element_id){
 	}	
 	var list = document.getElementById( element_id );
 	var html='';
+	
+	website_hide_foodprice = isHidePrice();
 		
 	$.each( data  , function( key, val ) {
 		html+='<ons-list-item tappable onclick="itemDetails('+ "'"+ val.item_id+"'," + "'" + val.cat_id + "'"  +')">';
@@ -1071,6 +1088,20 @@ itemListSmall = function(data, element_id){
 		  html+='<div class="center">';
 		    html+='<span class="list-item__title">' + val.item_name + '</span>';
 		    html+='<span class="list-item__subtitle">' + val.item_description + '</span>';
+		    
+		    if ((typeof  val.prices2 !== "undefined") && ( val.prices2 !== null)) {
+			    if (val.prices2.length>0 && !website_hide_foodprice){
+			    	$.each( val.prices2  , function( pricekey, priceval ) {
+			    	   if(priceval.discount>0){
+			    	   	  html+='<span class="list-item__subtitle"><span class="tag_discount" style="margin-left:0;">'+ priceval.original_price +'</span></span>';
+			    	   	  html+='<span class="list-item__subtitle">'+ priceval.discounted_price_pretty +'</span>';
+			    	   } else {
+			    	   	  html+='<span class="list-item__subtitle">'+ priceval.original_price +'</span>';
+			    	   }		    	   
+			    	});
+			    }
+		    }
+		    
 		  html+='</div>';
 		html+='</ons-list-item>';
 		
@@ -1633,31 +1664,27 @@ var displayCartDetails = function(datas){
 			/*SUB ITEM*/
 			if (!empty(item_val.new_sub_item)){
 				$.each( item_val.new_sub_item, function( new_sub_item_key, new_sub_item_val ) {
-					html+='<ons-list-header >'+ new_sub_item_key +'</ons-list-header>';
-					html+='<ons-list-item modifier="nodivider normal_list" >';
-					    //html+='<ons-list-header style="padding-left:0;"><span class="list-item__subtitle">'+ new_sub_item_key +'</span></ons-list-header>';					    
+					html+='<ons-list-header >'+ new_sub_item_key +'</ons-list-header>';					
+					    					   
 					    $.each( new_sub_item_val , function( new_sub_item_val_key, new_sub_item_val_val ) {
-					    	dump(new_sub_item_val_val);
-					    	/*html+='<ons-row>';
-					    	  html+='<ons-col vertical-align="center" width="70px" >'+ new_sub_item_val_val.addon_qty + 'x' + prettyPrice(new_sub_item_val_val.addon_price)  +'</ons-col>';
-					    	  html+='<ons-col vertical-align="center" >'+ new_sub_item_val_val.addon_name  +'</ons-col>';
-					    	  html+='<ons-col vertical-align="center" class="text_right" width="40px" >'+  prettyPrice(parseFloat(new_sub_item_val_val.addon_qty)*parseFloat(new_sub_item_val_val.addon_price))  +'</ons-col>';
-					    	html+='</ons-row>';*/
 					    	
+					    	html+='<ons-list-item modifier="nodivider normal_list" >';
+					    	
+					    	dump(new_sub_item_val_val);					    	
 					    	$addon_name = new_sub_item_val_val.addon_qty + ' x ' + prettyPrice(new_sub_item_val_val.addon_price);
 					    	$addon_name+= " " +new_sub_item_val_val.addon_name;
 					    	html+='<div class="left">'+ $addon_name +'</div>';
 					    	html+='<div class="right">'+  prettyPrice(parseFloat(new_sub_item_val_val.addon_qty)*parseFloat(new_sub_item_val_val.addon_price))  +'</div>';
-					    });
-					html+='</ons-list-item>';
+					    	
+					    	html+='</ons-list-item>';
+					    });					
 				});
 			}
-			
-			/*html+='<ons-list-item modifier="divider" >';				  
-			html+='</ons-list-item>';
-			*/
+			/*END SUB ITEM*/
+						
 			
 		});
+		/*END ITEM*/
 		
 		
 		html+='<ons-list-item modifier="nodivider normal_list" >';				  
@@ -2191,7 +2218,17 @@ accountMenu = function(login){
 	}
 		
 	if ((typeof  app_settings.app_rating !== "undefined") && ( app_settings.app_rating !== null)) {
-	if(app_settings.app_rating.enabled==1){
+		
+		$only_user_login = true;		
+		if ((typeof  app_settings.app_rating.only_user_login !== "undefined") && ( app_settings.app_rating.only_user_login !== null)) {
+			if(app_settings.app_rating.only_user_login==1){		
+				if(!isLogin()){					
+					$only_user_login = false;
+				}
+			}
+		}
+					
+	    if(app_settings.app_rating.enabled==1 && $only_user_login==true){
 		 html+='<ons-list modifier="list_menu">';
 	      html+='<ons-list-item  tappable onclick="rateApp()" >';
 	        html+='<div class="left"><ons-icon icon="md-star" size="22px"></ons-icon></div>';
@@ -3300,6 +3337,8 @@ setMerchantFoodList = function(data, element_id){
 	}	
 	var list = document.getElementById( element_id );
 	var html='';
+	
+	website_hide_foodprice = isHidePrice();
 		
 	$.each( data  , function( key, val ) {
 		
@@ -3315,11 +3354,24 @@ setMerchantFoodList = function(data, element_id){
 		  html+='</div>';
 		  html+='<div class="center">';
 		    html+='<span class="list-item__title">' + val.title + '</span>';
-		    html+='<span class="list-item__subtitle">' + val.sub_title + '</span>';
-		    //html+='<span class="list-item__subtitle">' + t("Search type") + ": " + t(val.restaurant) + '</span>';
+		    html+='<span class="list-item__subtitle">' + val.sub_title + '</span>';		    
 		    if(!empty(val.delivery_fee)){
 		       html+='<span class="list-item__subtitle">' + val.delivery_fee + '</span>';
 		    }
+		    
+		    if ((typeof  val.prices2 !== "undefined") && ( val.prices2 !== null)) {
+			    if (val.prices2.length>0 && !website_hide_foodprice){
+			    	$.each( val.prices2  , function( pricekey, priceval ) {
+			    	   if(priceval.discount>0){
+			    	   	  html+='<span class="list-item__subtitle"><span class="tag_discount" style="margin-left:0;">'+ priceval.original_price +'</span></span>';
+			    	   	  html+='<span class="list-item__subtitle">'+ priceval.discounted_price_pretty +'</span>';
+			    	   } else {
+			    	   	  html+='<span class="list-item__subtitle">'+ priceval.original_price +'</span>';
+			    	   }		    	   
+			    	});
+			    }
+		    }
+		    
 		  html+='</div>';
 		html+='</ons-list-item>';
 				
@@ -3479,7 +3531,9 @@ restaurantListColumn = function(data, element){
 			   
 			col+='</div> ';
 			col+='<h4 class="is_rtl_text_right">'+val.restaurant_name+'</h4>';
-			col+='<p class="concat_text is_rtl_text_right">'+val.cuisine+'</p>';
+			if ((typeof  val.cuisine !== "undefined") && ( val.cuisine !== null)) {
+			   col+='<p class="concat_text is_rtl_text_right">'+val.cuisine+'</p>';
+			}
 			col+='<ons-row class="rating_wrap raty-small">';
 			  col+='<ons-col vertical-align="top"><div class="raty-stars" data-score="'+ val.rating.ratings +'"></div></ons-col>';
 			  col+='<ons-col vertical-align="top">'+ val.rating.review_count +'</ons-col>';
@@ -4324,7 +4378,7 @@ ageRestriction = function(){
 
 
 fillHomeBanner = function(data, div){
-	
+			
 	app_settings = getAppSettings();	
 	
 	item_width ='item-width="60%"';
@@ -4336,9 +4390,24 @@ fillHomeBanner = function(data, div){
 	html='<ons-carousel fullscreen swipeable auto-scroll overscrollable id="banner_carousel" direction="horizontal" '+ item_width +' >';
 	$.each( data  , function( key, val ) {
 				
-	   params_data = clickFormat('ByTag' + "|" + val.banner_id);
-		
-      html+='<ons-carousel-item onclick="showRestaurantListByTag('+ params_data +')"  >';                 
+	  params_data = clickFormat('ByTag' + "|" + val.banner_id);
+	  
+	  $do_actions ='<ons-carousel-item onclick="showRestaurantListByTag('+ params_data +')"  >';
+	  
+	  if ((typeof  val.actions !== "undefined") && ( val.actions !== null)) {
+	  	  switch(val.actions){
+	  	  	 case "custom_page":
+	  	  	    $do_actions ='<ons-carousel-item onclick="loadCustomPage('+ val.page_id +')"  >';
+	  	  	 break;
+	  	  	 
+	  	  	 case "custom_link":
+	  	  	   $do_actions ='<ons-carousel-item onclick="browseLink('+ clickFormat(val.custom_url) +')"  >';
+	  	  	 break;
+	  	  }
+	  }		                 
+
+	  html+=$do_actions;
+      
       html+='<div class="banner">';
       
         if(!empty(val.title)){
@@ -5004,7 +5073,22 @@ fillCategories = function( data , div){
 			
 			  params_data = clickFormat('ByTag' + "|" + val.banner_id);
 			
-			  col+='<ons-col vertical-align="top" width="33.3%" onclick="showRestaurantListByTag('+ params_data +')"  >';
+			  $do_actions  = '<ons-col vertical-align="top" width="33.3%" onclick="showRestaurantListByTag('+ params_data +')"  >';
+			  
+			  if ((typeof  val.actions !== "undefined") && ( val.actions !== null)) {
+			  	  switch(val.actions){
+			  	  	 case "custom_page":
+			  	  	    $do_actions ='<ons-carousel-item onclick="loadCustomPage('+ val.page_id +')"  >';
+			  	  	 break;
+			  	  	 
+			  	  	 case "custom_link":
+			  	  	   $do_actions ='<ons-carousel-item onclick="browseLink('+ clickFormat(val.custom_url) +')"  >';
+			  	  	 break;
+			  	  }
+			  }		  
+			  
+			  col+=$do_actions;
+			  
 		       col+='<div class="banner small-loader">';
 		          col+='<img src="'+ val.banner +'">';
 		          col+='<div class="spinner"></div>';
@@ -5506,7 +5590,7 @@ restaurantListWithBannerAll = function(data){
 		   html+='<ons-col width="70%" vertical-align="center" class="is_rtl_text_right" >';
 			 html+='<h4>'+ val.restaurant_name +'</h4>';
 			 
-			 html+='<p class="concat_text">' ;
+			 html+='<p class="concat_text limit_description">' ;
 			 
 			    if(!empty(val.address)){
 			    	html+=val.address+'<br/>';
@@ -5583,6 +5667,120 @@ restaurantListWithBannerAll = function(data){
          html+='</p>';  
 		 
 		html+='</ons-list-item>';
+						
+	});
+	
+	$html ='';
+	$html+='<ons-list id="list_all_restaurant" modifier="list_grey_bg">';
+	$html+=html;
+    $html+='</ons-list>';
+	return $html;
+};
+
+
+restaurantListHomeWithBanner = function(data, element){
+	var list = document.getElementById(element);
+	html='';
+	
+	$.each(data, function(key, val){		
+		
+		html+='<ons-list-item modifier="longdivider list_item_nopadding list_type_list1" tappable onclick="loadMerchant('+ val.merchant_id+')" >';
+	      html+='<div class="left">';
+	        
+	        html+='<div class="is-loading xsmall-loader">';
+	          html +='<div class="spinner"></div>';		
+	          html+='<img class="list_left_logo" src="'+ val.logo+'" />';
+	          if(!empty(val.open_status_raw)){
+	             html+='<div class="green_tag '+val.open_status_raw+' inherit">'+val.open_status+'</div>'
+	          }
+	        html+='</div>';
+	        
+	      html+='</div>';
+	      html+='<div class="center">';
+	      
+	         html+='<span class="list-item__title is_rtl_text_right">'+ val.restaurant_name +'</span>';
+	         	         
+	         
+             html+='<span class="list-item__subtitle is_rtl_text_right">';
+              
+                if(!empty(val.address)){
+                	 html+=val.address;      
+                     html+='<br/>';
+                }
+                if(!empty(val.cuisine)){
+                     html+=val.cuisine;      
+                     html+='<br/>';
+                }
+                if(!empty(val.distance_plot)){
+                   html+=val.distance_plot;
+                   html+='<br/>';
+                }
+
+                if(!empty(val.minimum_order)){               	                
+	                html+= val.minimum_order+ '<br/>';
+                }
+                if(!empty(val.delivery_estimation)){               	                
+	                html+= val.delivery_estimation+ '<br/>';
+                }
+                if(!empty(val.delivery_distance)){               	                
+	                html+= val.delivery_distance+ '<br/>';
+                }
+                if(!empty(val.delivery_fee)){               	                
+	                html+= val.delivery_fee+ '<br/>';
+                }
+                
+                if(val.is_sponsored==2){
+                   html+= '<ons-icon icon="ion-ios-circle-filled" size="12px" ></ons-icon>&nbsp;' +  t("Sponsored") +  '<br/>';
+                }
+                
+                if(!empty(val.offers)){               	                                	
+	                if(val.offers.length>=1){
+	                	$.each(val.offers, function(offer_key, offer_val){	                		
+	                		html+= '<ons-icon icon="ion-ios-circle-filled" size="12px" ></ons-icon>&nbsp;' +  offer_val.full +  '<br/>';
+	                	});
+	                }
+                }
+                
+                if(!empty(val.vouchers)){               	                                	
+	                if(val.vouchers.length>=1){
+	                	$.each(val.vouchers, function(vouchers_key, vouchers_val){	                		
+	                		html+= '<ons-icon icon="ion-ios-circle-filled" size="12px" ></ons-icon>&nbsp;' +  vouchers_val +  '<br/>';
+	                	});
+	                }
+                }
+                
+                if(!empty(val.services)){               	                                	
+	                if(val.services.length>=1){
+	                	html+='<ons-row>';
+	                	$.each(val.services, function(services_key, services_val){	                			                		
+	                		html+='<ons-col width="80px" ><ons-icon icon="md-check" size="18px"></ons-icon><span class="indent">'+services_val+'</span></ons-col>';
+	                	});
+	                	html+='</ons-row>';
+	                }
+                }
+                
+                if(!empty(val.paymet_method_icon)){
+                	if(val.paymet_method_icon.length>=1){
+	                html+='<ons-row style="margin-top:10px;">';
+	                  $.each(val.paymet_method_icon, function(paymet_method_icon_key, paymet_method_icon_val){	                			                			                 
+	                     html+='<ons-col width="35px" ><img src="'+paymet_method_icon_val+'" class="payment_options_icon"></ons-col>';
+	                  });
+	                html+='</ons-row>';
+                	}
+                }
+                              
+             html+='</span>';
+                          
+                                       
+             if(!empty(val.rating)){
+	             html+='<span class="list-item__subtitle">';
+	             html+='<div class="raty-stars" data-score="'+ val.rating.ratings +'"></div>';
+	             html+='</span>';
+             }
+	      
+	      html+='</div>';
+	      	      
+	    html+='</ons-list-item>';
 						
 	});
 	

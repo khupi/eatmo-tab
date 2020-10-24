@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<widget xmlns="http://www.w3.org/ns/widgets" 
-        xmlns:gap="http://phonegap.com/ns/1.0" 
+<widget xmlns="http://www.w3.org/ns/widgets"
+        xmlns:gap="http://phonegap.com/ns/1.0"
         xmlns:android="http://schemas.android.com/apk/res/android" 
         id="com.datamintec.eatmo" 
-        versionCode="11.1" 
-        version="11.0">
+        versionCode="8" 
+        version="8.1">
   <name>EatMo</name>
   <description>
-        EatMo food mobile app version
+        eatMo food mobile app version
     </description>
-  <author email="admin@eatmo.co.za" href="http://www.eatmo.co.za">
+  <author email="admin@eatmo.co.za"
+          href="http://www.eatmo.co.za">
         eatmo.co.za
     </author>
   <content src="index.html"/>
@@ -76,6 +77,9 @@
     <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application">
       <application android:usesCleartextTraffic="true"/>
     </edit-config>
+    <config-file target="AndroidManifest.xml" parent="/*/application">
+        <uses-library android:name="org.apache.http.legacy" android:required="true"/>
+    </config-file>
     <resource-file src="www/beep.wav" target="app/src/main/res/raw/beep.wav"/>
     <resource-file src="google-services.json" target="google-services.json"/>
     <resource-file src="google-services.json" target="app/google-services.json"/>

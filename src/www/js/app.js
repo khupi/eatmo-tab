@@ -1,6706 +1,6978 @@
-/**
-KMRS MOBILE 
-Version 2.7
-*/
-
-/**
-Default variable declarations 
-*/
-var ajax_url= krms_config.ApiUrl ;
-var dialog_title_default= krms_config.DialogDefaultTitle;
-var search_address;
+/*DEFINE ALL VARIABLES*/
 var ajax_request;
+var ajax_url= krms_config.ApiUrl
+var dialog_title = krms_config.AppTitle
+
 var cart=[];
-var networkState;
+var cart_count = 0;
 
-var easy_category_list='';
-var map;
-var map_search;
-var drag_marker;
-var map_track;
-var track_order_interval;
-var track_order_map_interval;
-var drag_marker_bounce=1;
+var onsenNavigator ;
+var toast_handler;
 
-var global_city_id;
-var global_city_name;
-var global_area_id;
-var global_area_name;
-var global_state_id;
-var global_state_name;
-var global_postal_code;
+var push_handle;
 
-var global_filter_params;
-var browse_params;
-var push;
+var translator;
+var dict = {};
 
-var timer = null;
-var ajax_lazy;
-var ajax_lazy_item;
-
-var app_version = "2.7";
+var device_id   = 'device_01231';
+var device_uiid = 'uiid_01234561';
 var device_platform = 'android';
+var code_version = "1.5.1"; // don't change this value
 
-var send_post_ajax;
+var timer;
+var ajax_timeout = 60000;  //30000
+
+var ajax_cart;
+
+var icon_loader = '<ons-progress-circular indeterminate></ons-progress-circular>';
+
+var dialog;
+var tabbar_loaded;
+
+var track_interval;
+var modal_content='';
+
+var exit_cout = 0;
 var analytics;
+var track_history_interval;
+var track_interval_timeout = 7000;
+var sec = 0;
 
-var usethislocation_lat;
-var usethislocation_lng;
+var startup_banner_interval;
+var infinite_page = 0;
 
-document.addEventListener("deviceready", onDeviceReady, false);
+var geocoded_address=[];
+var karousel = [];
+var auto_carousel_name = [];
+var active_carousel = [];
 
-function onDeviceReady() {    
-	    					
-	try {
-			
-		navigator.splashscreen.hide();
-		
-		device_platform = device.platform;
-				
-		if(!isDebug()){		
-	 	   getLanguageSettings();
-		}				
-						
-		document.addEventListener("pause", onPause, false);
-		document.addEventListener("resume", onResume, false);
-		
-		initPush(false);
-   
-   } catch(err) {
-     alert(err.message);
-   } 
-}
+var $firebase_otp_attempt=0;
+var $firebase_otp_credentials=[];
 
-/*document.addEventListener("offline", onOffline, false);
-function onOffline() {    	
-    $(".home-page").hide();
-    $(".no-connection").show();		
-}
+var track_graphic_interval;
+var track_graphic_interval_timeout = 4*1000;
 
-document.addEventListener("online", onOnline, false);
-function onOnline()
-{
-	$(".home-page").show();
-    $(".no-connection").hide();		
-}*/
+/*END VARIABLES*/
 
-function onPause() {
-   //toastMsg('pause');
-}
-
-function onResume() {   
-   try {
-	   push.setApplicationIconBadgeNumber(function(){
-	      //toastMsg("success")
-	   }, function() {
-	      //toastMsg("failed")
-	   },0);	   	  
-	   
-   } catch(err) {
-      toastMsg(err.message);       
-   } 
-}
-
-document.addEventListener("offline", noNetConnection, false);
-
-function noNetConnection()
-{
-	toastMsg( getTrans("Internet connection lost","net_connection_lost") );
-	if ( $(".retry-language").exists() ){
-		 $(".retry-language").show();
-	}
-}
-
+/*DEFINE BASIC FUNCTIONS*/
 
 jQuery.fn.exists = function(){return this.length>0;}
 
-function dump(data)
-{
-	console.debug(data);
+dump = function(data) {
+	console.log(data);
 }
 
-function setStorage(key,value)
-{
-	localStorage.setItem(key,value);
-}
+dump2 = function(data) {
+	alert(JSON.stringify(data));	
+};
 
-function getStorage(key)
-{
-	return localStorage.getItem(key);
-}
-
-function removeStorage(key)
-{
-	localStorage.removeItem(key);
-}
-
-function explode(sep,string)
-{
-	var res=string.split(sep);
-	return res;
-}
-
-function urlencode(data)
-{
-	return encodeURIComponent(data);
-}
-
-$( document ).on( "keyup", ".numeric_only", function() {
-  this.value = this.value.replace(/[^0-9\.]/g,'');
-});	 
-
-ons.bootstrap();  
-ons.ready(function() {
-	dump('ready');
-		
-	removeStorage("geo_address_result_formatted_address");
-	removeStorage("gps_turn");
-	
-	if(isDebug()){		
-		removeStorage("default_lang");
-		removeStorage("search_address");
-		//setStorage("search_address","970 N Western Ave, Los Angeles, CA, United States");	
-		setStorage("search_address","Guadalupe Nuevo, Makati, NCR, Philippines");		
-	}
-		
-	//navigator.splashscreen.hide()	
-	$("#s").val( getStorage("search_address") );
-		
-	refreshConnection();
-	
-	//removeStorage("client_token");
-	
-	if(isDebug()){
-	   setStorage("device_id","device_12345");
-	}
-				
-	//getLanguageSettings();
-	if(isDebug()){
- 	   setTimeout('getLanguageSettings()', 1100);
-	}
-	
-	$( document ).on( "click", "#s", function() {    	     	    	   
-	   $("#s").val('');
-	});
-	
-}); /*end ready*/
-
-function refreshConnection()
-{	
-	if ( !hasConnection() ){
-		$(".home-page").hide();
-		$(".no-connection").show();		
-		toastMsg( getTrans("Internet connection lost","net_connection_lost") );
-	} else {
-		$(".home-page").show();
-		$(".no-connection").hide();
-	}	
-}
-
-function hasConnection()
-{
-	if(isDebug()){
-		return true;
-	}
-	//networkState = navigator.network.connection.type;		
-	var networkState = navigator.connection.type;	
-	if ( networkState=="Connection.NONE" || networkState=="none"){	
-		return false;
-	}	
-	return true;
-}
-
-function geoComplete()
-{
-	dump( "country_code_set=>" + getStorage("country_code_set"));
-			
-	if ( empty(getStorage("country_code_set")) ){				
-		if(empty(getStorage("mobile_country_code"))){
-		  $("#s").geocomplete();		
-		} else {
-		  $("#s").geocomplete({
-		    country: getStorage("mobile_country_code")
-	      });			 
-	           
-	      setStorage("country_code_set", getStorage("mobile_country_code") );
-	      
-		}				
-	} else {				
-		$("#s").geocomplete({
-		   country: getStorage("country_code_set")
-	    });	
-	}
-}
-
-function createElement(elementId,elementvalue)
-{
-   var content = document.getElementById(elementId);
-   content.innerHTML=elementvalue;
-   ons.compile(content);
-}
-
-function searchMerchant()
-{			
-			
-  global_filter_params = '';
-  
-  var s = $('#s').val();  
-  
-  /*clear all storage*/ 
-  setStorage("search_address",s);
-  clearAllStorage();
-  
-  search_mode = getSearchMode();
-  if ( search_mode=="postcode"){
-  	   s="location";
-  	   
-  	   var search_type = getSearchType();
-  	   dump("search_type=>"+search_type);
-  	   switch (search_type)
-  	   {
-  	   	  case "1":
-  	   	  case 1:
-	  	   	  global_city_id = $(".city_id").val();
-	  	   	  global_area_id = $(".area_id").val();
-	  	   	    	   	  
-			  if ( empty(global_city_id) ){
-				  onsenAlert( getTrans('Please select City first','please_select_city') );
-				  return;
-		      }
-			  if ( empty(global_area_id) ){
-				  onsenAlert( getTrans('Please select Area','please_select_area') );
-				  return;
-			  }  	   	  
-  	   	  break;
-  	   	  
-  	   	  case "2":
-  	   	  case 2:  	   	    	   	    	   	  
-	  	   	  if(empty(global_state_id)){
-				  onsenAlert( getTrans('Please select State first','please_select_state') );
-				  return;
-		      }
-			  if(empty(global_city_id)){
-				  onsenAlert( getTrans('Please select Cty first','please_select_city') );
-				  return;
-		      }  	   	  
-  	   	  break;
-  	   	  
-  	   	  case "3":
-  	   	  case 3:  	   	    	   	      
-	  	   	  if (empty(global_postal_code)){
-				  onsenAlert( getTrans('Please select Postal code','please_postal_code') );
-				  return;
-		      }	      
-  	   	  break;
-  	   	  
-  	   	  default:
-  	   	  break;
-  	   }
-  }
-  
-  if(s!=""){	  
-	  if ( search_mode=="postcode"){
-			var sparams="search_mode="+ search_mode;
-			var search_type = getSearchType();			
-			switch (search_type)
-			{
-				case "1":				
-				sparams+="&city_id="+ global_city_id;
-				sparams+="&area_id="+ global_area_id;
-				break;
-				
-				case "2":
-				sparams+="&state_id="+ global_state_id;
-				sparams+="&city_id="+ global_city_id;
-				break;
-				
-				case "3":
-				sparams+="&postal_code="+ global_postal_code;
-				break;
-				
-				default:
-				break;
-			}
-			callAjax("initSearch", sparams );	
-		} else {
-		    callAjax("initSearch","address="+ getStorage("search_address") + "&search_mode=" + search_mode );		
-		}
-  } else{
-  	 onsenAlert(   getTrans('Address is required','address_is_required')  );
-  }
-}
-
-/*ons.ready(function() {
-  kNavigator.on('prepush', function(event) {  	
-  	 dump("prepush");   
-  });
-});*/
-
-document.addEventListener("pageinit", function(e) {
-	dump("pageinit");	
-	
-	dump("pagname => "+e.target.id);
-			
-	switch (e.target.id)
-	{		
-						
-		case "page-edit_review":
-		   translatePage();
-		   break;
-		   
-		case "page_search":		   
-		  geoComplete2();
-		  $("#ss").attr("placeholder",  getTrans('Street Address,City,State','home_search_placeholder') );
-		  translatePage();
-		  search_address=getStorage("search_address");
-		  if(!empty(search_address)){		  	 		     
-		     setTimeout('$("#ss").val(search_address)', 100);
-		  }		  
-		  		  		  
-		  initAutoLocation();		  
-		  break;
-		  
-		case "page_search_byname":
-		   $("#ss_restaurant_name").attr("placeholder",  getTrans('Enter Restaurant Name','enter_restaurant_name') );
-		   translatePage();
-		break;
-		
-		case "page_search_bystreet":
-		  $("#ss_street").attr("placeholder",  getTrans('Enter Street Name','enter_street_name') );
-		  translatePage();
-		  break;
-		   
-		case "page_search_bycuisine":
-		  $("#ss_cuisine").attr("placeholder",  getTrans('Enter Cuisine Name','enter_cuisine') );
-		  translatePage();
-		  break;
-		  
-		case "page_search_byfood":
-		  $("#ss_item_name").attr("placeholder",  getTrans('Enter Food Name','enter_food') );
-		  translatePage();
-		  break;
-		  
-		case "page-photos":
-		   translatePage();
-		   callAjax("loadPhotos", "merchant_id=" +  getStorage("merchant_id") );
-		   break;
-		
-		case "page-promo":		  
-		  translatePage();
-	      callAjax("loadPromos", "merchant_id=" +  getStorage("merchant_id") );	             	       
-		  break;
-		  
-		case "page-menubycategoryitem":		   
-		  $("#page-menubycategoryitem .restauran-title").text( $(".selected_restaurant_name").val() );
-	      $("#page-menubycategoryitem .rating-stars").attr("data-score",  $(".selected_restaurant_ratings").val() );	      
-	      $("#page-menubycategoryitem .logo-wrap").html('<img src="'+ getStorage("merchant_logo") +'" />');
-	      initRating();	      
-	      
-	      enabled_food_search_menu = getStorage("enabled_food_search_menu");	      
-	      if(enabled_food_search_menu==1){
-	       	 $(".search_wrapper").show();
-	      } else {
-	       	 $(".search_wrapper").hide();
-	      }
-		break;
-		
-		case "page-getsettings":
-		  //getLanguageSettings();		  
-		  break;
-		
-		case "menucategory-page":
-		
-		   menu_enabled_gallery = getStorage("menu_enabled_gallery");
-		   if(menu_enabled_gallery==1){
-	      	 	$("#menu_enabled_gallery").show();
-	       } else {
-	      	 	$("#menu_enabled_gallery").hide();
-	       }
-	       
-	       menu_enabled_booking = getStorage("menu_enabled_booking");
-		   if(menu_enabled_booking==1){
-	      	 	$("#menu_enabled_booking").show();
-	       } else {
-	      	 	$("#menu_enabled_booking").hide();
-	       }
-	       
-	       menu_enabled_hours = getStorage("menu_enabled_hours");
-		   if(menu_enabled_hours==1){
-	      	 	$("#menu_enabled_hours").show();
-	       } else {
-	      	 	$("#menu_enabled_hours").hide();
-	       }
-	       
-	       menu_enabled_review = getStorage("menu_enabled_review");	       
-		   if(menu_enabled_review==1){		   	   
-	      	 	$("#menu_enabled_review").show();
-	       } else {
-	      	 	$("#menu_enabled_review").hide();
-	       }
-	       
-	       menu_enabled_map = getStorage("menu_enabled_map");
-		   if(menu_enabled_map==1){
-	      	 	$("#menu_enabled_map").show();
-	       } else {
-	      	 	$("#menu_enabled_map").hide();
-	       }
-	       
-	       menu_enabled_info = getStorage("menu_enabled_info");
-		   if(menu_enabled_info==1){
-	      	 	$("#menu_enabled_info").show();
-	       } else {
-	      	 	$("#menu_enabled_info").hide();
-	       }
-	       
-	       menu_enabled_promo = getStorage("menu_enabled_promo");
-		   if(menu_enabled_promo==1){
-	      	 	$("#menu_enabled_promo").show();
-	       } else {
-	      	 	$("#menu_enabled_promo").hide();
-	       }
-	       
-	       enabled_food_search_menu = getStorage("enabled_food_search_menu");
-	       if(enabled_food_search_menu==1){
-	       	  $(".search_wrapper").show();
-	       } else {
-	       	  $(".search_wrapper").hide();
-	       }
-	       
-		   callAjax("MenuCategory", "merchant_id="+getStorage("merchant_id") );		   
-		break;
-		
-		case "page-merchantinfo":				
-		case "page-change-address":				
-		  translatePage();
-		  break;
-		  
-		case "page-receipt":
-		  translatePage();
-		  setTrackView("receipt");
-		  break;
-		  
-		case "address-bymap":
-		  translatePage();
-		  $(".search_address_geo").attr("placeholder",  getTrans('Street Address,City,State','home_search_placeholder') );		  
-		  $(".map_type").val(  'select_address_from_map' );
-		  checkGPS('select_address_from_map');		  
-		  break;
-		   
-		case "page-enter-contact":  
-		  translatePage();
-		  $(".contact_phone").attr("placeholder", getTrans("Mobile Phone","mobile_number") );
-		  translateValidationForm();
-		  break;
-		  
-		case "page-booking":  
-		  translatePage();
-		  $(".number_guest").attr("placeholder", getTrans("Number Of Guests","number_of_guest") );		  
-		  initIntelInputs();
-		  
-		  setTrackView("book table: " + $(".selected_restaurant_name").val()  );
-		  break;
-		  
-	   case "page-paymentoption":	     
-	     translatePage();
-	     $(".order_change").attr("placeholder", getTrans('change? For how much?','order_change') );	     
-	     
-	     processAjax("checkOrderSMSSettings","merchant_id="+ $(".global_merchant_id").val() );
-		 break;
-		 
-	  case "page-addressbook-details":
-	    translatePage();
-	    translateValidationForm();
-	    
-	    $(".street").attr("placeholder",  getTrans("Street",'street') );
-	    $(".city").attr("placeholder",  getTrans("City",'city') );
-	    $(".state").attr("placeholder",  getTrans("State",'state') );
-	    $(".zipcode").attr("placeholder",  getTrans("Postal code/Zip Code",'zipcode') );
-	    $(".location_name").attr("placeholder",  getTrans("Location name",'location_name') );
-	    
-	    var page = sNavigator.getCurrentPage();
-		record_id = page.options.id;			
-		search_mode = getSearchMode();	
-		if (typeof record_id === "undefined" || record_id==null || record_id=="" || record_id=="null" ) {			
-			$(".id").val( '' );
-			$(".action").val('add');
-			$(".delete-addressbook").hide();
-		} else {
-			$(".id").val( record_id );
-			$(".action").val('edit');
-			$(".delete-addressbook").show();
-			var params="client_token="+ getStorage("client_token")+"&id="+record_id;
-      	    callAjax("getAddressBookDetails",params);
-		}
-	    
-	    break;
-	    
-	   case "page-signup":		 
-	     translatePage();
-	     translateValidationForm();
-	     $(".first_name").attr("placeholder",  getTrans("First Name",'first_name') );
-	     $(".last_name").attr("placeholder",  getTrans('Last Name','last_name') );
-	     $(".contact_phone").attr("placeholder",  getTrans('Mobile Phone','contact_phone') );
-	     $(".email_address").attr("placeholder",  getTrans('Email address','email_address') );
-	     $(".password").attr("placeholder",  getTrans('Password','password') );
-	     $(".cpassword").attr("placeholder",  getTrans('Confirm Password','confirm_password') );	     
-	     
-	     break;
-	     
-	   case "page-checkoutsignup": 
-	     translatePage();
-         translateValidationForm();
-         
-         $(".first_name").attr("placeholder",  getTrans("First Name",'first_name') );
-	     $(".last_name").attr("placeholder",  getTrans('Last Name','last_name') );
-	     $(".contact_phone").attr("placeholder",  getTrans('Mobile Phone','contact_phone') );
-	     $(".email_address").attr("placeholder",  getTrans('Email address','email_address') );
-	     $(".password").attr("placeholder",  getTrans('Password','password') );
-	     $(".cpassword").attr("placeholder",  getTrans('Confirm Password','confirm_password') );	
-	     break;
-		  
-	   case "page-shipping":	  
-	   
-	      $(".street").attr("placeholder", getTrans('Street','street') );
-	      $(".city").attr("placeholder", getTrans('City','city') );
-	      $(".state").attr("placeholder", getTrans('State','state') );
-	      $(".zipcode").attr("placeholder", getTrans('Postal code/Zip Code','zipcode') );
-	      $(".contact_phone").attr("placeholder", getTrans('Contact phone','contact_phone') );
-	      $(".location_name").attr("placeholder", getTrans('Apartment suite, unit number, or company name','location_name2') );
-	      $(".delivery_instruction").attr("placeholder", getTrans('Delivery instructions','delivery_instruction') );
-	   
-	      translatePage();
-	      translateValidationForm();
-	      	      
-	      //$('.zipcode').mask("00000-000", {placeholder: "_____-___"});
-	      
-	      initIntelInputs();
-	      
-	      var customer_contact_number=getStorage("customer_contact_number");
-	      if(!empty(customer_contact_number)){
-	      	  $(".contact_phone").val( customer_contact_number );
-	      }
-	      	      
-	      if(!empty(usethislocation_lat)){
-	      	  $(".google_lat").val(usethislocation_lat);
-	      	  $(".google_lng").val(usethislocation_lng);
-	      }
-	      
-	      break;
-		
-		case "searchresult-page":	
-		
-		/*$("#search-text").html( getStorage("search_address") );
-		
-		search_mode = getSearchMode();		
-		if ( search_mode=="postcode"){
-			var sparams="search_mode="+ search_mode;
-			var search_type = getSearchType();			
-			switch (search_type)
-			{
-				case "1":				
-				sparams+="&city_id="+ global_city_id;
-				sparams+="&area_id="+ global_area_id;
-				break;
-				
-				case "2":
-				sparams+="&state_id="+ global_state_id;
-				sparams+="&city_id="+ global_city_id;
-				break;
-				
-				case "3":
-				sparams+="&postal_code="+ global_postal_code;
-				break;
-				
-				default:
-				break;
-			}
-			callAjax("search", sparams );	
-		} else {
-		    callAjax("search","address="+ getStorage("search_address") + "&search_mode=" + search_mode );		
-		}*/
-		
-		search_mode = getSearchMode();
-		if ( search_mode=="postcode"){
-			$("#search-text").html( '' );
-		} else {
-			$("#search-text").html( getStorage("search_address") );
-		}
-		
-								
-		break;
-		
-		case "page-home":
-		    		    
-		    setNotificationDisplay();
-		    translatePage();
-		
-		    search_mode = getSearchMode();
-		    if ( search_mode=="postcode"){		
-		    	
-		    	search_type = getSearchType();
-		    	dump("search_type=>"+search_type);
-		    			    	
-		    	$(".search_by_location").show();
-				$(".search_by_address").hide();			
-				$(".advance_search").hide();		
-				
-				dump(global_city_id);
-				dump(global_area_id);
-				dump(global_city_name);
-				dump(global_area_name);
-				
-				if ( !empty(global_city_id)){
-					$(".city_id").val( global_city_id );
-					$(".location_city").html( global_city_name );
-				}
-				if ( !empty(global_area_id)){
-					$(".area_id").val( global_area_id );
-					$(".location_area").html( global_area_name );
-				}	
-				
-				switch (search_type)
-				{
-					case "1":
-					case 1:
-					$(".location_state").hide();
-					$(".location_postal").hide();
-					break;
-					
-					case "2":
-					case 2:
-					
-					if ( !empty(global_state_id)){
-						$(".state_id").val( global_state_id );
-						$(".location_state").html( global_state_name );
-					}	
-					
-					$(".location_state").show();
-					$(".location_area").hide();
-					$(".location_postal").hide();
-					break;
-					
-					case "3":
-					case 3:
-					$(".location_state").hide();
-					$(".location_city").hide();
-					$(".location_area").hide();
-					$(".location_postal").show();
-					break;
-				}
-							
-		    } else {			
-		    	var enabled_advance_search = getStorage("enabled_advance_search");
-		    	if(enabled_advance_search=="yes"){
-		    		
-		    		theme_address = getStorage("theme_search_merchant_address");
-		    		theme_name = getStorage("theme_search_merchant_name");
-		    		theme_street_name = getStorage("theme_search_street_name");
-		    		theme_cuisine = getStorage("theme_search_cuisine");
-		    		theme_foodname = getStorage("theme_search_foodname");
-		    				    		
-		    		var tab_html='';
-		    		 tab_html+='<ons-tabbar position="top" class="menu_tabbar" var="menu_tabbar" >';
-		    		      if(theme_address!=2){
-						     tab_html+='<ons-tab page="page_search.html" label="'+ getTrans('Address','address') +'" icon="ion-ios-location"></ons-tab>';
-		    		      }
-		    		      if(theme_name!=2){
-						     tab_html+='<ons-tab page="page_search_byname.html" label="'+ getTrans('Name','name') +'" icon="ion-android-restaurant"></ons-tab>';
-		    		      }
-		    		      if(theme_street_name!=2){
-						     tab_html+='<ons-tab page="page_search_bystreet.html" label="'+ getTrans('Street','street') +'" icon="ion-map"></ons-tab>';
-		    		      }
-		    		      if(theme_cuisine!=2){
-						     tab_html+='<ons-tab page="page_search_bycuisine.html" label="'+ getTrans('Cuisine','cuisine') +'" icon="ion-icecream"></ons-tab>';
-		    		      }
-		    		      if(theme_foodname!=2){
-						     tab_html+='<ons-tab page="page_search_byfood.html" label="'+ getTrans('Food','food') +'" icon="ion-soup-can-outline"></ons-tab>';
-		    		      }
-					 tab_html+='</ons-tabbar>';
-		    		
-		    		createElement("tabbar_wrap",tab_html);
-		    		
-		    		$(".search_by_location").hide();
-					$(".search_by_address").hide();
-					$(".advance_search").show();		
-					
-					
-					 setTimeout(function(){ 
-					    menu_tabbar.setActiveTab(0);	
-					 }, 100);
-												
-		    	} else {		    	
-			    	$(".search_by_location").hide();
-			    	$(".advance_search").hide();
-					$(".search_by_address").show();
-					
-					geoComplete();
-					search_address=getStorage("search_address");					
-					if (typeof search_address === "undefined" || search_address==null || search_address=="" ) { 						
-						if ( !empty( getStorage("geo_address_result_formatted_address") ) ){
-							search_address=getStorage("geo_address_result_formatted_address");
-							setTimeout('$("#s").val(search_address)', 100);
-						}						
-					} else {												
-						setTimeout('$("#s").val(search_address)', 100);
-					}										
-					$("#s").attr("placeholder",  getTrans('Street Address,City,State','home_search_placeholder') );		
-					
-					initAutoLocation();
-							
-		    	}								
-		    }
-		    
-		    setTrackView('homepage');		    
-			
-		break;
-		
-		case "page-filter-options":
-		  callAjax('cuisineList','');
-		  break;
-		
-		case "page-browse":
-		  //callAjax('browseRestaurant','');
-		  
-		  setTrackView('browse restaurant');
-		  
-		  translatePage();
-		  break;
-		  
-		case "page-profile":
-		  callAjax('getProfile',
-		  "client_token="+getStorage("client_token")
-		  );
-		  translatePage();
-		  translateValidationForm();
-		  
-		  $(".first_name").attr("placeholder",  getTrans('First Name','first_name') );
-		  $(".last_name").attr("placeholder",  getTrans('Last Name','last_name') );
-		  $(".email_address").attr("placeholder",  getTrans("Email Address",'email_address') );
-		  $(".password").attr("placeholder",  getTrans("Password",'password') );
-		  
-		  break;
-		
-		case "page-orders":  
-		
-		  setTrackView("order history");
-		  		
-		  callAjax('getOrderHistory',
-		  "client_token="+getStorage("client_token")
-		  );
-		  translatePage();
-		  break;
-		  
-		case "page-addressbook": 
-		  callAjax('getAddressBook',
-		  "client_token="+getStorage("client_token")
-		  );
-		  translatePage();
-		  break;
-		  
-		case "page-dialog-addressbook":  
-		  callAjax('getAddressBookDialog',
-		  "client_token="+getStorage("client_token")
-		  );
-		  break;
-		  
-		case "page-login":  
-		case "page-prelogin":  
-		  initSocialLogin();
-		  translatePage();
-		  translateValidationForm();
-
-		  $(".email_address").attr("placeholder",  getTrans('Email address','email_address') );
-		  $(".password").attr("placeholder",  getTrans('Password','password') );
-		  
-		  setTrackView("log in or register page")	  
-		  
-		  break;
-		  		  		  
-		case "page-settings":  
-		
-		  if (isDebug()){
-		    	$(".software_version").html( "1.3.6" );
-		  } else {
-		    	$(".software_version").html( BuildInfo.version );
-		  }
-		  
-		  setTrackView("app settings");
-		   
-		  callAjax("getSettings",
-		  "device_id="+getStorage("device_id")
-		  ); 
-		  translatePage();
-		  break;
-		  
-		case "page-locations":  
-		  callAjax('mobileCountryList',
-		  "device_id="+getStorage("device_id")
-		  );
-		  break;
-		  
-		case "page-languageoptions":  
-		  callAjax('getLanguageSelection','');
-		  break;
-		  
-		case "page-expirationmonth": 
-		  fillExpirationMonth();
-		  break;	
-		  
-		case "page-expiration-year": 
-		  fillExpirationYear();
-		  break;  	  
-		  
-		case "page-show-country":  
-		   fillCountryList();
-		   break;  	  
-		  		
-		   
-		case "page-pts":   
-		  dump('page-pts');
-		   callAjax('getPTS',
-		    "client_token="+getStorage("client_token")
-		   );
-		   translatePage();
-		   break; 
-		
-		case "page-atz-form":
-		   translatePage();
-	       translateValidationForm();	    
-	       
-	       $(".cc_number").attr("placeholder",  getTrans("Credit Card Number",'cc_number') );
-	       $(".cvv").attr("placeholder",  getTrans("CVV",'cvv') );
-	       $(".x_first_name").attr("placeholder",  getTrans("First Name",'first_name') );
-	       $(".x_last_name").attr("placeholder",  getTrans("Last Name",'last_name') );
-	       $(".x_address").attr("placeholder",  getTrans("Address",'address') );
-	       $(".x_city").attr("placeholder",  getTrans("City",'city') );
-	       $(".x_state").attr("placeholder",  getTrans("State",'state') );
-	       $(".x_zip").attr("placeholder",  getTrans("Postal code/Zip Code",'zipcode') );
-	       
-		   break; 
-		   
-		case "page-stripe-form":   
-		   translatePage();
-	       translateValidationForm();  
-	       
-	       $(".cc_number").attr("placeholder",  getTrans("Credit Card Number",'cc_number') );
-	       $(".cvv").attr("placeholder",  getTrans("CVV",'cvv') );
-	       
-		   break; 
-		   
-		   
-		case "page-verify-account":   
-		  $(".code").attr("placeholder",  getTrans("Code",'code') );
-		  $(".email_address").attr("placeholder",  getTrans("Email Address",'email_address') );
-		  translatePage();
-		  translateValidationForm();
-		 break;
-		 
-		case "page-address-selection":
-           translatePage();
-		   translateValidationForm();
-		   $(".stree_1").attr("placeholder",  getTrans("Street",'street') );
-	       $(".city_1").attr("placeholder",  getTrans("City",'city') );
-	       $(".state_1").attr("placeholder",  getTrans("State",'state') );
-	       $(".zipcode_1").attr("placeholder",  getTrans("Postal code/Zip Code",'zipcode') );	      		
-		  break;
-		  
-		  
-		case "page-hubtel-channel":  
-		   callAjax('getHubtelChannel',"client_token="+getStorage("client_token"));
-		   break;
-		   
-		/*case "page-location-city":   
-		   callAjax('getLocationCity', "" );
-		   break;*/
-		   
-		case "page-location-area":   
-		   callAjax('getLocationArea', "city_id=" + $(".city_id").val() );
-		   break; 
-		   
-		case "page-location-type":  
-		
-		   translatePage();
-		   
-		   if ( !empty(global_city_id)){
-		   	   $(".location_city").html( global_city_name );
-		   	   $(".city_id").val( global_city_id );
-		   }
-		   if ( !empty(global_area_id)){
-		   	   $(".location_area").html( global_area_name );
-		   	   $(".area_id").val( global_area_id );
-		   }
-		   
-		   if ( !empty(global_state_id)){
-		   	   $(".location_state").html( global_state_name );
-		   	   $(".state_id").val( global_state_id );
-		   }
-		   
-		   search_type = getSearchType();
-		   switch (search_type)
-		   {
-		   	   case "1":
-		   	   $(".location_state").hide();
-		   	   break;
-		   	   
-		   	   case "2":
-		   	   //$(".location_area").hide();
-		   	   break;
-		   	   
-		   	   case "3":
-		   	   break;
-		   }
-		   
-		   break;
-		   
-		case "page-shipping-location-area":   
-		
-		   translatePage();
-		   $(".street").attr("placeholder", getTrans('Street','street') );
-		   $(".contact_phone").attr("placeholder", getTrans('Contact phone','contact_phone') );
-	       $(".location_name").attr("placeholder", getTrans('Apartment suite, unit number, or company name','location_name2') );
-	       $(".delivery_instruction").attr("placeholder", getTrans('Delivery instructions','delivery_instruction') );
-		   
-		   if ( !empty(global_city_id)){
-		   	   $(".location_city").html( global_city_name );
-		   	   
-		   	   $(".city").val( global_city_name );
-		   	   $(".city_id").val( global_city_id );
-		   }
-		   
-		   if ( !empty(global_area_id)){
-		   	   $(".location_area").html( global_area_name );
-		   	   
-		   	   $(".state").val( global_area_name );
-		   	   $(".area_id").val( global_area_id );
-		   }
-		   
-		   if ( !empty(global_state_id)){
-		   	   $(".location_state").html( global_state_name );		   	   		   	   
-		   	   $(".state_id").val( global_state_id );
-		   	   $(".state").val( global_state_name );
-		   }
-		   		   
-           translateValidationForm();
-           initIntelInputs();
-
-           var customer_contact_number=getStorage("customer_contact_number");
-	       if(!empty(customer_contact_number)){
-	      	  $(".contact_phone").val( customer_contact_number );
-	       } 
-	      
-	       
-		   break;
-
-		 case "page-location-postal":   
-		   callAjax('getLocationPostal', "" );
-		   break;
-		   
-		 case "page-ipay_mpesa":  
-		    $(".ipay_phone_number").val( $(".ipay_phone_number").val() ) ;      	          	    
-      	    //callAjax("ipayAfricaGetInstructions", "key="+e.target.id );
-      	     $(".ipay_mpesa_content").html ( $(".int_MPESA").val()  );
-		   break;
-		   
-		 case "page-ipay_airtel":  		 		    
-		   //callAjax("ipayAfricaGetInstructions", "key="+e.target.id );
-		   $(".ipay_airtel_content").html ( $(".int_AIRTEL").val()  );
-		   break;
-		   
-		 case "page-dixicards-form":  		 
-		   callAjax('getDixiCards', "&client_token="+ getStorage("client_token") );
-		   break;
-		 
-		 case "page-map":		
-		   translatePage();
-  		   var page = sNavigator.getCurrentPage();	  	
-  		   $(".map_type").val(  page.options.map_type );
-		   checkGPS(page.options.map_type);
-		 break;
-		
-		 /*case "page-cart":
-		   translatePage();
-		   search_address = getStorage("search_address");
-		   if(!empty(search_address)){
-		  	  $(".google_formatted_address").html( search_address );
-		   }
-		 break*/
-		
-		 case "page-track-order":
-		   translatePage();
-		   var params='order_id=' + $(".order_option_order_id").val();
-      	   params+="&client_token="+getStorage("client_token");
-		   callAjax("trackOrderHistory",params);	       	 		  
-		   stopTrackInterval();	
-		 break;
-		 
-		 case "tracking-page":
-		   translatePage();
-		   initTrackingMap();
-		 break;
-		 
-		 case "page-order_details":		    
-		    var page = sNavigator.getCurrentPage();	  			    
-		    $("#page_title").html( getTrans('Order Details','order_details') + " #"+page.options.order_id );
-  		    callAjax("getReceipt","order_id="+ page.options.order_id );	
-		 break;
-		 
-		 case "page-order-options":		 
-		   translatePage();
-		   var page = sNavigator.getCurrentPage();
-		   $(".page_title").html( getTrans("Order Options",'order_option') + " #"+ page.options.order_id );
-		   $(".order_option_order_id").val( page.options.order_id );
-		   
-		   show_cancel_order = page.options.show_cancel_order;
-		   if(show_cancel_order==1){
-		   	  $(".cancel_this_order").show();
-		   } else {
-		   	  $(".cancel_this_order").hide();
-		   }
-		   
-		   show_review = page.options.show_review;
-		   if(show_review==1){
-		   	  $(".add_review_order").show();
-		   } else {
-		   	  $(".add_review_order").hide();
-		   }
-		   
-		 break;
-		 
-		 case "page-cart":
-		 
-		   translatePage();
-		   search_address = getStorage("search_address");
-		   //alert(search_address);
-		   if (typeof search_address === "undefined" || search_address==null || search_address=="" || search_address=="null" ) { 	    		   			  	  
-		   	  $(".google_formatted_address").html( '' );
-		   } else {
-		   	  $(".google_formatted_address").html( search_address );
-		   }
-		   
-		  var cart_params=JSON.stringify(cart);       	        	  
-      	  if (saveCartToDb()){
-      	  	  var cart_params='';
-      	  }      	  
-      	  
-      	  if ( empty(getStorage("tips_percentage")) ){
-      	  	   setStorage("tips_percentage",0);
-      	  }
-      	  
-      	  var remove_tips='';
-      	  if(!empty(getStorage("remove_tips"))){
-      	  	  remove_tips=getStorage("remove_tips");
-      	  }
-      	  
-      	  var tips_percentage='';
-      	  if(!empty(getStorage("tips_percentage"))){
-      	  	  tips_percentage=getStorage("tips_percentage");
-      	  }
-      	      	        	        	        	 
-      	  var params="merchant_id="+ getStorage('merchant_id');
-      	  
-      	  
-      	  if(!empty(getStorage("search_address"))){
-      	     params+="&search_address="+encodeURIComponent(getStorage("search_address"));
-      	  } else {
-      	  	if(!empty(getStorage("geo_address_result_formatted_address"))){
-      	  		params+="&search_address="+encodeURIComponent(getStorage("geo_address_result_formatted_address"));
-      	  	}
-      	  }
-      	  
-      	  params+="&cart="+cart_params;
-      	  
-      	  if(empty(getStorage("transaction_type"))){      	  	      	  	
-      	  	switch (getStorage("merchant_services"))
-      	  	{
-      	  		case 3:
-      	  		case 6:
-      	  		case "3":
-      	  		case "6":
-      	  		params+="&transaction_type=pickup";
-      	  		setStorage('transaction_type','pickup');
-      	  		break;
-      	  		      	  		
-      	  		case 7:
-      	  		case "7":
-      	  		params+="&transaction_type=dinein";
-      	  		setStorage('transaction_type','dinein');
-      	  		break;
-      	  		
-      	  		default:
-      	  		params+="&transaction_type=delivery";
-      	  		break;
-      	  	}
-      	  } else {
-      	  	params+="&transaction_type=" + getStorage("transaction_type");
-      	  }      	  
-      	  
-      	  
-      	  params+="&device_id="+ getStorage("device_id");
-      	  params+="&tips_percentage=" + tips_percentage;
-      	  params+="&remove_tips=" + remove_tips;
-      	        	 
-      	  callAjax("loadCart",params);
-      	  
-		 break;
-		 
-		 case "page-popup_options":
-		   loadOptionList();
-		 break;
-		 
-		 case "page-addreviews":
-		   var page = sNavigator.getCurrentPage();
-		   order_id = page.options.order_id;	
-		   $(".order_id").val( order_id );
-		   $('.raty-stars').raty({ 
-			   score:0,
-			   readOnly: false, 		
-			   path: 'lib/raty/images',
-			   click: function (score, evt) {					   	   
-			   	   $(".rating").val( score );
-			   }
-		  }); 		  
-		  		  		 
-		  displayMerchantLogo2( 
-            getStorage("merchant_logo") ,
-           '' ,
-           'page-addreviews'
-          );    
-          
-          translatePage();
-                    
-          $(".review").attr("placeholder", getTrans('Your reviews','your_reviews') );		   
-             
-		 break;
-		 
-		 case "page-reviews":
-		   website_review_type = getStorage("website_review_type");		   
-		   if(website_review_type==2){
-		   	  $(".add_review_button").hide();
-		   }
-		   
-		   displayMerchantLogo2( 
-      	     getStorage("merchant_logo") ,
-      	     '' ,
-      	     'page-reviews'
-      	   );    
-		   
-      	   translatePage();
-		   var params="merchant_id=" +  getStorage("merchant_id") ;
-      	   params+="&client_token="+ getStorage("client_token");
-	       callAjax("merchantReviews",params);
-	       
-		 break;
-		 
-		 case "page_postcode_address":
-		 
-		    $(".street").attr("placeholder", getTrans('Street','street') );		   
-	        $(".location_name").attr("placeholder", getTrans('Apartment suite, unit number, or company name','location_name2') );	       
-	        translateValidationForm();
-	        translatePage();
-	       
-		    var page = sNavigator.getCurrentPage();
-		    record_id = page.options.id;	
-		    if (typeof record_id === "undefined" || record_id==null || record_id=="" || record_id=="null" ) {
-		    	$(".id").val('');
-		    	$(".delete-addressbook-location").hide();
-		    } else {
-		    	$(".id").val(record_id);
-		    	var params="client_token="+ getStorage("client_token")+"&id="+record_id;
-      	        callAjax("getPostCodeAddressBookDetails",params);
-		    }
-		 break;
-		 
-		 case "page_popup_address_location":		         	   
-      	   getAddressBookLocation();
-		 break;
-		 
-		 case "page_notifications":		   		   
-		   if (!isLogin()){		   	
-		   	  removeStorage("client_token");		   	  
-		   }
-		   translatePage();
-      	   callAjax("getNotificationList",'');
-		 break;
-		 
-		 case "page_map_delivery":
-		    toastMsg(  getTrans("For exact location of your delivery address please select your address from map",'exact_location') );
-		    $(".map_type").val('delivery_map');
-		    checkGPS( $(".map_type").val() );
-		 break;
-		 
-		
-		 case "page_search_by_category":		   
-		    translatePage();
-		    $("#s_category_name").attr("placeholder",  getTrans('Search category','search_category') );
-		    setFocus('s_category_name');
-		    $( "#s_category_name" ).keyup(function( event ) {
-		    	if ( event.which == 13 ) {
-		    		event.preventDefault();
-		    	} else {
-		    		destroyList('s_category_name_results');
-		    		category_name = $(this).val();
-		    		dump("category_name=>"+ category_name);
-		    		if(!empty(category_name)){
-					    data = "category_name="+ category_name + "&merchant_id="+ getStorage("merchant_id");
-					    processAjax('searchByCategory',data);
-					} else {										
-						if(!empty(ajax_process)){						
-						    ajax_process.abort();
-						}
-					}
-		    	}
-		    });
-		 break;
-		 
-		 case "page_search_by_item":
-		    translatePage();
-		    $("#s_item_name").attr("placeholder",  getTrans('Search item','search_item') );
-		    setFocus('s_item_name');
-		    $( "#s_item_name" ).keyup(function( event ) {
-		    	if ( event.which == 13 ) {
-		    		event.preventDefault();
-		    	} else {
-		    		destroyList('s_item_results');
-		    		item_name = $(this).val();
-		    		dump("item_name=>"+ item_name);
-		    		if(!empty(item_name)){
-					    data = "item_name="+ item_name + "&merchant_id="+ getStorage("merchant_id");
-					    data+= "&category_id="+ getStorage("selected_cat_id");
-					    processAjax('searchByItem',data);
-					} else {										
-						if(!empty(ajax_process)){						
-						    ajax_process.abort();
-						}
-					}
-		    	}
-		    });
-		 break;
-		 
-		 /*end pagname*/
-		 		 		 
-		 default:
-		   break;
-	}
-    
-}, false);
-
-function searchResultCallBack(address)
-{
-	search_address=address;	
-}
-
-function showFilterOptions()
-{	
-	if (typeof navDialog === "undefined" || navDialog==null || navDialog=="" ) { 	    
-		ons.createDialog('filterOptons.html').then(function(dialog) {
-	        dialog.show();
-	        translatePage();
-	    });	
-	} else {
-		navDialog.show();
-		//translatePage();
-	}	
-}
-
-function applyFilter()
-{
-	navDialog.hide();
-	
-	var services='';
-	if (  $(".delivery_type").exists()){
-		$.each( $(".delivery_type:checked") , function( key, val ) { 			
-			//services+= $(this).val() +",";
-			services+= $(this).val();
-		});			
-	}
-	
-	dump("services=>"+services);
-	var cuisine_type='';
-	if (  $(".cuisine_type").exists()){
-		$.each( $(".cuisine_type:checked") , function( key, val ) { 			
-			cuisine_type+= $(this).val() +",";
-		});		
-	}
-	dump("cuisine_type=>"+cuisine_type);
-	
-	
-	params = "address="+ getStorage("search_address") +"&services=" + services + 
-	"&cuisine_type="+cuisine_type + "&restaurant_name="+ urlencode($(".filter_restaurant_name").val()) ;
-	
-	search_mode = getSearchMode();
-	if ( search_mode=="postcode"){
-		params+="&search_mode="+ search_mode;
-		search_type = getSearchType();
-		switch (search_type)
-		{
-			case "1":				
-			params+="&city_id="+ global_city_id;
-			params+="&area_id="+ global_area_id;
-			break;
-			
-			case "2":
-			params+="&state_id="+ global_state_id;
-			params+="&city_id="+ global_city_id;
-			break;
-			
-			case "3":
-			params+="&postal_code="+ global_postal_code;
-			break;
-			
-			default:
-			break;
-		}
-	}
-	
-
-	global_filter_params = params;
-	//callAjax("search", params);	
-	callAjax("initSearch", params );	
-}
-
-function onsenAlert(message,dialog_title)
-{		
-	if (typeof dialog_title === "undefined" || dialog_title==null || dialog_title=="" ) { 
-		dialog_title=dialog_title_default;
-	}
-	
-	if(empty(message)){
-		message='undefined error';
-	}
-	
-	label = getTrans('Ok','ok');	
-	if (typeof label === "undefined" || label==null || label=="" ) {
-		label="Ok";
-	}
-		
-	ons.notification.alert({
-      message: message,
-      title:dialog_title,
-      buttonLabel : getTrans('Ok','ok')
-    });
-}
-
-function hideAllModal()
-{
-	setTimeout('loaderSearch.hide()', 1);
-	setTimeout('loader.hide()', 1);
-	setTimeout('loaderLang.hide()', 1);
-}
-
-/*mycallajax*/
-function callAjax(action,params)
-{
-	
-	if ( !hasConnection() ){		
-		switch (action)
-		{
-			case "registerMobile":			
-			break;
-			
-			case "getLanguageSettings":
-			  $(".retry-language").show();
-			break;
-			
-			default:
-			toastMsg(  getTrans("CONNECTION LOST",'connection_lost') );
-			break;
-			
-		}
-		return;
-	}
-	
-	
-	/*ADD MORE PARAMETERS*/
-	switch (action)
-	{		
-		case "loadCart":
-		case "placeOrder":
-		case "getPaymentOptions":
-		case "checkout":
-			  search_mode = getSearchMode();
-			  if ( search_mode=="postcode"){
-			  	  params+="&search_mode=" + search_mode;		
-			  	  params+="&search_type=" + getSearchType()			  	  
-			  	  	  
-			  	  if(!empty(global_city_id)){
-			  	     params+="&city_id=" + global_city_id;
-			  	  }
-			  	  if(!empty(global_area_id)){
-			  	     params+="&area_id=" + global_area_id;
-			  	  }
-			  	  if(!empty(global_state_id)){
-			  	     params+="&state_id=" + global_state_id;
-			  	  }
-			  	  if(!empty(global_postal_code)){
-			  	     params+="&postal_code=" + global_postal_code;
-			  	  }
-			  }
-		break;
-		
-		default:
-		break;
-		
-	}
-	
-	dump("action=>"+action);
-	
-	/*add language use parameters*/
-	params+="&lang_id="+getStorage("default_lang");
-	params+="&lang="+getStorage("default_lang");
-	
-	if(!empty(krms_config.APIHasKey)){
-		params+="&api_key="+urlencode(krms_config.APIHasKey);
-	}
-	
-	params+="&app_version="+ app_version;
-	
-	var device_id=getStorage("device_id");
-	if(!empty(device_id)){
-		params+="&device_id="+device_id;
-	}
-	
-	if (isDebug()){
-  	  params+="&device_platform=Android";
-    } else {
-  	  params+="&device_platform="+ encodeURIComponent(device.platform);
-    }	 
-	
-    client_token = getStorage("client_token");
-    if(!empty(client_token)){
-       params+="&client_token="+ client_token;
-    }
-    
-	//alert(ajax_url+"/"+action+"?"+params);
-	dump(ajax_url+"/"+action+"?"+params);
-	
-    ajax_request = $.ajax({
-		url: ajax_url+"/"+action, 
-		data: params,
-		type: 'post',                  
-		async: false,
-		dataType: 'jsonp',
-		timeout: 30000,
-		crossDomain: true,
-	 beforeSend: function() {
-		if(ajax_request != null) {			 	
-		   /*abort ajax*/
-		   hideAllModal();	
-           ajax_request.abort();
-           clearTimeout(timer);
-		} else {    
-			/*show modal*/			
-
-			timer = setTimeout(function() {
-				hideAllModal();				
-				ajax_request.abort();
-	            toastMsg( getTrans('Request taking lot of time. Please try again','request_taking_lot_time')  );	            
-	        }, 30000);
-			  
-			switch(action)
-			{
-				case "registerMobile":
-				   break;
-				case "search":
-				   loaderSearch.show();
-				   translatePage();
-				   break;
-			    case "getLanguageSettings":			    
-			       loaderLang.show();
-			       break;
-			    case "trackOrderMap":   
-			        dump("no loader");
-			       break;
-				default:
-				   loader.show();
-				   break;
-			}
-		}
-	},
-	complete: function(data) {					
-		ajax_request=null;   	     				
-		hideAllModal();		
-	},
-	success: function (data) {	  
-		dump(data); 		
-		if (data.code==1){
-			switch (action)
-			{
-
-				case "loadPhotos":
-				   var html_gallery='<ons-carousel swipeable overscrollable auto-scroll fullscreen var="carousel">';
-				   
-				   $.each( data.details, function( key, val ) {
-				   	    dump(val);				   
-				   	    html_gallery+='<ons-carousel-item>';
-				   	       html_gallery+='<div class="item-label" style="background-image: url('+val+')" ></div>';
-				   	    html_gallery+='</ons-carousel-item>';
-				   });
-				   
-				   html_gallery+='<ons-carousel-cover>';
-                     html_gallery+='<div class="cover-label">'+  getTrans("Swipe left or right",'swipe') +'</div>';
-                   html_gallery+='</ons-carousel-cover>';
-				   
-				   html_gallery+='</ons-carousel>';
-				   				   
-				   createElement("gallery_list",html_gallery);
-				break;
-				
-				case "getReview":
-			        var options = {
-				      animation: 'slide',
-				      onTransitionEnd: function() { 
-				      	  $(".review").val( data.details.review);
-				      	  $(".review_id").val( data.details.id);
-				      } 
-				    };     
-				    sNavigator.pushPage("page-edit_review.html", options);
-				    break;
-				    
-				case "deleteReview":
-				    loadMoreReviews();
-				    break;
-				    
-				case "updateReview":
-				    sNavigator.popPage({cancelIfRunning: true}); 
-				    loadMoreReviews();
-				    break;
-				
-				case "loadPromos":
-				  if ( data.details.enabled==2){
-				  	
-				  	 var html_promo = '<ons-list class="list-dim-text">';
-				  	 
-				  	 if(!empty(data.details.offer)){
-				  	 	 html_promo += '<ons-list-header>'+ getTrans("Promos","promos")+'</ons-list-header>';
-					  	 $.each( data.details.offer, function( key, val ) {					  	 	
-					  	 	html_promo += '<ons-list-item>'+val+'</ons-list-item>';
-					  	 });
-				  	 }
-				  	 
-				  	 if(!empty(data.details.voucher)){
-				  	 	 html_promo += '<ons-list-header>'+ getTrans("Vouchers","vouchers")+'</ons-list-header>';  
-					  	 $.each( data.details.voucher, function( key, val ) {
-					  	 	dump(val);
-					  	 	html_promo += '<ons-list-item>'+val+'</ons-list-item>';
-					  	 });
-				  	 }
-				  	 
-				  	 if(!empty(data.details.free_delivery)){
-				  	 	html_promo += '<ons-list-header>'+ getTrans("Delivery","delivery")+'</ons-list-header>'; 
-				  	 	html_promo += '<ons-list-item>'+data.details.free_delivery+'</ons-list-item>';
-				  	 }
-				  	 
-				  	 html_promo += '</ons-list>';
-				  	 				  	
-				  	 createElement("promo-list",html_promo);
-				  } else {
-				  	  //createElement("promo-list", '<p style="margin:20px;" class="small-font-dim">' +  data.msg + '</span>' );
-				  	  createElement("promo-list",'');
-				  	  toastMsg(data.msg)
-				  }					
-				break;
-				
-				case "search":				
-				displayRestaurantResults(data.details.data ,'restaurant-results');
-				//$(".result-msg").text(data.details.total+" Restaurant found");
-				$(".result-msg").text(data.details.total+" "+getTrans("Restaurant found",'restaurant_found') );
-								
-				break;
-				
-				case "MenuCategory":			
-				/*save merchant logo*/								
-				setStorage("merchant_logo",data.details.logo);
-				dump(data.details.restaurant_name);
-				setStorage("merchant_name",data.details.restaurant_name);
-				
-				setStorage("enabled_table_booking",data.details.enabled_table_booking);
-				
-				setStorage("merchant_latitude",data.details.coordinates.latitude);
-				setStorage("merchant_longtitude",data.details.coordinates.longtitude);
-				setStorage("merchant_address",data.details.address);
-				
-				removeStorage("transaction_type");
-				setStorage("merchant_services",data.details.service);
-				
-				removeStorage("two_flavor_option");
-				if(!empty(data.details.two_flavor_option)){
-				   setStorage("two_flavor_option",data.details.two_flavor_option);				   
-				}
-				
-				$("#menucategory-page .restauran-title").text(data.details.restaurant_name);
-				$("#menucategory-page .rating-stars").attr("data-score",data.details.ratings.ratings);
-				initRating();
-				$("#menucategory-page .logo-wrap").html('<img src="'+data.details.logo+'" />');
-				
-				if ( data.details.open){
-					$("#merchant_open").val(2);
-				} else $("#merchant_open").val(1);
-					
-				if (data.details.merchant_close_store){
-					$("#close_store").val(2);
-				} else $("#close_store").val(1);
-				
-				$(".selected_restaurant_name").val( data.details.restaurant_name );
-				$(".selected_restaurant_ratings").val( data.details.ratings.ratings );
-
-							
-				break;
-				
-				case "cuisineList":
-				cuisineResults(data.details);
-				break;
-								
-				case "getItemByCategory":			
-				easy_category_list='';						
-				displayItemByCategory(data.details);
-				fillPopOverCategoryList(data.details.category_list);
-				break;
-				
-				case "getItemDetails":
-				displayItem(data.details);
-				break;
-				
-				case "loadCart":
-				$("#page-cart .wrapper").show();				
-				$(".checkout-footer").show();
-				$("#page-cart .frm-cart").show();
-								
-				$(".global_merchant_id").val( data.details.merchant_info.merchant_id );
-				
-				/*tips*/
-				if ( data.details.enabled_tip==2){
-					$(".tip_amount_wrap").show();	
-					setStorage("tips_percentage", data.details.tip_default );
-				} else {
-					$(".tip_amount_wrap").hide();
-				}
-												
-				displayCart(data.details);
-				
-				if (!empty(data.details.cart.discount)){
-					setStorage("has_discount",1);
-				} else {
-					removeStorage("has_discount");
-				}
-				
-				if (typeof addressDialog === "undefined" || addressDialog==null || addressDialog=="" ) {
-				} else {					
-					if ( addressDialog.isShown()){						
-						addressDialog.hide();
-					}				
-				}
-				
-				
-				/*HIDE CHANGES ADDRESS FUNCTIONS*/
-				if ( data.details.transaction_type=="delivery"){									   
-					$(".change_address_wrap").show();					
-					if (!empty(data.details.merchant_info.can_checkout)){
-						if ( data.details.merchant_info.can_checkout.is_pre_order == 2){
-							$(".delivery_asap_wrap").show();
-						} else {
-							$(".delivery_asap_wrap").hide();
-						}					
-					}								
-				} else {
-					$(".change_address_wrap").hide();
-				}			
-				
-				/*FILL ESTIMATION TIME*/				
-				/*if ( data.details.transaction_type=="delivery"){
-					if (!empty(data.details.estimation_delivery_time)){					    
-					   $(".delivery_time").val( data.details.estimation_delivery_time );
-					}				
-				}*/
-				
-				if(!empty(data.details.checkout_button)){
-					$(".btn_checkout").html( data.details.checkout_button );
-				}			
-				
-				if ( data.details.delivery_options){
-					$(".cart_delivery_date").html( data.details.delivery_options.label.date );
-					$(".cart_delivery_time").html( data.details.delivery_options.label.time );
-					
-					$(".delivery_date").val( data.details.delivery_options.default_value_date.date );
-					$(".delivery_time").val( data.details.delivery_options.default_value_time.time );
-					
-					$(".cart_delivery_date_value").html( data.details.delivery_options.default_value_date.date_pretty );
-					$(".cart_delivery_time_value").html( data.details.delivery_options.default_value_time.time_pretty );
-				}
-				
-				break;
-														
-				case "checkout":
-								
-				    if ( data.details=="shipping"){		
-				    	
-				    	search_mode = getSearchMode();
-				    	if (search_mode=="postcode"){
-
-				    		showShippingLocation(data);			    		
-				    		
-				    	} else {				    
-				    			    					    		
-					    	var options = {
-						      animation: 'slide',
-						      onTransitionEnd: function() { 	
-						      							      				      	  
-						      	  displayMerchantLogo2( getStorage("merchant_logo") ,
-						      	     getStorage("order_total") ,
-						      	     'page-shipping');
-						      	  
-						      	  if(!empty(data.msg.profile)){
-						      	  	  $(".contact_phone").val( data.msg.profile.contact_phone ) ;
-						      	  	  $(".location_name").val( data.msg.profile.location_name ) ;
-						      	  }
-						      	  
-						      	  var address_fill = false;
-						      	  
-						      	  if(!empty(getStorage("geo_address_result_formatted_address"))){
-						      	  							      	  
-						      	  	   $(".delivery-address-text").html( getStorage("geo_address_result_formatted_address") );
-							  	       $(".street").val( getStorage("geo_address_result_address") );
-									   $(".city").val( getStorage("geo_address_result_city") );
-									   $(".state").val( getStorage("geo_address_result_state") );
-									   $(".zipcode").val( getStorage("geo_address_result_zip") );	
-									   $(".formatted_address").val( getStorage("geo_address_result_formatted_address") );	
-						      	  				
-									   dump('d0');						   
-									   
-						      	  } else if ( !empty( getStorage("map_address_result_formatted_address") )){
-						      	  	    $(".delivery-address-text").html( getStorage("map_address_result_formatted_address") );
-									    $(".street").val( getStorage("map_address_result_address") );
-									    $(".city").val( getStorage("map_address_result_city") );
-									    $(".state").val( getStorage("map_address_result_state") );
-									    $(".zipcode").val( getStorage("map_address_result_zip") );	
-									    $(".formatted_address").val( getStorage("map_address_result_formatted_address") );	
-									 
-									    $(".google_lat").val( getStorage("google_lat") );	
-									    $(".google_lng").val( getStorage("google_lng") );	
-									    									    
-									    address_fill = true;
-									    dump('d1');
-						      	  } else {
-						      	  	  if(!empty(data.msg.address_book)){
-						      	  	  	  $(".street").val( data.msg.address_book.street );
-										  $(".city").val( data.msg.address_book.city );
-										  $(".state").val( data.msg.address_book.state );
-										  $(".zipcode").val( data.msg.address_book.zipcode );
-										  $(".location_name").val( data.msg.address_book.location_name );	
-										  
-										  
-										  var complete_address = data.msg.address_book.street;
-										  complete_address+=" "+ data.msg.address_book.city;
-										  complete_address+=" "+ data.msg.address_book.state;
-										  complete_address+=" "+ data.msg.address_book.zipcode;
-										
-										  $(".delivery-address-text").html( complete_address ); 
-										  $(".formatted_address").val( complete_address );	
-										  
-										  address_fill = true;										  						
-										  dump('d2');			  
-						      	  	  }
-						      	  }
-						      	  
-						      	  if(!address_fill){						      	  	
-						      	  	//fillShippingAddress();
-						      	  }						      
-						      	  					      	      	  
-						      } /*end transition*/
-						    };     
-						    sNavigator.pushPage("shipping.html", options);
-						    
-				    	}				
-					    		
-				    } else if ( data.details =="payment_method") {
-				    	
-				    	/*alert(data.msg.transaction_type);
-				    	alert(data.msg.show_mobile_number);*/
-				    	
-					    var options = {
-					      animation: 'slide',
-					      onTransitionEnd: function() { 						      	  
-					      	  displayMerchantLogo2( 
-					      	     getStorage("merchant_logo") ,
-					      	     getStorage("order_total") ,
-					      	     'page-paymentoption'
-					      	  );
-					      	  
-					      	  var params="merchant_id="+ getStorage("merchant_id");
-					      	  params+="&client_token="+ getStorage("client_token");
-					      	  params+="&transaction_type=" + $(".transaction_type:checked").val();
-					      	  callAjax("getPaymentOptions",params);
-					      } 
-					    };   
-					    sNavigator.pushPage("paymentOption.html", options);		       
-				    	
-				    } else if ( data.details =="enter_contact_number") {
-				    	 
-				    	var options = {
-					      animation: 'slide',
-					      onTransitionEnd: function() { 	
-					      	  initIntelInputs();					      	  					      	  
-					      } 
-					    };   
-					    sNavigator.pushPage("enterContact.html", options);		
-					    				    
-				    } else {
-						var options = {
-					      animation: 'slide',
-					      onTransitionEnd: function() { 	
-					      	  dump( getStorage("merchant_logo") );	      	  
-					      	  dump( getStorage("order_total") );
-					      	  displayMerchantLogo2( getStorage("merchant_logo") ,
-					      	     getStorage("order_total") ,
-					      	     'page-checkoutsignup');
-					      	     
-					      	  callAjax("getCustomFields",'');     
-					      	  initIntelInputs();      
-					      } 
-					    };     
-					    sNavigator.pushPage("checkoutSignup.html", options);				
-				    }
-				break;
-				
-				case "signup":
-				    setStorage("client_token", data.details.token ); // register token
-				    
-				    setStorage("avatar",data.details.avatar);
-                    setStorage("client_name_cookie",data.details.client_name_cookie);
-				    
-					if (data.details.next_step=="shipping_address"){
-						
-					    search_mode = getSearchMode();
-					    
-					    if (search_mode=="postcode"){                    	    	           	    	                   	    
-                   	    	showShippingLocation(data);                   	    	
-                   	    } else {                   	    	                   	    
-							var options = {
-						      animation: 'slide',
-						      onTransitionEnd: function() { 						      	  
-						      	  displayMerchantLogo2( getStorage("merchant_logo") ,
-						      	     getStorage("order_total") ,
-						      	     'page-shipping');
-						      	     
-						      	     fillShippingAddress();
-						      } 
-						    };     
-						    sNavigator.pushPage("shipping.html", options);		
-                   	    }
-					    		
-					} else if ( data.details.next_step =="return_home") {
-						onsenAlert(data.msg);
-						menu.setMainPage('home.html', {closeMenu: true});
-						
-				   // mobile verification
-				   } else if ( data.details.next_step =="mobile_verification") {
-				   	
-				   	    removeStorage('client_token');
-				   	    
-						var options = {
-					      animation: 'none',
-					      onTransitionEnd: function() { 						      	  
-					      	   $(".mobile-verification-msg").show();
-					      	   $(".email-verification-msg").hide();
-					      	   $(".client_id").val( data.details.client_id);
-					      	   $(".is_checkout").val( data.details.is_checkout);
-					      	   $(".validation_type").val( data.details.next_step );
-					      } 
-					    };     
-					    sNavigator.pushPage("SignupVerification.html", options);
-					    
-					// email verification
-					} else if ( data.details.next_step =="email_verification") {
-				   	
-				   	    removeStorage('client_token');
-				   	    
-						var options = {
-					      animation: 'none',
-					      onTransitionEnd: function() { 						      	  
-					      	   $(".mobile-verification-msg").hide();
-					      	   $(".email-verification-msg").show();
-					      	   $(".client_id").val( data.details.client_id);
-					      	   $(".is_checkout").val( data.details.is_checkout);
-					      	   $(".validation_type").val( data.details.next_step );
-					      } 
-					    };     
-					    sNavigator.pushPage("SignupVerification.html", options);
-					        
-					} else {
-						dump('payment_option');
-						 var options = {
-					      animation: 'slide',
-					      onTransitionEnd: function() { 						      	  
-					      	  displayMerchantLogo2( 
-					      	     getStorage("merchant_logo") ,
-					      	     getStorage("order_total") ,
-					      	     'page-paymentoption'
-					      	  );
-					      	  var params="merchant_id="+ getStorage("merchant_id");			
-					      	  params+="&transaction_type=" +  getStorage("transaction_type") ;	
-					      	  params+="&client_token=" +  getStorage("client_token");
-					      	  callAjax("getPaymentOptions",params);
-					      } 
-					    };   
-					    sNavigator.pushPage("paymentOption.html", options);	
-					}
-				break;
-				
-				case "getPaymentOptions":				
-				   $(".frm-paymentoption").show();				   
-				   
-				   /*$(".client_id_sandbox").val( data.details.paypal_credentials.client_id_sandbox );
-			   	   $(".client_id_live").val( data.details.paypal_credentials.client_id_live );*/
-				   
-			   	   $(".paypal_flag").val( data.details.paypal_flag );			   	   
-			   	   if(data.details.paypal_flag==1){
-				   	   $(".paypal_mode").val( data.details.paypal_credentials.mode );			   	   			   	   
-				   	   $(".client_id").val( data.details.paypal_credentials.client_id );
-			   	   }
-			   	   
-			   	   $(".paypal_card_fee").val( data.details.paypal_credentials.card_fee );	
-			   	   setStorage("paypal_card_fee", data.details.paypal_credentials.card_fee );
-			   	   
-			   	   if (data.details.voucher_enabled=="yes"){
-			   	   	   $(".voucher-wrap").show();			   	   	   
-			   	   	   $(".voucher_code").attr("placeholder", getTrans("Enter Voucher here",'enter_voucher_here') );
-			   	   } else {
-			   	   	   $(".voucher-wrap").hide();
-			   	   }			
-
-			   	   /*set stripe key*/
-			   	   setStorage("stripe_publish_key", data.details.stripe_publish_key );	
-			   	   setStorage("stripe_publish_key", data.details.stripe_publish_key );
-			   	   
-			   	   /*set razor pay*/
-			   	   if (!empty(data.details.razorpay)){
-			   	   	   setStorage("razor_key_id", data.details.razorpay.razor_key );	
-			   	       setStorage("razor_secret_key", data.details.razorpay.razor_secret );
-			   	   }
-			   	   
-			   	   /*pts*/
-			   	   if ( getStorage("pts")==2){			   	   	   
-			   	   	   dump('pts is enabled');
-			   	   	   $(".redeem_points").attr("placeholder",data.details.pts.pts_label_input);
-			   	   	   $(".pts_available_points").html(data.details.pts.balance);
-			   	   } else {
-			   	   	   $(".pts-apply-points-wrap").hide();
-			   	   }
-			   	   
-			   	   /*set ipay88*/
-			   	   if (!empty(data.details.ip8_credentials)){
-			   	   	   setStorage("ip8_merchantcode", data.details.ip8_credentials.code );	
-			   	       setStorage("ip8_merchantkey", data.details.ip8_credentials.key );
-			   	   }
-			   	   
-			   	    /*APPEND DINE INFORMATION*/
-					new_fields='';		
-			    	if (data.details.transaction_type=="dinein"){
-			    		new_fields=DineinFields();					    		
-			    		createElement("checkout_information_dinein",new_fields);
-			    		$( document ).on( "keyup", ".numeric_only2", function() {
-						  this.value = this.value.replace(/[^0-9\.]/g,'');
-						});	 					    	
-			        }			
-			        
-			        /*APPEND MOBILE NUMBER INFORMATION*/
-			    	if(data.details.show_mobile_number){
-			    	  	 new_fields=ContactNumberFields();					    		
-			    		 createElement("checkout_information_contact",new_fields);
-			    		 initIntelInputs();
-			       }			 
-			       
-			        translateValidationForm();
-			   	   			   	   
-			   	   displayPaymentOptions(data);
-			   	   
-			   	   $(".cod_change_required").val( data.details.cod_change_required);
-			   	   
-			   	   setTrackView("payment options");
-			   	   
-				break;				
-				
-				case "placeOrder":																  
-				
-				  setStorage("order_id",data.details.order_id);
-				  
-				  switch (data.details.next_step){
-				  					  	   
-				  	   case "paypal_init":
-				  	   				  	   
-				  	   setStorage("currency_code", data.details.payment_details.currency_code);
-				  	   setStorage("paymet_desc", data.details.payment_details.paymet_desc);
-				  	   setStorage("total_w_tax", data.details.payment_details.total_w_tax);
-				  	   
-				  	   app_paypal.initPaymentUI();
-				  	   break;
-
-				  	   case "atz_init":
-				  	      var options = {
-						      animation: 'slide',
-						      onTransitionEnd: function() {
-						      	  $(".order_id").val( data.details.order_id );
-						      	  $(".currency_code").val( data.details.payment_details.currency_code );
-						      	  $(".paymet_desc").val( data.details.payment_details.paymet_desc );
-						      	  $(".total_w_tax").val( data.details.payment_details.total_w_tax );
-						      } 
-						  }; 
-						  sNavigator.pushPage("atzPaymentForm.html", options);
-				  	   break;
-				  	   
-				  	   
-				  	   case "stp_init":
-				  	      var options = {
-						      animation: 'slide',
-						      onTransitionEnd: function() {
-						      	  $(".order_id").val( data.details.order_id );
-						      	  $(".currency_code").val( data.details.payment_details.currency_code );
-						      	  $(".paymet_desc").val( data.details.payment_details.paymet_desc );
-						      	  $(".total_w_tax").val( data.details.payment_details.total_w_tax );
-						      } 
-						  }; 
-						  sNavigator.pushPage("stripePaymentForm.html", options);
-				  	   break;
-				  	   
-				  	   case "rzr_init":
-				  	     
-				  	     var razor_key_id = getStorage("razor_key_id");				  	     
-				  	     
-				  	     if(empty(razor_key_id)){
-				  	     	onsenAlert( getTrans("Key id is empty","key_id_empty") );
-				  	     	return;
-				  	     }
-				  	     
-				  	     var rzr_options = {
-						  description: data.details.payment_details.paymet_desc ,						  
-						  currency: data.details.payment_details.currency_code ,
-						  key: razor_key_id ,
-						  amount: data.details.payment_details.total_w_tax_times,
-						  name: data.details.payment_details.merchant_name ,
-						  prefill: {
-						    email: data.details.payment_details.customer_email ,
-						    contact: data.details.payment_details.customer_contact ,
-						    name: data.details.payment_details.customer_name
-						  },
-						  theme: {
-						    color: data.details.payment_details.color
-						  }
-						};
-						
-						dump(rzr_options);
-						
-						if(isDebug()){
-						   rzr_successCallback('pay_debug_1234566');
-						} else {
-						   RazorpayCheckout.open(rzr_options, rzr_successCallback, rzr_cancelCallback);
-						}
-				  	     
-				  	   break;
-				  	   
-				  	   case "mri_init":
-				  	      var options = {
-						      animation: 'slide',
-						      onTransitionEnd: function() {
-						      	  $(".order_id").val( data.details.order_id );
-						      	  $(".currency_code").val( data.details.payment_details.currency_code );
-						      	  $(".paymet_desc").val( data.details.payment_details.paymet_desc );
-						      	  $(".total_w_tax").val( data.details.payment_details.total_w_tax );
-						      } 
-						  }; 
-						  sNavigator.pushPage("monerisForm.html", options);
-				  	   break;
-				  	   				  	   
-				  	   case "ip8_init":
-				  	     				  	     
-				  	     /*alert(getStorage("ip8_merchantcode"));
-				  	     alert(getStorage("ip8_merchantkey"));*/				  	     
-				  	     
-				  	     if(isDebug()){
-				  	     	var params="payment_id=1234567890";
-							params+="&order_id=55555-"+ data.details.order_id ;
-							params+="&client_token="+ getStorage("client_token");	
-							callAjax("iPay88Successfull",params);	  
-				  	     	return;
-				  	     }
-				  	     
-				  	     //alert(JSON.stringify(data.details.ipay88_details));  
-				  	     
-				  	     cloudSky.iPay88.makePayment(
-						    {
-						        amount: data.details.ipay88_details.amount ,
-						        name:  data.details.ipay88_details.name ,
-						        email: data.details.ipay88_details.email ,
-						        phone: data.details.ipay88_details.phone ,
-						        refNo: data.details.ipay88_details.refNo ,
-						        currency: data.details.ipay88_details.currency ,
-						        lang: data.details.ipay88_details.lang ,
-						        country: data.details.ipay88_details.country ,
-						        description: data.details.ipay88_details.description ,	
-						        remark: data.details.ipay88_details.remark ,
-						        paymentId: data.details.ipay88_details.paymentId ,					        
-						        merchantKey: getStorage("ip8_merchantkey") ,
-						        merchantCode: getStorage("ip8_merchantcode") ,
-						        backendPostUrl: data.details.ipay88_details.backendPostUrl
-						    },
-						    function (resp) {
-						        //alert("Success callback ");
-						        //alert(JSON.stringify(resp));     
-						        						        
-						        var params="payment_id="+resp.transactionId;
-								params+="&order_id="+ resp.referenceNo;
-								params+="&client_token="+ getStorage("client_token");	
-								callAjax("iPay88Successfull",params);	  
-	     
-						        // resp = { 
-						        //     transactionId: transId, 
-						        //     referenceNo: refNo, 
-						        //     amount: amount, 
-						        //     remarks: remarks, 
-						        //     authCode: auth, 
-						        // } 
-						    },
-						    function (err) {						        
-						        //alert(JSON.stringify(err));           
-						        onsenAlert(err.err);
-						        // err = "unexpected error string" OR 
-						        // err = { 
-						        //     transactionId: transId, 
-						        //     referenceNo: refNo, 
-						        //     amount: amount, 
-						        //     remarks: remarks, 
-						        //     err: error message, // "canceled" if user canceled the payment. 
-						        // } 
-						    }
-						)				  	     
-				  	     
-				  	   break;
-				  	   
-				  	   case "hubtel_init":
-				  	     var options = {
-						      animation: 'slide',
-						      onTransitionEnd: function() {
-						      	  $(".order_id").val( data.details.order_id );
-						      	  $(".currency_code").val( data.details.payment_details.currency_code );
-						      	  $(".paymet_desc").val( data.details.payment_details.paymet_desc );
-						      	  $(".total_w_tax").val( data.details.payment_details.total_w_tax );
-						      	  
-						      	  $(".customer_name").val( data.details.customer_info.customer_name );
-						      	  $(".customer_mobileno").val( data.details.customer_info.contact_phone );
-						      	  $(".customer_email").val( data.details.customer_info.email_address );	
-						      	  
-						      } 
-						  }; 
-						  sNavigator.pushPage("hubtelForm.html", options);
-				  	   break;
-				  	   
-				  	   
-				  	   case "mcd_init":
-
-				  	        toastMsg(data.details.mercapago.payment_ref);
-				  	   
-				  	        MercadoPago.startCheckout( data.details.mercapago.mercado_key , data.details.mercapago.payment_ref, null, false, mercapagoSuccess, mercapagoFailed );
-				  	        
-				  	   break;
-				  	   
-				  	   case "mcd_error":
-				  	      toastMsg(data.msg);
-				  	   break;
-				  	   				  	   
-				  	   default:		
-				  	   var options = {
-					      animation: 'slide',
-					      onTransitionEnd: function() { 						      	  
-					      	  /*displayMerchantLogo2( getStorage("merchant_logo") ,
-					      	                      getStorage("order_total") ,
-					      	                      'page-receipt');*/
-					      	  displayMerchantLogo2( getStorage("merchant_logo") ,
-					      	                      data.details.payment_details.total_w_tax_pretty ,
-					      	                      'page-receipt');
-					      	  $(".receipt-msg").html(data.msg); 
-					      } 
-					    };     
-					    sNavigator.pushPage("receipt.html", options);
-				  	   
-				  	   break;
-				  	   
-				  	   case "wing_form":
-				  	   				  	   
-				  	     var options = {
-						      animation: 'slide',
-						      onTransitionEnd: function() {
-						      	  $(".order_id").val( data.details.order_id );
-						      	  $(".currency_code").val( data.details.payment_details.currency_code );
-						      	  $(".paymet_desc").val( data.details.payment_details.paymet_desc );
-						      	  $(".total_w_tax").val( data.details.payment_details.total_w_tax );
-						      	  
-						      	  $(".payment_desc_text").html(data.details.payment_details.paymet_desc);
-						      	  $(".payment_amount_text").html(data.details.payment_details.total_w_tax_pretty);
-						      	  
-						      } 
-						  }; 
-						  sNavigator.pushPage("wingPaymentForm.html", options);
-						  
-				  	   break;
-				  	   
-				  	   case "ipay_africa_form":
-				  	      var options = {
-						      animation: 'slide',
-						      onTransitionEnd: function() {
-						      	
-						      	  $(".payment_desc_text").html(data.details.payment_details.paymet_desc);
-                                  $(".payment_amount_text").html(data.details.payment_details.total_w_tax_pretty);
-
-						      	  $(".order_id_token").val( data.details.order_id_token );
-                                  $(".order_id_token_text").html( data.details.order_id_token );
-                                  
-                                  $(".ipay_phone_number").val( data.details.customer_info.contact_phone );
-						        
-						      	  if(!empty(data.details.ipay_africa_payment)){
-						      	  	ipay_html='<ons-list-header class="">'+getTrans('Select Payment','select_payment')+'</ons-list-header>';									      	  				      	 
-						      	    $.each( data.details.ipay_africa_payment, function( ikey, ival ) {
-						      	    	page_name = "ipay_"+ival.key;
-						      	  	    ipay_html+='<ons-list-item modifier="chevron" class="trn" onclick="showPage('+  "'" +page_name+ "'"  +')" >'+ival.label+'</ons-list-item>';
-						      	    });
-						      	    createElement('ipay_africa_payment_list',ipay_html);	
-						      	  }
-						      	  
-						      	  ipay_params="order_id="+data.details.order_id_token;
-						      	  ipay_params+="&client_token="+getStorage("client_token");
-						      	  callAjax("ipayInitiatorRequest",ipay_params);
-						      } 
-						  }; 
-						  sNavigator.pushPage("ipaySelectPayment.html", options);
-				  	   break;
-				  	   
-				  	   
-				  	   case "strip_ideal_form":
-				  	         var options = {
-						      animation: 'slide',
-						      onTransitionEnd: function() { 						      	 
-						      	
-						      	  $(".stripe_pub_key").val( data.details.ideal.publishable_key );
-						      	  $(".stripe_amount").val( data.details.ideal.stripe_amount );
-						      	  $(".stripe_descriptor").val( data.details.ideal.stripe_descriptor );
-						      	  $(".stripe_currency").val( data.details.ideal.stripe_currency );
-						      	  $(".stripe_client_name").val( data.details.ideal.stripe_client_name );
-						      	  $(".stripe_return_url").val( data.details.ideal.stripe_return_url );
-						      	  
-						      	  $(".payment_desc_text").html(data.details.ideal.stripe_descriptor);
-                                  $(".payment_amount_text").html(data.details.payment_details.total_w_tax_pretty);                                  						      	  
-                                  $(".stripe_order_id").html( data.details.order_id );
-						      } 
-						    };     
-						    sNavigator.pushPage("stripeIdealForm.html", options);
-				  	   break;
-				  	   
-				  	   case "mollie_form":
-				  	      var options = {
-							  animation: 'slide',
-							  onTransitionEnd: function() { 						      	 
-								 						
-							  	 $(".mol_order_id").val(data.details.order_id);
-							  	 $(".payment_desc_text").html(data.details.payment_details.paymet_desc);
-							  	 $(".payment_amount_text").html(data.details.payment_details.total_w_tax_pretty);
-							  	 $(".mol_order_id_text").html( data.details.order_id);
-							  } 
-							  
-						   };     
-						  sNavigator.pushPage("mollieForm.html", options);
-				  	   break;
-				  	   
-				  	 case "dixipay_form":  
-				  	       var options = {
-						      animation: 'slide',
-						      onTransitionEnd: function() {
-						      	  $(".order_id").val( data.details.order_id );
-						      	  $(".currency_code").val( data.details.payment_details.currency_code );
-						      	  $(".paymet_desc").val( data.details.payment_details.paymet_desc );
-						      	  $(".total_w_tax").val( data.details.payment_details.total_w_tax );
-						      	  
-						      	  $(".payment_desc_text").html(data.details.payment_details.paymet_desc);
-						      	  $(".payment_amount_text").html(data.details.payment_details.total_w_tax_pretty);
-						      	  
-						      	  if(!empty(data.details.has_cards)){
-						      	  	  $(".select_credit_cards").show();
-						      	  } else {
-						      	  	  $(".select_credit_cards").hide();
-						      	  }				      						      
-						      	  
-						      	  document.getElementById('cc_number').oninput = function() {
-								    this.value = CreditCardFormat(this.value)
-								  }
-						      } 
-						  }; 
-						  sNavigator.pushPage("dixiForm.html", options);
-				  	   break;
-				  	   				  	 				  	 				  	
-				  	 case "init_webview":
-				  	   setStorage("global_receipt_amount_pay", data.details.payment_details.total_w_tax_pretty );   
-				  	   setStorage("global_receipt_message", data.msg );   
-				  	   payWebview( data.details.redirect_url);	
-				  	 break;
-				  	
-				  	 
-				  }
-				  
-				  /*END NEXT STEP*/
-				  
-				  break;
-				  
-				case "paypalSuccessfullPayment": 
-				case "PayAtz":  
-				case "PayStp":
-				case "razorPaymentSuccessfull":
-				case "iPay88Successfull":
-				case "monerisPay":
-				case "hubtelPaymentInit":
-				case "WingCommit":
-				case "ipayMobileMoney":
-				case "ipayTransactCC":
-				case "payDixiPay":
-				case "payDixiPayCards":
-								    
-				       var amount_to_pay=data.details.amount_to_pay;
-				       if(amount_to_pay==0){
-				       	  amount_to_pay=getStorage("order_total");
-				       }
-					   var options = {
-					      animation: 'slide',
-					      onTransitionEnd: function() { 						      	  
-					      	  displayMerchantLogo2( getStorage("merchant_logo") ,
-					      	                       prettyPrice(amount_to_pay) ,
-					      	                      'page-receipt');
-					      	  $(".receipt-msg").html(data.msg); 
-					      } 
-					    };     
-					    sNavigator.pushPage("receipt.html", options);
-				   break;  
-				
-				case "getMerchantInfo":
-				   showMerchantInfo(data.details)
-				   break;
-								
-				case "bookTable":
-				  var options = {
-				      animation: 'slide',
-				      onTransitionEnd: function() { 			
-				      	  displayMerchantLogo2( 
-				      	     getStorage("merchant_logo") ,
-				      	     '' ,
-				      	     'page-booking-ty'
-				      	  );    
-				      	  				      	 	      	 
-				      	  $(".book-ty-msg").html(data.msg);
-				      } 
-				    };     
-				    sNavigator.pushPage("bookingTY.html", options);
-				    break;
-				
-				case "merchantReviews":
-				   //alert(JSON.stringify(data.details));  
-				   displayReviews(data.details);
-				   break;
-				
-				case "addReview":
-				   toastMsg(data.msg);				   
-				   if(data.details.review_type==2){
-				   	  menu.setMainPage('orders.html', {closeMenu: true});
-				   } else  {
-				   	  sNavigator.popPage({cancelIfRunning: true}); 
-				   	  setTimeout(function(){ 	
-					   	 var params="merchant_id=" +  getStorage("merchant_id") ;
-		                 params+="&client_token="+ getStorage("client_token");
-	                     callAjax("merchantReviews",params);	   
-				   	  }, 500);		   	  				   
-				   }			
-				   break;
-				   				   
-				
-				case "browseRestaurant":
-				   /*displayRestaurantResults( data.details.data ,'browse-results');				   
-				   $(".result-msg").text(data.details.total+" "+ getTrans("Restaurant found",'restaurant_found')  );*/
-				   break;   
-				   
-				case "getProfile":   
-				  $(".first_name").val( data.details.first_name );
-				  $(".last_name").val( data.details.last_name );
-				  $(".email_address").val( data.details.email_address );
-				  $(".contact_phone").val( data.details.contact_phone );
-				  
-				  $(".avatar").attr("src", data.details.avatar );
-				  
-				  dump('set avatar');
-				  setStorage("avatar",data.details.avatar);
-				  
-				  imageLoaded('.img_loaded');
-				  
-				  initIntelInputs();
-				  
-				  break;   
-				  
-				case "registerUsingFb":  
-				case "login": 
-				case "googleLogin":
-				  //onsenAlert(data.msg);				  			
-				  setStorage("client_token",data.details.token);
-				  
-				  setStorage("avatar",data.details.avatar);
-                  setStorage("client_name_cookie",data.details.client_name_cookie);
-                  
-                  if (!empty(data.details.social_strategy)){
-                  	  setStorage("social_strategy",data.details.social_strategy);
-                  }
-                  
-                  checkDeviceRegister();
-				  
-				  switch (data.details.next_steps)
-				  {
-				  	 case "delivery":
-				  	 
-				  	     search_mode = getSearchMode();
-				  	     
-				  	     if (search_mode=="postcode"){
-				  	     	showShippingLocation(data);
-				  	     } else {				  	    
-						  	 var options = {
-						      animation: 'slide',
-						      onTransitionEnd: function() { 						      	  
-						      	  displayMerchantLogo2( getStorage("merchant_logo") ,
-						      	     getStorage("order_total") ,
-						      	     'page-shipping');					      	    
-							      	  
-	                                 if(!empty(data.details.contact_phone)){
-						      	  	     $(".contact_phone").val( data.details.contact_phone ) ;
-						      	     }
-						      	     if(!empty(data.details.location_name)){
-						      	  	     $(".location_name").val( data.details.location_name ) ;
-						      	     }
-						      	     
-						      	     var address_fill = false;
-							      	  					      	     					      	     
-							      	 if ( !empty( getStorage("map_address_result_formatted_address") )){
-						      	  	     $(".delivery-address-text").html( getStorage("map_address_result_formatted_address") );
-						      	  	     $(".street").val( getStorage("map_address_result_address") );
-										 $(".city").val( getStorage("map_address_result_city") );
-										 $(".state").val( getStorage("map_address_result_state") );
-										 $(".zipcode").val( getStorage("map_address_result_zip") );	
-										 $(".formatted_address").val( getStorage("map_address_result_formatted_address") );	
-										 
-										 $(".google_lat").val( getStorage("google_lat") );	
-										 $(".google_lng").val( getStorage("google_lng") );	
-										 address_fill = true;
-						      	  	 } else {
-						      	  	    if (data.details.has_addressbook==2){
-						      	  	    	
-						      	  	       if(!empty(data.details.default_address)){
-						      	  	       	   address_fill = true;						      	  	       
-							      	  	       $(".delivery-address-text").html( data.details.default_address.address );
-							      	  	       $(".street").val (  data.details.default_address.street  );
-											   $(".city").val( data.details.default_address.city  );
-											   $(".state").val( data.details.default_address.state );
-											   $(".zipcode").val(  data.details.default_address.zipcode );	
-											   $(".formatted_address").val( data.details.default_address.address );	
-						      	  	       }
-						      	  	    	
-						      	  	    }					      	  	 
-						      	  	 }					      	  	
-						      	  	 						      	  	 
-						      	  	 if(!address_fill){						      	  
-						      	  	    fillShippingAddress();
-						      	     }		
-						      } 
-						     };     
-						     sNavigator.pushPage("shipping.html", options);		
-				  	     }
-				  	 break;
-				  	 
-				  	 case "pickup":
-				  	 case "dinein":				  	 
-				  	 
-				  	   var options = {
-					      animation: 'slide',
-					      onTransitionEnd: function() { 						      	  
-					      	  displayMerchantLogo2( 
-					      	     getStorage("merchant_logo") ,
-					      	     getStorage("order_total") ,
-					      	     'page-paymentoption'
-					      	  );
-					      	  var params="merchant_id="+ getStorage("merchant_id");
-					      	  params+="&client_token="+ getStorage("client_token");
-					      	  params+="&transaction_type=" +  getStorage("transaction_type") ;
-					      	  callAjax("getPaymentOptions",params);
-					      } 
-					    };   
-					    sNavigator.pushPage("paymentOption.html", options);		
-				  	 
-				  	 break;
-				  	 
-				  	 
-				  	 default:
-				  	 menu.setMainPage('home.html', {closeMenu: true});
-				  	 break;
-				  }	
-				  
-				  
-				  break;   
-				  
-				case "forgotPassword":  
-				  onsenAlert(data.msg);	
-				  dialogForgotPass.hide();
-				  break;   
-				  
-				case "getOrderHistory":  				   
-				    displayOrders(data.details);
-				  break;   
-				  
-				case "ordersDetails":  
-				  displayOrderHistoryDetails(data.details);
-				  break;  
-				   
-				case "getAddressBook":  
-				  displayAddressBook(data.details);
-				  break;  
-				  
-			    case "getAddressBookDetails":
-			      fillAddressBook(data.details);
-			      break;  
-			      
-			    case "saveAddressBook":  
-			      if (data.details=="add"){
-			         sNavigator.popPage({cancelIfRunning: true});
-			         
-			         callAjax('getAddressBook',
-					  "client_token="+getStorage("client_token")
-					  );
-			      } else {
-			      	  onsenAlert(data.msg);
-			      }
-			      break;  
-			      
-			    case "deleteAddressBook":  
-			         sNavigator.popPage({cancelIfRunning: true});			         
-			         callAjax('getAddressBook',
-					  "client_token="+getStorage("client_token")
-					  );
-			      break;  
-			      
-			    case "getAddressBookDialog":  
-			       displayAddressBookPopup(data.details);
-			       break; 
-			       
-			    case "reOrder":   
-			       setStorage("merchant_id",data.details.merchant_id)
-			       cart=data.details.cart;
-			       showCart();
-			       break;
-			       			      
-			    /*case "registerUsingFb":   
-			       onsenAlert(data.msg);
-			       setStorage("client_token",data.details.token);
-			       menu.setMainPage('home.html', {closeMenu: true});
-			       break;*/
-
-			    case "registerMobile":
-			    /*silent */
-			    break;
-			    
-			    case "reverseGeoCoding":
-			       //$("#s").val( data.details );
-			       			       
-			       var enabled_advance_search = getStorage("enabled_advance_search");
-                   if(enabled_advance_search=="yes"){
-                   	  $("#ss").val( data.details.address_to_use );
-                   } else {
-                   	  $("#s").val( data.details.address_to_use );
-                   }
-			                          
-			       setStorage("geo_search_address", data.details.address_to_use );			       
-			       setStorage("geo_address_result_address",data.details.address);
-			       setStorage("geo_address_result_city",data.details.city);
-			       setStorage("geo_address_result_state",data.details.state);
-			       setStorage("geo_address_result_zip",data.details.zip);
-			       setStorage("geo_address_result_country",data.details.country);
-			       setStorage("geo_address_result_formatted_address",data.details.formatted_address);
-			       
-			       break;
-			          
-			    
-			    case "getSettings":      			       
-			       if ( data.details.enabled_push==1){		
-			       	   enabled_push.setChecked(true);			       	   	       	  			       	  
-			       } else {			       	  
-			       	   enabled_push.setChecked(false);
-			       }			
-			       $(".country_code_set").val( data.details.country_code_set);
-			       
-			       var device_id=getStorage("device_id");
-			       $(".device_id_val").html( device_id );
-			       break;
-			       
-			    case "mobileCountryList":   
-			       displayLocations(data.details);
-			       break;
-			   
-			    case "getLanguageSelection":
-			       displayLanguageSelection(data.details);
-			       break;    
-			       
-			    case "getLanguageSettings":   			       		      
-			    
-			       setStorage("enabled_advance_search",data.details.settings.enabled_advance_search);
-			       
-			       setStorage("theme_search_merchant_name",data.details.settings.theme_search_merchant_name);
-			       setStorage("theme_search_street_name",data.details.settings.theme_search_street_name);
-			       setStorage("theme_search_cuisine",data.details.settings.theme_search_cuisine);
-			       setStorage("theme_search_foodname",data.details.settings.theme_search_foodname);
-			       setStorage("theme_search_merchant_address",data.details.settings.theme_search_merchant_address);
-			       
-			       setStorage("translation",JSON.stringify(data.details.translation));
-			       
-			       dump(data);
-			       /*set settings to storage*/			       
-			       setStorage("decimal_place",data.details.settings.decimal_place);
-			       setStorage("currency_position",data.details.settings.currency_position);
-			       setStorage("currency_set",data.details.settings.currency_set);
-			       setStorage("thousand_separator",data.details.settings.thousand_separator);
-			       setStorage("decimal_separator",data.details.settings.decimal_separator);
-			       setStorage("show_addon_description",data.details.settings.show_addon_description);
-
-			       var device_set_lang=getStorage("default_lang");
-			       
-			       /*CHECK FORCE LANGUAGE*/
-			       if(!empty(data.details.settings.force_app_default_lang)){
-			       	   device_set_lang  = data.details.settings.force_app_default_lang;
-			       	   setStorage("default_lang",device_set_lang);
-			       }
-			       
-			       dump("device_set_lang=>"+device_set_lang);
-			       
-			       if (empty(device_set_lang)){
-			       	   dump('proceed');
-				       if(!empty(data.details.settings.default_lang)){			       	  
-				          setStorage("default_lang",data.details.settings.default_lang);
-				       } else {
-				       	  setStorage("default_lang","");
-				       }			
-			       } 
-			       
-			       
-			       dump("SET LANG=>"+ getStorage("default_lang"));
-			       
-			       /*single food item*/
-			       setStorage('single_add_item', data.details.settings.single_add_item );
-			       
-			       /*pts*/
-			       setStorage("pts",data.details.settings.pts);
-			       
-			       /*facebook_flag*/
-			       setStorage("facebook_flag",data.details.settings.facebook_flag);
-			       
-			       /*avatar*/
-			       setStorage("avatar",data.details.settings.avatar);
-			       setStorage("client_name_cookie",data.details.settings.client_name_cookie);			       
-			       setStorage("mobile_country_code",data.details.settings.mobile_country_code);
-			       
-			       setStorage("from_icon",data.details.settings.map_icons.from_icon);
-			       setStorage("destination_icon",data.details.settings.map_icons.destination_icon);
-			       setStorage("driver_icon",data.details.settings.map_icons.driver_icon);
-			       
-			       
-			       setStorage("mobile_save_cart_db",data.details.settings.mobile_save_cart_db);
-			       
-			       setStorage("search_mode",data.details.settings.search_mode);			       			       
-			       setStorage("search_type",data.details.settings.search_type);
-			       
-			       setStorage("location_accuracy",data.details.settings.location_accuracy);			       
-			       setStorage("facebook_app_id",data.details.settings.facebook_app_id);
-			       setStorage("enabled_googlogin",data.details.settings.enabled_googlogin);
-			       
-			       setStorage("custom_pages",data.details.settings.pages);
-			       
-			       setStorage("analytics_id",data.details.settings.analytics_id);
-			       setStorage("analytics_enabled",data.details.settings.analytics_enabled);
-			       
-			       setStorage("website_review_type",data.details.settings.website_review_type);
-			       setStorage("mobile_enabled_fblogin",data.details.settings.mobile_enabled_fblogin);
-			       setStorage("mobile_auto_location",data.details.settings.mobile_auto_location);
-			       setStorage("enabled_delivery_select_map",data.details.settings.enabled_delivery_select_map);
-			       
-			       setStorage("map_provider",data.details.settings.map_provider);
-			       setStorage("mapbox_access_token",data.details.settings.mapbox_access_token);
-			       setStorage("mapbox_default_zoom",data.details.settings.mapbox_default_zoom);			       
-			       setStorage("enabled_food_search_menu",data.details.settings.enabled_food_search_menu);
-			       
-			       /*SET ANALYTICS*/
-			       /*if (!isDebug()){			       	   
-			       	   if ( data.details.settings.analytics_enabled == 1 && !empty(data.details.settings.analytics_id)){
-			       	   	   window.ga.startTrackerWithId( data.details.settings.analytics_id , 30);
-			       	   }			      					   					  
-			       }*/
-			       
-			       /*SET ANALYTICS*/
-			       setTrackingAccount();
-			       
-			       //translatePage();	  
-			       var options = {
-				      animation: 'slide',
-				      onTransitionEnd: function() { 		
-				      	 initSlideMenu();						      	 				      	 
-				      } 
-				   };     
-				   //kSettingsNavigator.pushPage("slidingMenu.html", options);	
-				   kSettingsNavigator.resetToPage("slidingMenu.html", options);	
-			       
-			       break;
-			       
-			   case "applyVoucher":   
-			       dump(data.details);			       
-			       $(".voucher_amount").val( data.details.amount );
-			       $(".voucher_type").val( data.details.voucher_type );
-			       
-			       $(".apply-voucher").hide();
-			       $(".remove-voucher").css({
-			       	  "display":"block"
-			       });
-			       
-			       $(".voucher-header").html(data.details.less);
-			       
-			       var new_total= data.details.new_total;
-			       $(".total-amount").html( prettyPrice(new_total) );
-			       
-			       break;
-			       
-			       
-			    case "validateCLient":   
-			       setStorage("client_token", data.details.token ); // register token
-                   onsenAlert(data.msg);
-                   
-                   
-                   if ( data.details.is_checkout=="shipping_address"){
-                   	   
-                   	    search_mode = getSearchMode();
-                   	   
-                   	    if (search_mode=="postcode"){                    	    	           	    	                   	    
-                   	    	showShippingLocation(data);                   	    	
-                   	    } else {
-	                   	    var options = {
-						      animation: 'slide',
-						      onTransitionEnd: function() { 						      	  
-						      	  displayMerchantLogo2( getStorage("merchant_logo") ,
-						      	     getStorage("order_total") ,
-						      	     'page-shipping');
-						      	     					      	     
-						      	     fillShippingAddress();
-						      	     
-						      } 
-						    };     
-						    sNavigator.pushPage("shipping.html", options);	
-                   	    }
-					    
-                   } else if ( data.details.is_checkout=="payment_option" )  {
-						 var options = {
-					      animation: 'slide',
-					      onTransitionEnd: function() { 						      	  
-					      	  displayMerchantLogo2( 
-					      	     getStorage("merchant_logo") ,
-					      	     getStorage("order_total") ,
-					      	     'page-paymentoption'
-					      	  );
-					      	  var params="merchant_id="+ getStorage("merchant_id");
-					      	  params+="&client_token="+ getStorage("client_token");
-					      	  params+="&transaction_type=" +  getStorage("transaction_type") ;
-					      	  callAjax("getPaymentOptions",params);
-					      } 
-					    };   
-					    sNavigator.pushPage("paymentOption.html", options);	   
-                   	
-                   } else {
-                      menu.setMainPage('home.html', {closeMenu: true});
-                   }
-			       break;
-			       
-			    /*pts*/
-			    case "getPTS":   
-			       $(".available_points").html( data.details.available_points );
-			       $(".expenses_points").html( data.details.total_expenses_points );
-			       $(".expired_points").html( data.details.points_expiring );
-			    break;
-			    
-			    case "detailsPTS":
-			      $(".pts_title").html(data.details.title);
-			      displayPTSdetails(data.details.data);
-			    break;
-			    
-			    
-			    case "applyRedeemPoints":
-			    
-			      $(".pts_redeem_points").val( data.details.pts_points_raw );
-			      $(".pts_redeem_amount").val( data.details.pts_amount_raw );
-			      $(".pts_points_label").html( data.details.pts_points +" ("+ data.details.pts_amount+")" );
-			      $(".pts_pts").hide();
-			      $(".pts_pts_cancel").css({"display":"block"});
-			      
-			      
-			      var new_total= data.details.new_total;
-			      dump('compute new total for pts');
-			      
-			      $(".total-amount").html( prettyPrice(new_total) );
-			      
-			    break;
-			    
-			    case "addToCart":
-			    //onsenAlert(  getTrans("Item added to cart",'item_added_to_cart') );
-			    toastMsg( getTrans("Item added to cart",'item_added_to_cart') );
-			    break;
-			    
-			   
-			    case "getCustomFields":
-			      var custom_fields='';
-			      $.each( data.details, function( key, val ) {     			      	  
-			      	 custom_fields+= customFields(key,val);
-			      });			      
-                  createElement("custom-fields-wrap",custom_fields);
-                  
-                  if ( data.msg=="yes"){
-                  	  $(".iagree-wrap").show();
-                  } else $(".iagree-wrap").hide();
-                  
-			    break;
-			    
-			    case "verifyAccount":
-			      setStorage("client_token", data.details.token ); // register token
-			      toastMsg( data.msg );
-			      menu.setMainPage('home.html', {closeMenu: true});
-			    break;
-
-			    case "coordinatesToAddress":	
-			    
-			       var your_location = new plugin.google.maps.LatLng(data.details.lat,data.details.lng); 
-			       
-			       var marker_title='';			       
-			       marker_title+=data.details.result.formatted_address;
-			       
-			       setStorage("map_address_result_address",data.details.result.address);
-			       setStorage("map_address_result_city",data.details.result.city);
-			       setStorage("map_address_result_state",data.details.result.state);
-			       setStorage("map_address_result_zip",data.details.result.zip);
-			       setStorage("map_address_result_country",data.details.result.country);
-			       setStorage("map_address_result_formatted_address",data.details.result.formatted_address);
-			       
-			       setStorage("google_lat",data.details.lat);
-			       setStorage("google_lng",data.details.lng);
-			       
-			       //alert("add marker");
-			       
-			        map_search.addMarker({
-					  'position': your_location ,
-					  'title': marker_title,
-					  'snippet': getTrans( "Press on marker 2 seconds to drag" ,'press_marker'),
-					  'draggable': true				  
-					}, function(marker) {
-						
-					   marker.showInfoWindow();
-					   if(drag_marker_bounce==1){
-					      //marker.setAnimation(plugin.google.maps.Animation.BOUNCE);
-					   }
-					   
-					   drag_marker=marker;
-					   drag_marker_bounce=2;					   
-					   
-					   
-					   marker.addEventListener(plugin.google.maps.event.MARKER_DRAG_END, function(marker) {
-							marker.getPosition(function(latLng) {								 
-								 temp_result=explode(",", latLng.toUrlValue() );
-								 /*alert(temp_result[0]);
-								 alert(temp_result[1]);*/
-								 drag_marker=marker;
-								 callAjax("dragMarker","lat=" + temp_result[0] + "&lng="+ temp_result[1] );	 
-							});
-					   });
-										   
-					}); /*marker*/	    
-			    break;
-			    
-			    case "dragMarker":
-			    
-			       setStorage("map_address_result_address",data.details.result.address);
-			       setStorage("map_address_result_city",data.details.result.city);
-			       setStorage("map_address_result_state",data.details.result.state);
-			       setStorage("map_address_result_zip",data.details.result.zip);
-			       setStorage("map_address_result_country",data.details.result.country);
-			       setStorage("map_address_result_formatted_address",data.details.result.formatted_address);
-			       
-			       setStorage("google_lat",data.details.lat);
-			       setStorage("google_lng",data.details.lng);	       
-			       
-			       drag_marker.setTitle( data.details.result.formatted_address );
-			       drag_marker.showInfoWindow();
-			    break;
-			    
-			    case "trackOrderHistory":	
-			    
-			       $(".track_driver").show();
-			       $(".track-status-wrap").html(''); 
-			       
-			       $(".time-left").html( data.details.time_left );
-			       $(".remaining").html( data.details.remaining );
-			       
-			       if ( data.details.history.length>0){
-			       	  var html='<ul>';
-			       	  $.each( data.details.history , function( key, val ) {     
-			       	  	  dump(val);
-			       	  	  html+='<li>';
-				       	  	  html+='<div class="s-c-g"></div>';
-				       	  	  html+='<p>'+val.date_time+'</p>';
-				       	  	  html+='<h3>'+val.status+'</h3>';
-			       	  	  html+='</li>';
-			       	  });
-			       	  html+='</ul>';
-			       	  $(".track-status-wrap").append( html );
-			       }
-			       
-			       if ( data.details.assign_driver==1){
-			       	   $(".track_driver").show();
-			       	   
-			       	   $(".driver_lat").val( data.details.coordinates.driver_lat );
-			       	   $(".driver_lng").val( data.details.coordinates.driver_lng );
-			       	   
-			       	   $(".task_lat").val( data.details.coordinates.task_lat );
-			       	   $(".task_lng").val( data.details.coordinates.task_lng );
-			       	   
-			       	   $(".driver_name").val( data.details.driver_info.driver_name );
-			       	   $(".driver_email").val( data.details.driver_info.driver_email );
-			       	   $(".driver_phone").val( data.details.driver_info.driver_phone );
-			       	   $(".transport_type").val( data.details.driver_info.transport_type );
-			       	   $(".licence_plate").val( data.details.driver_info.licence_plate );
-			       	   $(".delivery_address").val( data.details.delivery_address );
-			       	   
-			       	   $(".driver_icon").val( data.details.driver_icon );
-			       	   $(".address_icon").val( data.details.address_icon );
-			       	   $(".driver_avatar").val( data.details.driver_avatar );
-			       	   
-			       	   $(".dropoff_lat").val( data.details.coordinates.dropoff_lat );
-			       	   $(".dropoff_lng").val( data.details.coordinates.dropoff_lng );
-			       	   $(".drop_address").val( data.details.coordinates.drop_address );
-			       	   $(".merchant_icon").val( data.details.merchant_icon );
-			       	   
-			       }  else {
-			       	   $(".track_driver").hide();
-			       	   
-			       	   $(".driver_lat").val('');
-			       	   $(".driver_lng").val('');
-			       	   
-			       	   $(".task_lat").val('');
-			       	   $(".task_lng").val('');
-			       	   
-			       	   $(".driver_name").val( '' );
-			       	   $(".driver_email").val( '' );
-			       	   $(".driver_phone").val( '' );
-			       	   $(".transport_type").val( '' );
-			       	   $(".licence_plate").val( '' );
-			       	   $(".delivery_address").val( '' );
-			       	   $(".driver_avatar").val( '' );
-			       	   
-			       	   $(".dropoff_lat").val( '' );
-			       	   $(".dropoff_lng").val( '' );
-			       	   $(".merchant_icon").val( '' );
-			       	   
-			       }
-			       
-			       stopTrackInterval();
-		           track_order_interval = setInterval(function(){runTrackOrder()}, 60000);
-			       
-			    break;
-			    
-			    
-			    case "saveContactNumber":	
-			    		    
-                   var options = {
-				      animation: 'slide',
-				      onTransitionEnd: function() { 						      	  
-				      	  displayMerchantLogo2( 
-				      	     getStorage("merchant_logo") ,
-				      	     getStorage("order_total") ,
-				      	     'page-paymentoption'
-				      	  );
-				      	  var params="merchant_id="+ getStorage("merchant_id");
-				      	  params+="&client_token="+ getStorage("client_token");
-				      	  params+="&transaction_type=" +  getStorage("transaction_type") ;
-				      	  callAjax("getPaymentOptions",params);
-				      } 
-				    };   
-				    sNavigator.pushPage("paymentOption.html", options);		
-
-			    break;
-			    
-			    case "trackOrderMap":
-			       //reInitTrackMap(data.details);
-			       ReInitTrackingMap(data.details);
-			    break;
-			    
-			    case "getMerchantCClist":
-			       fillCCList(data.details);
-			    break;
-			    
-			    case "saveCreditCard":
-			    case "deleteCreditCard":
-			        sNavigator.popPage({cancelIfRunning: true});			        
-			        var params="merchant_id=" +  getStorage("merchant_id") ;
-			      	params+="&client_token="+getStorage("client_token");
-				    callAjax("getMerchantCClist",params);			        
-			    break;
-			    
-			    case "loadCC":
-			       $(".card_name").val( data.details.card_name);
-			       $(".cc_number").val( data.details.credit_card_number);
-			       $(".cvv").val( data.details.cvv);
-			       $(".billing_address").val( data.details.billing_address);
-			       
-			       $(".expiration_month").val( data.details.expiration_month);
-			       $(".expiration_yr").val( data.details.expiration_yr);
-			       $(".expiration_month_label").html( data.details.expiration_month );
-			       $(".expiration_year").html( data.details.expiration_yr );
-
-			       $(".cc_id").val( data.details.cc_id );	
-			       
-			       $(".delete-cc").show();
-			       
-			    break;
-			    
-			    case "getHubtelChannel":
-			    
-			       var htm='';
-					htm+='<ons-list>';
-					htm+='<ons-list-header class="list-header trn" data-trn-key="channel">Channel</ons-list-header>';
-			       $.each( data.details, function( channel, channel_name ) { 
-			       	
-			       	 htm+='<ons-list-item modifier="tappable" onclick="setChannel('+"'"+channel+"',"+"'"+channel_name+"'"+ ');">';
-					 htm+='<label class="radio-button checkbox--list-item">';
-						htm+='<input type="radio" name="channel_m" class="channel_m" value="'+channel+'"  >';
-						htm+='<div class="radio-button__checkmark checkbox--list-item__checkmark"></div>';
-						htm+=' '+channel_name;
-					  htm+='</label>'; 
-					htm+='</ons-list-item>';
-			       	
-			       });
-			       htm+='</ons-list>';	
-	               createElement('hubtel-channel-options-list',htm);	
-			    break;
-			    
-			    case "getLocationCity":
-			    
-			      var htm='';
-					htm+='<ons-list>';
-					//htm+='<ons-list-header class="list-header trn" >'+ getTrans('City','city') +'</ons-list-header>';
-			       $.each( data.details, function( city_key , city_val ) { 
-			       	
-			       	 htm+='<ons-list-item modifier="tappable" onclick="setLocationCity('+"'"+city_val.id+"',"+"'"+city_val.name+"',"+  "'" + city_val.state_id + "'" +  ');">';
-					 htm+='<label class="radio-button checkbox--list-item">';
-						htm+='<input type="radio" name="channel_m" class="channel_m" value="'+city_val.id+'"  >';
-						htm+='<div class="radio-button__checkmark checkbox--list-item__checkmark"></div>';
-						htm+=' '+city_val.name;
-					  htm+='</label>'; 
-					htm+='</ons-list-item>';
-					
-					});
-					
-					htm+='</ons-list>';	
-	               createElement('location-city-list',htm);	
-			    
-			    break;
-			    
-			    case "getLocationArea":
-			    
-			       var htm='';
-					htm+='<ons-list>';
-					//htm+='<ons-list-header class="list-header trn">'+getTrans('Area','area')+'</ons-list-header>';
-			       $.each( data.details, function( area_key , val_area ) { 
-			       				       	
-			       	 htm+='<ons-list-item modifier="tappable" onclick="setLocationArea('+"'"+val_area.area_id+"',"+"'"+val_area.name+"'"+ ');">';
-					 htm+='<label class="radio-button checkbox--list-item">';
-						htm+='<input type="radio" name="channel_m" class="channel_m" value="'+val_area.area_id+'"  >';
-						htm+='<div class="radio-button__checkmark checkbox--list-item__checkmark"></div>';
-						htm+=' '+val_area.name;
-					  htm+='</label>'; 
-					htm+='</ons-list-item>';
-					
-					});
-					
-					htm+='</ons-list>';	
-	               createElement('location-area-list',htm);	
-	               
-			    break;
-			    
-			    case "locationState":
-			    
-			       var htm='';
-					htm+='<ons-list>';
-					htm+='<ons-list-header class="list-header trn">'+getTrans("State",'state')+'</ons-list-header>';
-			       $.each( data.details, function( state_key , val_state ) { 
-			       				       	
-			       	 htm+='<ons-list-item modifier="tappable" onclick="setLocationState('+"'"+val_state.id+"',"+"'"+val_state.name+"'"+ ');">';
-					 htm+='<label class="radio-button checkbox--list-item">';
-						htm+='<input type="radio" name="channel_m" class="channel_m" value="'+val_state.id+'"  >';
-						htm+='<div class="radio-button__checkmark checkbox--list-item__checkmark"></div>';
-						htm+=' '+val_state.name;
-					  htm+='</label>'; 
-					htm+='</ons-list-item>';
-					
-					});
-					
-					htm+='</ons-list>';	
-	               createElement('location-state-list',htm);	
-			    
-			    break;
-			    
-			    case "getLocationPostal":
-			    
-			        var htm='';
-					htm+='<ons-list>';
-					htm+='<ons-list-header class="list-header trn" ">'+getTrans("Postal Code",'postal_code')+'</ons-list-header>';
-			       $.each( data.details, function( postal_key , val_postal ) { 
-			       				       	
-			       	 htm+='<ons-list-item modifier="tappable" onclick="setLocationPostal('+"'"+val_postal.postal_code+"'"+');">';
-					 htm+='<label class="radio-button checkbox--list-item">';
-						htm+='<input type="radio" name="channel_m" class="channel_m" value="'+val_postal.postal_code+'"  >';
-						htm+='<div class="radio-button__checkmark checkbox--list-item__checkmark"></div>';
-						htm+=' '+val_postal.postal_code;
-					  htm+='</label>'; 
-					htm+='</ons-list-item>';
-					
-					});
-					
-					htm+='</ons-list>';	
-	               createElement('location-area-postal',htm);	
-			    
-			    break;
-			    
-			    case "initSearch":
-			    
-			       setTrackView("restaurant results");
-			    
-			       // set the total search results
-			       setStorage("search_total", data.details.total);
-			       setStorage("search_total_raw", data.details.total_raw);
-			    
-			       var options = {     
-				  	  //address:s,	  	 	  	  
-				  	  closeMenu:true,
-				      animation: 'slide',
-				      callback: function(index) {	      	
-				      }
-				   };	   	   	 				   
-				   menu.setMainPage('searchResults.html',options);
-			    break;
-			    
-			    case "initBrowseMerchant":
-			       setStorage("browse_total", data.details.total);			       
-			       setStorage("browse_total_raw", data.details.total_raw);	
-			       menu.setMainPage('browseRestaurant.html', {closeMenu: true});
-			    break;
-			    
-			    case "getCategoryCount":
-			     
-			       setTrackView("restaurant menu - " + data.details.restaurant_name );
-			    
-			       setStorage("category_count", data.details.total);
-			       
-			       /*setStorage("enabled_gallery", data.details.enabled_gallery);
-			       setStorage("enabled_booking", data.details.enabled_booking);*/
-			       
-			       setStorage("menu_enabled_gallery", data.details.menu_enabled_gallery);
-			       setStorage("menu_enabled_booking", data.details.menu_enabled_booking);
-			       setStorage("menu_enabled_hours", data.details.menu_enabled_hours);
-			       setStorage("menu_enabled_review", data.details.menu_enabled_review);
-			       setStorage("menu_enabled_map", data.details.menu_enabled_map);
-			       setStorage("menu_enabled_info", data.details.menu_enabled_info);
-			       setStorage("menu_enabled_promo", data.details.menu_enabled_promo);
-			       
-			       
-			       var options = {
-				      animation: 'slide',
-				      onTransitionEnd: function() { 	
-				      					      	
-				      	 if(data.details.total<=0){
-				      	    toastMsg(data.msg);	
-				      	 }
-				      	 if(!empty(data.details.merchant_photo_bg)){
-				      	 	//$(".menu-header").css("background","url("+data.details.merchant_photo_bg+") no-repeat center center / cover");
-				      	 	$(".menu-header").css("background", 'url("' + data.details.merchant_photo_bg + '") no-repeat center center / cover ');
-				      	 }
-				      } 
-				   };
-				   sNavigator.pushPage("menucategory.html", options);
-			    break;
-			    
-			    case "getItemCount":
-			    			       
-			       setTrackView( $(".selected_restaurant_name").val() + " category" ,  data.details.category_name );
-			       
-			       setStorage("item_count",data.details.total)			       
-			       var options = {
-				      animation: 'none',
-				      onTransitionEnd: function(){				      	  
-				      	 showCartNosOrder();
-				      } 
-				   };
-				   sNavigator.pushPage("menuItem.html", options);
-			    break;
-			    
-			    
-			    case "GetCategoryList":
-			       $("#page-menubycategoryitem #search-text").html(data.details.category_name);
-			       fillPopOverCategoryList(data.details.category);
-			    break;
-			    
-			    case "getPages":			    
-			      $(".custompage_title").html(data.details.title);
-			      $(".custom_page_content").html(data.details.content);
-			      setTrackView( data.details.title );
-			    break;
-			    
-			    case "clearMyCart":
-			      cart=[];		       
-		          sNavigator.popPage({cancelIfRunning: true}); //back button
-		          showCartNosOrder();
-			    break;
-			    
-			    case "WingValidate":
-			    
-			          var options = {
-					      animation: 'slide',
-					      onTransitionEnd: function() {
-					      	  $(".wing_token").val( data.details.wing_token );
-					      	  $(".order_id").val( data.details.order_info.order_id );
-					      	  $(".total_w_tax").val( data.details.order_info.total_w_tax );
-					      	  
-					      	  var html='';
-					      	  html = wingRow('pay_to','Pay to', data.details.wing_data.merchant_name );
-					      	  html+= wingRow('item','Item', data.details.wing_data.amount );
-					      	  html+= wingRow('fee','Fee', data.details.wing_data.fee );
-					      	  if ( !empty(data.details.wing_data.exchange_rate)){
-					      	  	html+= wingRow('exchange_rate','Exchange Rate', data.details.wing_data.exchange_rate );
-					      	  }					     
-					      	  html+= wingRow('total_amount','Total Amount', data.details.wing_data.total );
-					      	  html+= wingRow('wing_account','WING Account', data.details.order_info.wing_account );
-					      	  html+= wingRow('account_name','Account Name ', data.details.wing_data.account_name );					      	  
-					      	  createElement('wing_confirm_payment_details',html);
-					      } 
-					  }; 
-					  sNavigator.pushPage("wingCommitForm.html", options);   
-			    
-			    break;
-			    
-			    case "ipayAfricaGetInstructions":			        			        
-			        $(".ipay_"+data.msg+"_content").html(data.details);
-			    break;
-			    
-			    case "ipayInitiatorRequest":
-			       $(".ipay_sid").val( data.details.sid ); 
-			       $(".ipay_hash").val( data.details.hash ); 
-			       $(".ipay_oid").val( data.details.oid ); 
-			       $(".ipay_amount").val( data.details.amount ); 
-			       
-			       $(".int_MPESA").val( data.details.instructions.MPESA ); 
-			       $(".int_AIRTEL").val( data.details.instructions.AIRTEL ); 
-			       $(".int_EQUITEL").val( data.details.instructions.EQUITEL ); 
-			       
-			    break;
-			    
-			    case "ipaympesaSendCode":
-			        onsenAlert( data.msg );
-			        $(".frm-ipay_initiator").hide();
-			        $(".frm-ipay_mpesa").show();
-			    break;
-			    
-			    case "payMollie":
-			       setHome();
-			       if(!isDebug()){			    		
-			    		var iab = cordova.InAppBrowser;
-			    		iab.open( data.details  , '_system');  
-			    	} else {
-			    	    window.open(data.details);
-			    	}
-			    break;
-			    
-			    case "getDixiCards":
-			       var crd_html='';
-			       $.each( data.details.cards, function( card_key, card_val ) {
-			       	   dump(card_val);
-			       	   
-			       	    crd_html+='<ons-list-item modifier="tappable" >';
-					       crd_html+='<ons-row class="row">';
-					         crd_html+='<ons-col width="10%">';
-						       crd_html+='<label class="radio-button" >';
-								  crd_html+='<input type="radio" name="selected_cards" value="'+card_val.id+'" class="selected_cards">';
-								  crd_html+='<div class="radio-button__checkmark"></div>';
-								crd_html+='</label>';
-							  crd_html+='</ons-col>';
-							  
-							  crd_html+='<ons-col>';
-							    crd_html+= '<span class="small-font-dim-smaller">'+card_val.card_number+'</span>';
-							  crd_html+='</ons-col>';
-							  
-						    crd_html+='</<ons-row>';
-						crd_html+='</ons-list-item>'; 
-			       	   
-			       });			       			       
-			       createElement('dixicards_list',crd_html);
-			    break;
-			    
-			    case "useThisLocation":
-			       var page = sNavigator.getCurrentPage();
-	               map_address_action = page.options.map_address_action;
-	               dump("map_address_action : "+ map_address_action);
-	               
-	               var location_res = data.details.result;
-	               dump(location_res);
-	               
-	               removeStorage("geo_address_result_formatted_address");
-	               
-	               switch(map_address_action){
-	               	 case "mapaddress":
-	               	 
-	               	 $(".street").val( location_res.address );
-					 $(".city").val( location_res.city );
-					 $(".state").val( location_res.state );
-					 $(".zipcode").val( location_res.zip );	
-					
-					 $(".google_lat").val( data.details.lat );	
-					 $(".google_lng").val( data.details.lng  );	
-					 $(".formatted_address").val( location_res.formatted_address );	
-					
-					 $(".delivery-address-text").html( location_res.formatted_address );  
-	               	 
-					 sNavigator.popPage({cancelIfRunning: true}); //back button
-		             sNavigator.popPage({cancelIfRunning: true}); //back button    
-	               	 break;
-	               	  
-	               	 case "changeaddress":
-	               	 	               	    
-	               	    $(".google_formatted_address").html( location_res.formatted_address );
-		                setStorage("search_address", location_res.formatted_address );	
-		                	
-		                setStorage("geo_address_result_formatted_address", location_res.formatted_address );
-		                setStorage("geo_address_result_address", location_res.address );
-		                setStorage("geo_address_result_city", location_res.city );
-		                setStorage("geo_address_result_state", location_res.state );
-		                setStorage("geo_address_result_zip", location_res.zip );	               
-		                
-		                var cart_params=JSON.stringify(cart);       			     
-					    if (saveCartToDb()){
-					       var cart_params='';
-					    }
-					    						
-					    callAjax("loadCart","merchant_id="+ getStorage('merchant_id')+"&search_address=" + 
-					    encodeURIComponent( getStorage("search_address") ) + "&cart="+cart_params +"&transaction_type=" +
-					    getStorage("transaction_type") + "&device_id="+ getStorage("device_id") );
-					   
-					    sNavigator.popPage({cancelIfRunning: true}); //back button
-					    sNavigator.popPage({cancelIfRunning: true}); //back button		
-					                    
-		                
-	               	 break;
-	               	 
-	               	 default:
-	               	  sNavigator.popPage({cancelIfRunning: true}); //back button
-	               	 break;
-	               }			
-			    break;
-			    
-			    case "getReceipt":
-			      html='';			      
-			      html+='<ons-list>';
-			      $.each( data.details.info, function( key, val ) {     
-			      	 dump(val);
-			      	 html+=wingRow( '', val.label, val.value );
-			      });
-			      html+='</ons-list>';
-			      
-			      html +='<br/>';	
-			      html += data.details.html;
-			      createElement('receipt_wrap', html);
-			    break;
-			    
-			    case "requestCancelOrder":
-			      menu.setMainPage('orders.html', {closeMenu: true});
-			    break;
-			    
-			    case "loadOptionList":
-			      displayOptionsList(data.details);
-			    break;
-			    
-			    case "saveAddressBookLocation":
-			    case "deleteAddressBookLocation":
-				   menu.setMainPage('addressBook.html', {closeMenu: true});
-				 break;
-				 
-				case "getPostCodeAddressBookDetails":
-				    $(".id").val( data.details.data.id );
-				    $(".street").val( data.details.data.street );
-				    $(".location_name").val( data.details.data.location_name );
-				    $(".state_id").val( data.details.data.state_id );
-				    $(".city_id").val( data.details.data.city_id );
-				    $(".area_id").val( data.details.data.area_id );				    
-				    if (data.details.data.as_default==2){
-						$(".as_default").attr("checked","checked");
-					} else $(".as_default").removeAttr("checked");
-					
-					$(".location_state").html( data.details.data.state_name );
-					$(".location_city").html( data.details.data.city_name );
-					$(".location_area").html( data.details.data.area_name );
-					
-				 break;
-				 
-				case "getAddressBookLocation":
-				   var htm='';
-					htm+='<ons-list>';
-					$.each( data.details, function( key, val ) {
-						htm+='<ons-list-item modifier="tappable" onclick="setAddressLocation(' + "'" + val.id + "'" + ');" >';
-						   htm+= '<span class="small-font-dim">'+val.address+'</span>';
-						htm+='</ons-list-item>';
-					});
-					htm+='</ons-list>';	
-					createElement('options_list',htm);
-				break;
-				
-				case "setAddressLocation":
-				   $(".state_id").val( data.details.data.state_id );
-				   $(".city_id").val( data.details.data.city_id );
-				   $(".area_id").val( data.details.data.area_id );
-				   
-				   $(".city").val( data.details.data.city_name );
-				   $(".state").val( data.details.data.state_name );
-				   $(".zipcode").val( data.details.data.postal_code );
-				   $(".area_name").val( data.details.data.area_name );
-				   
-				   $(".location_state").html( data.details.data.state_name );
-				   $(".location_city").html( data.details.data.city_name );
-				   $(".location_area").html( data.details.data.area_name );
-				   
-				   $(".street").val( data.details.data.street );
-				   $(".location_name").val( data.details.data.location_name );
-				   
-				   global_city_id='';
-				   global_area_id='';
-				   global_state_id='';
-				   global_postal_code='';
-				   
-				   popup_address_location.hide();	
-				break;
-				
-				case "saveSettings":
-				   toastMsg(data.msg);	
-				   dump( "enabled_push-> "+data.details.enabled_push );
-				   if (data.details.enabled_push==2){				   	   			
-				   	   pushUnregister();				   	   
-				   } else {
-				   	   checkDeviceRegister();
-				   }			
-				   
-				break;
-				
-				case "reRegisterDevice":
-				  onsenAlert(data.msg);	
-				  removeStorage("push_unregister");
-				break;
-				
-				case "getNotificationList":
-				   clearNotificationCount();
-				   displayNotification(data.details);
-				break;
-							
-				case "requestSMSCode":
-				   dialog_enter_mobile.hide();
-				   toastMsg(data.msg);
-				break;
-								 				
-				default:
-				//onsenAlert("Sorry but something went wrong during processing your request");
-				  onsenAlert(data.msg);	
-				  break;				
-			}
-			
-			/* end ok conditions*/
-		} else {
-			/*failed condition*/
-			
-			dump('failed condition');
-			switch(action)
-			{					
-									
-				case "getNotificationList":		
-				  clearNotificationCount();	
-				  toastMsg(data.msg);
-				break;
-				
-				case "getPostCodeAddressBookDetails":
-				  toastMsg(data.msg);
-				  menu.setMainPage('addressBook.html', {closeMenu: true});
-				break;
-				
-				case "getLocationCity":
-				  toastMsg(data.msg);
-				  createElement('location-city-list','');
-				break;
-				
-				case "loadOptionList":
-				case "getAddressBookLocation":
-				  $(".options_list").html('');
-				  toastMsg(data.msg);
-			    break;
-			    
-				case "getReceipt":
-				$(".receipt_wrap").html('');
-				  toastMsg(data.msg);
-			    break;
-			    
-				case "loadPhotos":		
-				   toastMsg(data.msg);
-				break;
-				
-				case "merchantReviews":
-				  toastMsg(data.msg);
-				  createElement('review-list-scroller','');
-				break;
-				
-					
-				case "search":
-				  //$(".result-msg").text("No Restaurant found");
-				  $(".result-msg").text(data.msg);				  
-				  toastMsg(data.msg);
-				  createElement('restaurant-results','');
-				  break;
-								
-				case "getItemByCategory":				
-				  onsenAlert(data.msg);	
-				  displayMerchantInfo(data.details);			
-				  //sNavigator.popPage({cancelIfRunning: true});	back button
-				  break;
-				
-				case "loadCart":				
-				  displayMerchantLogo(data.details,'page-cart');
-				  //onsenAlert(data.msg);
-				  toastMsg(data.msg);
-				  
-				  $("#page-cart .wrapper").hide();				
-				  $("#page-cart .frm-cart").hide();	
-				  $(".checkout-footer").hide();
-				  showCartNosOrder();
-				  break;
-				
-				case "getPaymentOptions":
-				  if ( data.details==3){
-				  	  toastMsg(data.msg);				  	  
-				  	  //resetLocation();
-				  	  sNavigator.popPage({cancelIfRunning: true});
-				  } else {
-					  $(".frm-paymentoption").hide();
-					  toastMsg(data.msg);
-				  }
-				  break;
-				
-				case "browseRestaurant":
-				   toastMsg(data.msg);
-				  /*$(".result-msg").text(data.msg);
-			      createElement('browse-results','<div></div>');*/
-			      break;   
-				
-			    case "getProfile":  
-			      dump('show login form')
-			      menu.setMainPage('prelogin.html', {closeMenu: true});
-			      break;   
-			      
-			    case "getAddressBook":  		
-			      //onsenAlert(data.msg);
-			      createElement('address-book-list', '');
-			      if (data.code==3){
-			      	 menu.setMainPage('prelogin.html', {closeMenu: true});
-			      }			      
-			      break;   
-			      
-			    case "getOrderHistory":  
-			       if (data.code==3){
-			           menu.setMainPage('prelogin.html', {closeMenu: true}); 
-			       } else {
-			       	   toastMsg(data.msg);
-			       }
-			       break;   
-			      			    
-			    case "registerMobile":  			    
-			    //case "getLanguageSettings":  
-			      /*silent */
-			      break;   
-			      
-			    case "getLanguageSettings":   
-			      toastMsg(data.msg);
-			      break;   
-			      
-
-			    case "getSettings":      
-			       var device_id=getStorage("device_id");
-			       $(".device_id_val").html( device_id );
-			    break;   
-			       
-			    
-			    /*silent*/
-			    case "addToCart":
-			    case "getCustomFields":
-			    break;
-			    			    
-			    case "saveContactNumber":
-			    case "coordinatesToAddress":
-			    case "trackOrderMap":			    
-			       toastMsg(data.msg);
-			    break;
-			    
-			    case "getMerchantCClist":
-			       toastMsg(data.msg);
-			       $("#cc-list").html('');
-			    break;
-			    
-			    //case "trackOrderHistory":		
-			    case "loadCC":	        
-			      sNavigator.popPage({cancelIfRunning: true}); //back button			      
-			    break;
-			    
-			    case "trackOrderHistory":		
-			       toastMsg(data.msg);
-			       $(".track_driver").hide();
-			    break;
-			    			    
-			    case "ipayInitiatorRequest":
-			      toastMsg(data.msg);
-			      sNavigator.popPage({cancelIfRunning: true}); //back button
-			    break;
-			    
-				default:
-				  //onsenAlert(data.msg);	
-				  toastMsg(data.msg);
-				  break;
-			}			
-		}
-				
-	},
-	error: function (request,error) {	        
-		hideAllModal();		
-		//if ( action=="getLanguageSettings" || action=="registerMobile"){
-		if ( action=="registerMobile"){
-		} else {			
-			//onsenAlert( getTrans("Network error has occurred please try again!",'network_error') );		
-			toastMsg( getTrans("Network error has occurred please try again!",'network_error') );		
-		}	
-	}
-   });       	
-   
-   ajax_request.always(function() {
-       dump( "second complete" );
-       ajax_request=null;  
-       clearTimeout(timer);
-   });
-}
-
-function setHome()
-{
-	dump("setHome");
-	var options = {     	  		  
-	  	  closeMenu:true,
-	      animation: 'slide',
-	      callback:setHomeCallback
-	   };	   	   	   
-	 menu.setMainPage('home.html',options);
-}
-
-function setHomeCallback()
-{	
-	refreshConnection();
-}
-
-function displayRestaurantResults(data , target_id)
-{	
-	//dump(data);	
-	var htm='';	
-	
-	htm+='<ons-list class="restaurant-list">';
-       
-    $.each( data, function( key, val ) {     
-    	
-    	 //dump(val);
-    	 
-    	 htm+='<ons-list-item modifier="tappable" class="list-item-container" onclick="loadRestaurantCategory('+val.merchant_id+');" >';
-    	 //htm+='<ons-row class="row" onclick="loadRestaurantCategory('+val.merchant_id+');" >';    	 
-    	 htm+='<ons-row class="row" >';    	 
-    	     htm+='<ons-col class="col-image border" width="35%">';
-    	          htm+='<div class="logo-wrap2" >';
-    	            htm+='<div class="img_loaded" >';
-    	             htm+='<img src="'+val.logo+'" />';
-    	            htm+='</div>';
-    	            
-    	          htm+='</div>';
-    	          
-    	          dump(val.services);
-    	          
-    	          if(!empty(val.services)){    	          	
-    	          	    $.each( val.services, function( key_service, val_services ) { 
-    	           	   	  htm+='<p class="center">'+val_services+' <i class="green-color ion-android-checkmark-circle"></i></p>';
-    	           	   });    	          	
-    	          }
-    	              	          
-    	          //htm+='<p class="center">'+val.payment_options.cod+'</p>';
-    	          if(!empty(val.payment_available)){ 
-    	          	 if(val.payment_available.length>0){
-    	          	 	$.each( val.payment_available, function( key_pv, val_pv ) { 
-    	          	 		 htm+='<p class="center">'+val_pv+'</p>';
-    	          	 	});	
-    	          	 }
-    	          }
-    	          
-    	          
-    	     htm+='</ons-col>';
-    	     
-    	     htm+='<ons-col class="col-description border" width="65%">';
-    	           htm+='<div>';
-	    	           htm+='<div class="rating-stars" data-score="'+val.ratings.ratings+'"></div>';
-	    	           htm+='<p class="restauran-title concat-text">'+val.restaurant_name+'</p>';
-	    	           htm+='<p class="concat-textx">'+val.cuisine+'</p>';
-	    	           
-	    	           if(!empty(val.distance)){
-	    	           	   htm+='<p>'+val.distance+'</p>';
-	    	           }
-	    	           
-	    	           //if(val.service!=3){
-	    	           if(val.service==1 || val.service==2 || val.service==4 || val.service==5 ){
-	    	           	   if(!empty(val.delivery_estimation)){
-	    	           	      htm+='<p>'+val.delivery_estimation+'</p>';	    	           	   
-	    	           	   }
-	    	           	   if(!empty(val.delivery_distance)){
-	    	           	      htm+='<p>'+val.delivery_distance+'</p>';
-	    	           	   }
-	    	           }
-	    	           
-	    	           if ( val.offers.length>0){
-	    	           	   $.each( val.offers, function( key_offer, val_offer ) { 
-	    	           	   	  htm+='<p class="top10">'+val_offer+'</p>';
-	    	           	   });
-	    	           }
-	    	           
-	    	           htm+='<span class="notification '+val.tag_raw+' ">'+val.is_open+'</span>';
-	    	           
-	    	           if (val.is_sponsored==2){
-	    	           	  htm+='<span class="notification sponsored">'+ getTrans("Sponsored",'sponsored') +'</span>';
-	    	           }
-	    	           
-    	           htm+='</div>';
-    	           
-    	           htm+='<ons-row>';
-    	              htm+='<ons-col width="60%">';
-    	                 //if(val.service!=3){
-    	                 if(val.service==1 || val.service==2 || val.service==4 || val.service==5 ){
-    	                   htm+='<p class="p-small trn" data-trn-key="delivery">Delivery</p>';
-    	                   if(!empty(val.delivery_fee)){
-    	                      htm+='<price>'+val.delivery_fee+'</price>';
-    	                   }
-    	                 }
-    	              htm+='</ons-col>';
-    	              
-    	              if (!empty(val.minimum_order)){
-    	              htm+='<ons-col class="border-left">';
-    	                  htm+='<p class="p-small trn" data-trn-key="min_order">Min. Order</p>';
-    	                  htm+='<price>'+val.minimum_order+'</price>';
-    	              htm+='</ons-col>';
-    	              }
-    	              
-    	           htm+='</ons-row>';
-    	           
-    	     htm+='</ons-col>';
-    	     
-    	 htm+='</ons-row>';
-    	 htm+='</ons-list-item>';
-    });
-    
-    htm+='</ons-list>';
-      
-    createElement(target_id,htm);
-        
-    initRating();  
-    
-    imageLoaded('.img_loaded');
-}
-
-function initRating()
-{
-	$('.rating-stars').raty({ 
-		readOnly: true, 
-		score: function() {
-             return $(this).attr('data-score');
-       },
-		path: 'lib/raty/images'
-    });
-    translatePage();
-}
-
-function loadRestaurantCategory(mtid)
-{		  	
-  cart = [] ; /*clear cart variable*/
-  removeStorage("tips_percentage");  
-  removeStorage("cc_id");  
-  removeStorage("category_count");  
-  removeStorage("item_count");  
-  
-  setStorage("merchant_id",mtid);
-    
-  /*var options = {
-      animation: 'slide',
-      onTransitionEnd: function() { 
-      	  callAjax("MenuCategory","merchant_id="+mtid + "&device_id=" + getStorage("device_id")  );	
-      } 
-   };
-   sNavigator.pushPage("menucategory.html", options);
-   */ 
-    
-  callAjax("getCategoryCount","mtid="+ mtid + "&device_id="+getStorage("device_id") );
-}
-
-function cuisineResults(data)
-{		
-	var htm='';
-	htm+='<ons-list>';
-	htm+='<ons-list-header class="list-header trn" data-trn-key="services">Services</ons-list-header>';
-	
-	if (!empty(data.services)){
-		$.each( data.services, function( key, val ) {			
-			/*htm+='<ons-list-item modifier="tappable">';
-			 htm+='<label class="checkbox checkbox--list-item">';
-				htm+='<input type="checkbox" name="delivery_type" class="delivery_type" value="'+key+'" >';
-				htm+='<div class="checkbox__checkmark checkbox--list-item__checkmark"></div>';
-				htm+=' <span>'+val+'</span>';
-			  htm+='</label>';
-			htm+='</ons-list-item>';*/
-			
-   htm+='<ons-list-item modifier="tappable">';
-    htm+='<ons-row class="row">';
-     htm+='<ons-col class="concat-text" width="10%">';
-       htm+='<label class="radio-button checkbox--list-item">';
-	     htm+='<input type="radio" name="delivery_type" class="delivery_type" value="'+key+'" >';
-	     htm+='<div class="radio-button__checkmark checkbox--list-item__checkmark"></div>';	     
-	   htm+='</label>';
-	  htm+='</ons-col>';	
-	  htm+='<ons-col class="text-left" >'+val+'</ons-col>';
-    htm+='</ons-row>';
-    htm+='</ons-list-item>';
-    
-		});
-	}	
-	
-	/*htm+='<ons-list-item modifier="tappable">';
-	 htm+='<label class="checkbox checkbox--list-item">';
-		htm+='<input type="checkbox" name="delivery_type" class="delivery_type" value="1" >';
-		htm+='<div class="checkbox__checkmark checkbox--list-item__checkmark"></div>';
-		htm+=' <span class="trn" data-trn-key="delivery_n_pickup" >Delivery & Pickup</span>';
-	  htm+='</label>';
-	htm+='</ons-list-item>';
-	
-	htm+='<ons-list-item modifier="tappable">';
-	 htm+='<label class="checkbox checkbox--list-item">';
-		htm+='<input type="checkbox" name="delivery_type" class="delivery_type" value="2">';
-		htm+='<div class="checkbox__checkmark checkbox--list-item__checkmark"></div>';
-		htm+=' <span class="trn" data-trn-key="delivery_only">Delivery Only</span>';
-	  htm+='</label> ';
-	htm+='</ons-list-item>';
-	
-	htm+='<ons-list-item modifier="tappable">';
-	 htm+='<label class="checkbox checkbox--list-item">';
-		htm+='<input type="checkbox" name="delivery_type" class="delivery_type" value="3">';
-		htm+='<div class="checkbox__checkmark checkbox--list-item__checkmark"></div>';
-		htm+=' <span class="trn" data-trn-key="pickup_only">Pickup Only</span>';
-	  htm+='</label>  	   '; 
-	htm+='</ons-list-item>	';*/
-	    
-	htm+='<ons-list-header class="list-header trn" data-trn-key="cuisine">Cuisine</ons-list-header>';
-	
-	$.each( data.cuisine, function( key, val ) {        		  		  
-		htm+='<ons-list-item modifier="tappable">';
-		 htm+='<label class="checkbox checkbox--list-item">';
-			htm+='<input type="checkbox" name="cuisine_type" class="cuisine_type" value="'+key+'">';
-			htm+='<div class="checkbox__checkmark checkbox--list-item__checkmark"></div>';
-			htm+=' '+val;
-		  htm+='</label>'; 
-		htm+='</ons-list-item>';
-	});	
-	
-	htm+='</ons-list>';	
-	createElement('filter-options-list',htm);	
-	
-	$(".restaurant_name").attr("placeholder",  getTrans("Enter Restaurant name",'enter_resto_name') );
-	
-	translatePage();
-}
-
-function menuCategoryResult(data)
-{
-	$("#menucategory-page .restauran-title").text(data.restaurant_name);
-	$("#menucategory-page .rating-stars").attr("data-score",data.ratings.ratings);
-	initRating();
-	$("#menucategory-page .logo-wrap").html('<img src="'+data.logo+'" />')
-	
-	if ( data.open){
-		$("#merchant_open").val(2);
-	} else $("#merchant_open").val(1);
-		
-	if (data.merchant_close_store){
-		$("#close_store").val(2);
-	} else $("#close_store").val(1);
-	
-	if (data.has_menu_category==2){
-		var htm='';
-		htm+='<ons-list>';
-		$.each( data.menu_category, function( key, val ) { 			  
-             htm+='<ons-list-item modifier="tappable" class="row" onclick="loadmenu('+
-             val.cat_id+','+val.merchant_id+');">'+val.category_name+'</ons-list-item>';
-		});	
-		htm+='</ons-list>';
-		createElement('category-list',htm);	
-	} else {
-		toastMsg(  getTrans("This restaurant has not published their menu yet.",'this_restaurant_no_menu') );
-	}	
-}
-
-function loadmenu(cat_id,mtid)
-{			       
-	
-	/*if ( $("#close_store").val()==2 || $("#merchant_open").val()==1 ){
-		onsenAlert( getTrans("This Restaurant Is Closed Now.  Please Check The Opening Times",'restaurant_close') );
-		return;
-	}*/
-	
-	/*var options = {
-      animation: 'none',
-      onTransitionEnd: function() { 
-      	  callAjax("getItemByCategory", "cat_id="+cat_id+"&merchant_id="+mtid);
-      	  showCartNosOrder();
-      } 
-   };
-   sNavigator.pushPage("menuItem.html", options);*/
-	
-	removeStorage("item_count");	
-	setStorage("selected_cat_id" , cat_id);
-	callAjax("getItemCount", "cat_id="+cat_id+"&merchant_id="+mtid );
-}
-
-function displayMerchantInfo(data)
-{
-	if (!empty(data)){
-		$("#page-menubycategoryitem #search-text").html(data.category_info.category_name);
-		$("#page-menubycategoryitem .restauran-title").text(data.merchant_info.restaurant_name);
-		$("#page-menubycategoryitem .rating-stars").attr("data-score",data.merchant_info.ratings.ratings);
-		initRating();
-		$("#page-menubycategoryitem .logo-wrap").html('<img src="'+data.merchant_info.logo+'" />')			
-	}
-}
-
-function displayMerchantLogo(data,page_id)
-{
-	if(!empty(data.merchant_info)){
-		$("#"+ page_id +" .logo-wrap").html('<img src="'+data.merchant_info.logo+'" />')		
-	}
-	if (!empty(data.cart_total)){
-		$("#"+ page_id +" .total-amount").html(data.cart_total);
-	}
-}
-function displayMerchantLogo2(logo,total,page_id)
-{
-	if(!empty(logo)){
-	    $("#"+ page_id +" .logo-wrap").html('<img src="'+logo+'" />')		
-	}
-	if (!empty(total)){
-		$("#"+ page_id +" .total-amount").html(total);
-	}
-	
-	var merchant_name=getStorage("merchant_name");	
-	if (!empty(merchant_name)){
-		$("#"+ page_id +" .restauran-title").html(merchant_name);
-	}
-}
-
-function displayItemByCategory(data , index)
-{			
-	
-	/*dump( "mobile_menu=>"+data.mobile_menu );	
-	$("#page-menubycategoryitem #search-text").html(data.category_info.category_name);
-	$("#page-menubycategoryitem .restauran-title").text(data.merchant_info.restaurant_name);
-	$("#page-menubycategoryitem .rating-stars").attr("data-score",data.merchant_info.ratings.ratings);
-	initRating();
-	$("#page-menubycategoryitem .logo-wrap").html('<img src="'+data.merchant_info.logo+'" />');*/
-	
-	    
-	var actions = '';
-	
-	var html='';
-	html+='<ons-list>';	 
-	//html+='<ons-list class="restaurant-list">';
-	$.each( data.item, function( key, val ) { 		 
-
-		html+= '<ons-list-item>';	
-		
-		 if (data.disabled_ordering==2){
-		 //html+='<ons-list-item modifier="tappable" class="list-item-container" onclick="itemNotAvailable(2)" >';		
-		   actions = "itemNotAvailable(2)";
-		 } else {
-			 if (val.not_available==2){
-			     //html+='<ons-list-item modifier="tappable" class="list-item-container" onclick="itemNotAvailable(1)" >';	
-			     actions = "itemNotAvailable(1)";
-			 } else {
-			 	  var single_add_item=getStorage("single_add_item");
-			 	  dump("=>"+single_add_item);
-			 	  if (val.single_item==2 && single_add_item==2){
-			 	  	  item_auto_price="0|";
-			 	  	  item_auto_discount="0";
-			 	  	  if ( val.prices.length>0){
-			 	  	  	  $.each( val.prices, function( key_price, price ) { 
-			 	  	  	  	   if (!empty(price.price_discount_pretty)){
-			 	  	  	  	   	   //item_auto_price = "'"+price.price+"|'";
-			 	  	  	  	   	   item_auto_price = price.price+"|";
-			 	  	  	  	   	   item_auto_discount=parseInt(price.price)-parseInt(price.price_discount)
-			 	  	  	  	   } else {
-			 	  	  	  	   	   //item_auto_price=  "'"+price.price+"|'";
-			 	  	  	  	   	   item_auto_price =  price.price+"|";
-			 	  	  	  	   }
-			 	  	  	  });
-			 	  	  }
-			 	  	  			 	  	  			 	  	 
-/*html+='<ons-list-item modifier="tappable" class="list-item-container"';
-html+='onclick="autoAddToCart('+ "'"+val.item_id+"'," +  "'"+item_auto_price+"'," + "'"+item_auto_discount+"'"  +');"  >';*/
-			 	  	   
-                     actions = '"autoAddToCart('+ "'"+val.item_id+"'," +  "'"+item_auto_price+"'," + "'"+item_auto_discount+"'," + "'"+data.cat_id+"'"  +');"';
-			 	  } else {
-			          /*html+='<ons-list-item modifier="tappable" class="list-item-container" onclick="loadItemDetails('+val.item_id+','+data.merchant_info.merchant_id+','+data.category_info.cat_id+');"  >';*/			         
-			          
-actions='"loadItemDetails('+ "'"+val.item_id+"'," +  "'"+data.merchant_id+"'," + "'"+data.cat_id+"'"  +');"';
-			 	  }
-			 }
-		 }
-		 
-         html+='<ons-row class="row" onclick='+actions+' >';
-         
-         /*DISH ICON*/
-         var dish_icon_html = '';
-     	 if(!empty(val.icon_dish)){         	 	
-     	    $.each( val.icon_dish, function( dish_id, dish_icon_url ) {
-     	    	dish_icon_html += '<img src="'+ dish_icon_url +'" />';
-     	    });
-     	 }
-         
-         if ( data.mobile_menu==1){
-         	
-         	html+='<ons-col class="col-image" width="65%">';
-                html+='<p class="restauran-title concat-text">'+val.item_name+'</p>';
-                html+='<p class="small-font-dim small nomargin">'+val.item_description+'</p>';  
-                
-                if(!empty(dish_icon_html)){
-                   html+= '<div class="dish_icon_wrap">'+dish_icon_html+'</div>';   
-                }
-                 
-             html+='</ons-col>';
-         	
-             html+='<ons-col class="col-image text-right" width="35%">';
-              if ( val.prices.length>0){
-	                $.each( val.prices, function( key_price, price ) { 
-	                   if (!empty(price.price_discount_pretty)){
-	                   	   html+='<p class="p-small">'+price.size+' <price class="discount">'+price.price_pretty+'</price>'; 
-	                   	   html+='<price>'+price.price_discount_pretty+'</price>';
-	                   	   html+='</p>';
-	                   } else {
-	                   	   html+='<p class="p-small">'+price.size+' <price>'+price.price_pretty+'</price></p>';
-	                   }                   
-	                });
-                }
-             html+='</ons-col>';
-             
-         } else {
-         	
-             html+='<ons-col class="col-image" width="35%">';
-                html+='<div class="logo-wrap2" >';
-                  html+='<div class="img_loaded" >';
-                  html+='<img src="'+val.photo+'" />';
-                  html+='</div>';
-                html+='</div>';
-             html+='</ons-col>';
-             
-                html+='<ons-col class="col-description" width="65%">';
-                html+='<p class="restauran-title concat-text">'+val.item_name+'</p>';
-                html+='<p class="small-font-dim small">'+val.item_description+'</p>';   
-                                     
-                if ( val.prices.length>0){
-	                $.each( val.prices, function( key_price, price ) { 
-	                   if (!empty(price.price_discount_pretty)){
-	                   	   html+='<p class="p-small">'+price.size+' <price class="discount">'+price.price_pretty+'</price>'; 
-	                   	   html+='<price>'+price.price_discount_pretty+'</price>';
-	                   	   html+='</p>';
-	                   } else {
-	                   	   html+='<p class="p-small">'+price.size+' <price>'+price.price_pretty+'</price></p>';
-	                   }                   
-	                });
-                }
-                                
-                if (val.not_available==2){
-                	//html+='<p>item not available</p>';
-                	html+='<p>'+  getTrans("item not available",'item_not_available')  +'</p>';
-                }
-                
-                if(!empty(dish_icon_html)){
-                   html+= '<div class="dish_icon_wrap">'+dish_icon_html+'</div>';   
-                }
-                
-             html+='</ons-col>';
-         }                 
-           
-         html+='</ons-row>';
-        html+='</ons-list-item>';
-    });			
-    html+='</ons-list>';    
-    
-    //createElement('menu-list',html);
-    createElement( 'item-results-'+ index , html);
-    
-    imageLoaded('.img_loaded');
-}
-
-function empty(data)
-{
-	//if (typeof data === "undefined" || data==null || data=="" ) { 
+empty = function(data) {
 	if (typeof data === "undefined" || data==null || data=="" || data=="null" || data=="undefined" ) {	
 		return true;
 	}
 	return false;
 }
 
-function loadItemDetails(item_id,mtid,cat_id)
-{		
-		
-    if ( $("#close_store").val()==2 || $("#merchant_open").val()==1 ){
-		onsenAlert( getTrans("This Restaurant Is Closed Now.  Please Check The Opening Times",'restaurant_close') );
-		return;
-	}
-	
-	var options = {
-      animation: 'slide',
-      onTransitionEnd: function() { 
-      	  callAjax("getItemDetails","item_id="+item_id+"&merchant_id="+mtid+"&cat_id="+cat_id);
-      } 
-   };   
-   sNavigator.pushPage("itemDisplay.html", options);
+setStorage = function(key,value)
+{
+	localStorage.setItem(key,value);
 }
 
-function displayItem(data)
-{		
-	/*$("#page-itemdisplay .item-header").css({
-		'background-image':'url('+data.photo+')'
-	});*/
-		
-	$("#page-itemdisplay .item-header").css({
-		'background-image':'url('+ "'" + data.photo + "'" +')'
-	});
-		
-	
-	$("#page-itemdisplay .title").html(data.item_name);
-	$("#page-itemdisplay .description").html(data.item_description);	
-	
-	
-	if (!empty(data.category_info)){
-		$("#page-itemdisplay #search-text").text(data.category_info.category_name);
-	}
-	
-	var htm='';
-	
-	htm+='<input type="hidden" name="item_id" class="item_id" value="'+data.item_id+'">';	
-	htm+='<input type="hidden" name="category_id" class="category_id" value="'+data.category_info.cat_id+'">';	//cart category
-	htm+='<input type="hidden" name="currency_symbol" class="currency_symbol" value="'+data.currency_symbol+'">';	
-	htm+='<input type="hidden" name="discount" class="discount discount_amt" value="'+data.discount+'">';	
-	
-	htm+='<input type="hidden" name="two_flavors" class="two_flavors" value="'+data.two_flavors+'">';	
-	
-	if (data.two_flavors==2){
-		data.has_price=1;
-	}
-	
-	if ( data.has_price==2){	
-		htm+='<ons-list-header class="list-header trn" data-trn-key="price">Price</ons-list-header>';
-		var x=0
-		$.each( data.prices, function( key, val ) { 				
-			if (data.discount>0){
-				var discount_price='<price class="discount">'+val.pretty_price;				
-				discount_price+='</price>';
-				discount_price+='<price>'+val.discounted_price_pretty+'</price>';
-				if (x==0){	
-					htm+=privatePriceRowWithRadio2('price',
-					val.price+'|'+val.size ,
-					val.size,
-					discount_price,
-					'checked="checked"');
-				} else {
-					htm+=privatePriceRowWithRadio2('price',
-					val.price+'|'+val.size,
-					val.size,
-					discount_price);
-				}	
-			} else {			
-				if (x==0){				
-					htm+=privatePriceRowWithRadio('price',
-					val.price+'|'+val.size ,
-					val.size,
-					val.pretty_price,
-					'checked="checked"');
-				} else {
-					htm+=privatePriceRowWithRadio('price',
-					val.price+'|'+val.size,
-					val.size,
-					val.pretty_price);
-				}		
-			}	
-			x++;
-		});	
-	}
-	
-	if (!empty(data.cooking_ref)){
-		htm+='<ons-list-header class="list-header trn" data-trn-key="cooking_ref">Cooking Preference</ons-list-header>';
-		$.each( data.cooking_ref, function( key, val ) { 
-			htm+=privateRowWithRadio('cooking_ref',val,val);	
-		});		
-	}
-	
-	if (!empty(data.ingredients)){
-		htm+='<ons-list-header class="list-header trn" data-trn-key="ingredients">Ingredients</ons-list-header>';
-		$.each( data.ingredients, function( key, val ) { 
-			htm+=privateRowWithCheckbox('ingredients','ingredients',val,val);	
-		});		
-	}
-	
-	var show_addon_description=getStorage("show_addon_description");	
-	
-	if (!empty(data.addon_item)){
-		$.each( data.addon_item, function( key, val ) { 
-			htm+='<ons-list-header class="list-header require_addon_'+val.subcat_id+' ">'+val.subcat_name+'</ons-list-header>';
-			
-			htm+='<input type="hidden" name="require_addon_'+val.subcat_id+'" class="require_addon" value="'+val.require_addons+'" data-id="'+val.subcat_id+'" data-name="'+val.subcat_name+'" >'
-			
-			if (!empty(val.sub_item)){
-				$.each( val.sub_item, function( key2, val2 ) { 				
-					  if (val.multi_option == "custom"){					  	 
-	                     htm+=subItemRowWithCheckbox(
-	                                 val.subcat_id,
-	                                 'sub_item', 
-	                                 val2.sub_item_id+"|"+val2.price +"|"+val2.sub_item_name,
-	                                 val2.sub_item_name,
-	                                 val2.pretty_price ,
-	                                 val.multi_option_val,
-	                                 val2.item_description
-	                                 );	
-	                                 	                     
-					  } else if ( val.multi_option == "multiple") { 
-					  	 htm+=subItemRowWithCheckboxQty(
-					  	             val.subcat_id,
-					  	            'sub_item', 
-	                                 val2.sub_item_id+"|"+val2.price +"|"+val2.sub_item_name,
-	                                 val2.sub_item_name,
-	                                 val2.pretty_price );	
-	                                 
-	                     
-	                     if(show_addon_description==1){
-		                     if(!empty(val2.item_description)){
-		                        htm+='<div class="addon_description small-font-dim">'+val2.item_description+'</div>'; 
-		                     }
-	                     }
-	                     
-					  } else {    
-                          htm+=subItemRowWithRadio(
-                                   val.subcat_id,
-                                   "sub_item",
-                                   //val2.sub_item_id+"|"+val2.price + "|"+val2.sub_item_name  , 
-                                   val2.sub_item_id+"|"+val2.price + "|"+val2.sub_item_name + "|" + val.two_flavor_position  , 
-                                   val2.sub_item_name,
-                                   val2.pretty_price,
-                                   false,
-                                   val2.item_description
-                                   );                                                           
-					  }
-				});	
-			}
-		});	
-	}
-	
-	htm+=cartFooter(data.currency_code);
-	
-	createElement('item-info',htm);
-
-	setCartValue()
-	
-	translatePage();
-		
+getStorage = function(key)
+{
+	return localStorage.getItem(key);
 }
+
+removeStorage = function(key)
+{
+	localStorage.removeItem(key);
+}
+
+isdebug = function(){
+	if (krms_config.debug){
+		return true;
+	}
+	return false;
+};
+/*END DEFINE BASIC FUNCTIONS*/
+
+/*START ONSEN 
+ONSEN READY
+*/
+ons.platform.select('android');
+//ons.platform.select('ios');
+/*ons.disableAutoStatusBarFill();*/
 
 jQuery(document).ready(function() {	
+	onsenNavigator = document.getElementById('onsenNavigator');
+});
+
+ons.ready(function() {
 	
-	/*jquery onclick*/
+		
+	if (ons.platform.isIPhoneX()) {		
+	    document.documentElement.setAttribute('onsflag-iphonex-portrait', '');
+	    $('head').append('<link rel="stylesheet" href="css/app_ios.css?ver=1.0" type="text/css" />'); 	     
+	}
 	
-	 // fix to autocomplete search address bar
+	// fix to autocomplete search address bar
 	$(document).on({
 	"DOMNodeInserted": function(e){
-	console.log(e);
+	  //console.log(e);
 	$(".pac-item span",this).addClass("needsclick");
 	}
 	}, ".pac-container");
 	
-	$( document ).on( "click", ".price", function() {
-		setCartValue();
-	});
-	$( document ).on( "change", ".qty", function() {
-		setCartValue();
-	});
-	
-	$( document ).on( "change", ".sub_item", function() {
-		setCartValue();
-	});
-	
-	$( document ).on( "change", ".subitem-qty", function() {
-		setCartValue();
-	});
-	
-	$( document ).on( "click", ".edit-order", function() {
-		editOrderInit();
-	});
+	onsenNavigator = document.getElementById('onsenNavigator');	
 		
-	$( document ).on( "click", ".order-apply-changes", function() {
-		applyCartChanges();
-	});
+	/*RESET DATA*/		
 		
-	$( document ).on( "click", ".delete-item", function() {
-		var id=$(this).data('id');
-		var parent=$(this).parent().parent().parent();		
-		parent.remove();
-		$(".subitem-row"+id).remove();
-	});
+	//localStorage.clear();
+	/*	
+	removeStorage("location_lat");
+	removeStorage("user_token");			
+	removeStorage("location_data_city");	
+	removeStorage("location_data_area");				
+	removeStorage("location_data_postal");			
+	removeStorage('transaction_type');
+	removeStorage('recheck_location');
+	*/
+	
+	geocoded_address = getStorage("geocoded_address");	
+	if(empty(geocoded_address)){		
+		removeStorage("location_lat");
+		removeStorage("location_lng");
+		removeStorage("location_address");
+	}
 		
-	$( document ).on( "click", ".sub_item_custom", function() {		
-		 var this_obj=$(this);
-		 var multi=$(this).data("multi");		 
-		 if (empty(multi)){
-		 	return;
-		 }		 
-		 var id=$(this).data("id");		 
-		 var total_check=0;		 	
-		 $('.sub_item_custom:checked').each(function(){ 
-		 	if ( $(this).data("id") == id){
+	removeStorage("next_step");
+	removeStorage("cart_re_order");
+	removeStorage("delivery_date_set");
+	removeStorage("delivery_date_set_pretty");	
+	removeStorage("delivery_time_set");	
+	removeStorage("active_merchant_category");
+	removeStorage("opt_contact_delivery");
+	//removeStorage("tooltip_home");
+	//removeStorage("device_id");		
+	removeStorage("change_language");
+	removeStorage("page_need_refresh");
+		
+	
+	ons.setDefaultDeviceBackButtonListener(function(event) {
+		dump("Back event");
+		dump(event);
+		current_page_id = onsenNavigator.topPage.id;
+		dump("Back event current_page_id=>" + current_page_id);		
+		switch (current_page_id){
+			case "receipt":
+			case "graphical_tracking":
+			lat_res = getCurrentLocation();
+			resetToPage('tabbar.html','none',{
+		    	 lat : lat_res.lat,
+		  	   	 lng : lat_res.lng,
+		    });
+			break;			
+						
+			case "page_startup":			
+			case "tabbar":
+			case "page_settings":
+			case "page_startup2":
+			case "operational_close_page":
+			  
+			  if(current_page_id=="tabbar"){
+				  active_index = document.querySelector('ons-tabbar').getActiveTabIndex();
+				  dump("active_index=>"+ active_index);
+				  if(active_index>0){				  	 
+				  	 document.querySelector('ons-tabbar').setActiveTab(0);
+				  	 return;
+				  } 			  
+			  }
+			
+			  exit_cout++;
+			  if(exit_cout<=1){
+			  	showToast( t("Press once again to exit!") ,'' );	
+				 setTimeout(function(){ 
+				 	 exit_cout=0;
+				 }, 3000);
+			  } else {
+			  	 if (navigator.app) {
+				   navigator.app.exitApp();
+				 } else if (navigator.device) {
+				   navigator.device.exitApp();
+				 } else {
+				   window.close();
+				 }
+			  }
+			break;
+			
+		}
+	}); 
+	
+	tabbar_loaded = false;
+	
+	
+	$( document ).on( "keyup", ".numeric_only", function() {
+       this.value = this.value.replace(/[^0-9\.]/g,'');
+    });	 
+    
+	$( document ).on( "click", ".subitem_custom", function() {
+		object = $(this);
+		var limited = object.data("limited");
+		dump("limited: "+ limited);
+		var total_check=0;	
+		
+		var id=$(this).data("id");	
+		dump("id: "+ id);
+		
+		$('.subitem_custom input:checked').each(function(){ 
+			dump($(this));
+		 	if ( $(this).parent().data("id") == id){
 		 		total_check++;
 		 	}
-		 });		 
-		 if (multi<total_check){
-		 	onsenAlert( getTrans('Sorry but you can select only','sorry_but_you_can_select') + " "+multi+" "  +
-		 	 getTrans('addon','addon') );
-		 	this_obj.attr("checked",false);
-		 	return;
+		});	
+		dump("total_check=>" + total_check) ;
+				
+		if (limited<total_check){
+			dump(object);
+			showAlert( t('Sorry but you can select only')  +  " " + limited  + " " + t("addon") );
+			dump(object.find("input"));			
+			object.prop('checked', false);			
+		}
+		
+	});
+	
+});
+/*END ONSEN*/
+
+/*CORDOVA DEVICE READY*/
+document.addEventListener("deviceready", onDeviceReady, false);
+
+function onDeviceReady(){
+	try {
+						
+		navigator.splashscreen.hide();	
+		device_uiid = device.uuid;
+		device_platform = device.platform;		
+		
+		if(device.platform=="android" || device.platform=="Android" ){
+		   //StatusBar.backgroundColorByHexString("#ef6625");
+		}
+				
+		initFirebasex();		
+				
+	} catch(err) {
+       dump(err.message);
+    } 
+};
+/*END CORDOVA DEVICE READY*/
+
+document.addEventListener("offline", function(){
+  showNoConnection(true);
+  retryNetConnection(true);
+}, false);
+
+document.addEventListener("online", function(){
+	showNoConnection(false);	
+}, false);
+
+document.addEventListener("resume", function(){
+	
+	try {
+		if(cordova.platformId == "ios"){
+			window.FirebasePlugin.getBadgeNumber(function(n) {		   	       
+		       total_badge = parseInt(n);	       
+		       if(total_badge>0){
+		       	   window.FirebasePlugin.setBadgeNumber(0);
+		       }
+		    });
+		}
+    } catch(err) {
+       //alert(err.message);
+    } 
+    
+}, false);
+
+
+playSound = function(){		 
+	 try {	 		 	 
+		 url = 'file:///android_asset/www/beep.wav';			 
+		 if(device_platform=="iOS"){
+		 	url = "beep.wav";
 		 }
-	});
+		 //alert(url);
+		 my_media = new Media(url,	        
+	        function () {
+	            dump("playAudio():Audio Success");
+	            my_media.stop();
+	            my_media.release();
+	        },	        
+	        function (err) {
+	            dump("playAudio():Audio Error: " + err);
+	        }
+	    );	    
+	    my_media.play({ playAudioWhenScreenIsLocked : true });
+	    my_media.setVolume('1.0');
+    
+    } catch(err) {
+       alert(err.message);
+    } 
+};
+
+handleNotification = function(data){	
+	showToast(data.title+"\n"+data.message  ,'success' );		
+};
+
+/*ONSEN INIT*/
+document.addEventListener('show', function(event) {
+	dump('show page');
+    var page = event.target;
+    var page_id = event.target.id;   
+    //alert("page_id = "+page_id); 
+    switch(page_id)
+    {
+    	case "home":
+    	 tooltip_home = getStorage("tooltip_home");
+    	 if(empty(tooltip_home)){
+	    	 close_button='<ons-button modifier="bluebutton_small" onclick="hideTooltip('+ "'"+ '.tooltip_home' + "'" +');" >';
+	    	 close_button+=t("OK, THANKS");
+	    	 close_button+='</ons-button>';
+	    	 $('.tooltip_home').webuiPopover({   	     	
+		     	content:'<p>'+t('Want to change address')+'?</p><p class="small">'+t('You can change your address here')+'</p><br/>'+ close_button,
+		     	backdrop:false,	     	
+		     	offsetLeft:90
+		   	});
+		   	$('.tooltip_home').webuiPopover('show');
+    	 }
+    	break;
+    }
+     
 	
-	$( document ).on( "click", ".transaction_type", function() {
-		var transaction_type=$(this).val();		
-		
-		if(transaction_type=="pickup"){
-			$(".delivery_asap_wrap").hide();
-		} else {
-			$(".delivery_asap_wrap").show();
-		}
-		
-		setStorage('transaction_type',transaction_type);
-		
-		  var cart_params=JSON.stringify(cart);	
-		  if (saveCartToDb()){	
-		      cart_params='';
-		  }
-		    
-		  var extra_params= "&delivery_date=" +  $(".delivery_date").val();  
-		  if ( !empty($(".delivery_time").val()) ){
-			  extra_params+="&delivery_time="+$(".delivery_time").val();
-		   }
-		  
-      	  callAjax("loadCart","merchant_id="+ getStorage('merchant_id')+"&search_address=" + 
-      	  encodeURIComponent(getStorage("search_address")) + "&cart="+cart_params +"&transaction_type=" +
-      	  getStorage("transaction_type") + extra_params + "&device_id="+ getStorage("device_id") );
-			
-	});
+});
+
+document.addEventListener('init', function(event) {
 	
-	$( document ).on( "click", ".payment_list", function() {		
-		//alert( $(this).val() );
-		var transaction_type = getStorage("transaction_type");
-		//alert( transaction_type );
-		var paypal_card_fee=$(".paypal_card_fee").val();
-		
-		/*CHECK IF CHANGE IS REQUIRED*/
-		if ( $(this).val() == "cod"){
-			if ( $(".cod_change_required").val()==2 ){
-			   if ( transaction_type =="delivery" ) {
-			      $(".order_change").attr("data-validation","required");
-			   }
+   dump('init page');
+   /*page init*/
+   
+   var page = event.target;
+   var page_id = event.target.id;   
+   dump("page_id = "+page_id);  
+
+   
+   if( page_id!="map_select_location" || page_id!="select_location" ){
+     $(".search-input").removeClass("search-input--material");
+   }
+      
+   translatePage();
+   
+   if(page_id!="page_startup2"){
+   	  StopStartUpBanner();
+   }
+   
+   switch(page_id)
+   {
+   	
+   	  case "page_settings":   	        	     
+   	     $(".app_title").html( krms_config.AppTitle );
+   	     processAjax('getSettings','');    	        	     
+   	  break;
+   	     	  
+   	  case "page_startup":   	    
+   	    $(".app_title").html( krms_config.AppTitle );   	    
+   	    AnalyticsTrack("page start up"); 
+   	       	    
+   	  break;
+   	  
+   	  case "tabbar":
+   	    tabbar_loaded = true;
+   	    $(".tabbar_wrap").html( tabbarMenu() );   	       	    
+   	  break;
+   	  
+   	  case "login":
+   	     	   
+   	    placeholder(".user_mobile", "Mobile number or Email" );
+   	    placeholder("#password", "Password" );   	    
+   	  
+   	    next_step = getStorage("next_step");
+   	    dump("next_step=>"+ next_step);
+   	    if(!empty(next_step)){
+   	    	$(".bt_signup").show();
+   	    	$(".topbar_login_skip").hide();
+   	    	$(".button--skip_button").hide();
+   	    }
+   	    
+   	    enabledSocialLogin();
+   	    AnalyticsTrack("page login"); 
+   	  break;
+   	  
+   	  case "forgot_password":   	       	    
+   	   if(app_settings = getAppSettings()){
+   	   	  if(app_settings.customer_forgot_password_sms!=1){
+   	   	  	 document.querySelector('ons-tabbar.forgot_pass_tabbar').setTabbarVisibility(false);
+   	   	  }   	   
+   	   }
+   	    AnalyticsTrack("page forgot password");    	    
+   	  break;
+   	  
+   	  case "forgot_via_email":
+   	    placeholder(".user_mobile", "Enter your email or mobile" ); 
+   	  break;
+   	  
+   	  case "forgot_via_sms":
+   	    placeholder(".contact_phone", "Mobile number" ); 
+   	  break;
+   	     	     	 
+   	  case "create_account":
+   	     	       	      	    
+   	    createAccountFields();
+   	  
+   	    get_customField();
+   	    
+   	    setTimeout(function() {		
+		   addTermsCondition('create_account_list');
+        }, 100);    	    
+   	    
+   	    next_step = getStorage("next_step");
+   	    dump("next_step=>"+ next_step);
+   	    if(!empty(next_step)){
+   	    	$(".next_step").val( next_step );
+   	    }
+   	    AnalyticsTrack("page create account"); 
+   	       	      
+   	    
+   	  break;
+   	  
+   	  case "map_select_location":   	
+   	     	       	  
+   	     lat = page.data.lat;
+   	     lng = page.data.lng;
+   	     dump("lat=>"+ lat);
+   	     if( !empty(lat)) {   	     	  
+   	     	 initMapSelectLocation(lat, lng);
+   	     } else {
+   	     	 initMapSelectLocation();
+   	     }
+   	     
+   	     /*placeholder(".street", t("Street") );
+   	     placeholder(".city", t("City") );
+   	     placeholder(".state", t("State") );
+   	     placeholder(".zipcode", t("Zip Code") );
+   	     placeholder(".location_name", t("Floor/unit/Room #") );*/
+   	     
+   	     
+   	     AnalyticsTrack("page map selection"); 
+   	     
+   	  break;
+   	  
+   	  case "map_enter_address":
+   	     	    
+   	    placeholder(".search_address", t("Search for your location") );
+   	    
+   	    if(app_settings = getAppSettings()){
+   	    	if(app_settings.map_provider.provider=="google.maps"){
+		   	    setTimeout(function() {		
+		 		   setFocus('search_address');
+		        }, 500); 
+   	    	}
+   	    }
+            	    
+   	    initGeocomplete('.search-input');
+   	       	       	    
+   	    processDynamicAjax('GetRecentLocation','','recent_location_loader','GET',1 );   	     
+   	    initPullHook('map_enter_address', 'recent_location_pull_hook');
+   	    
+   	    resetPaginate("#map_enter_address");   	    
+   	    initInfiniteScroll(page, 'map_enter_address', 'map_enter_address');
+   	    
+   	    AnalyticsTrack("page enter address"); 
+   	    
+   	  break;
+   	  
+   	  case "page_mobilecode_list":
+   	    processAjax("getMobileCodeList",'');
+   	  break;
+   	  
+   	  case "verification":   	   	   
+   	  
+   	   placeholder(".code", t("Code") );   
+   	   $(".customer_token").val( page.data.customer_token );
+   	   $(".email_address").val( page.data.email_address );
+   	   $(".contact_phone").val( page.data.contact_phone );
+   	   $(".verification_type").val( page.data.verification_type );   	   
+   	   $(".next_step").val( page.data.next_step );
+   	   
+   	   icon_html = '';
+   	   if ( page.data.verification_type=="verification_email"){
+   	   	   icon_html = '<ons-icon icon="ion-ios-email-outline" size="60px" class="button--to_text_orange" ></ons-icon>';
+   	   } else {
+   	   	   icon_html = '<ons-icon icon="ion-android-phone-portrait" size="60px" class="button--to_text_orange" ></ons-icon>';
+   	   }
+   	   $(".verify_icon").html( icon_html );
+   	   
+   	   
+   	   $verification_type = page.data.verification_type;
+   	      	      	  
+   	   if($verification_type=="verification_firebase_otp"){
+   	   	  FirebaseVerifyPhone( page.data.contact_phone );
+   	   }
+   	   
+   	   AnalyticsTrack("page verification"); 
+   	   
+   	  break;
+   	  
+   	  case "home":
+   	  
+   	     homeSwitchViewAll()  ;
+   	  
+   	    /*RTL CODE*/
+   	    current_lang_code = getLanguageCode();
+   	    if(isRTL(current_lang_code)){
+   	       $("ons-button ons-icon").attr("icon","ion-ios-arrow-left");
+   	    }
+   	       	  
+   	    if(isLocation()){
+   	    	if ( location_res = getLocationData() ){  
+   	    		dump(location_res);
+   	    		//$(".print_location_address").html( location_res.pretty_address );   	    		
+   	    		$("#" + onsenNavigator.topPage.id + " .formatted_address").html( location_res.pretty_address );
+   	    		params = "search_type=byLatLong";	
+	   	    	processDynamicAjax('searchMerchant', params , 'search_results_wrapper');
+	   	    	   	    		
+   	    	} else {
+   	    		//$(".print_location_address").html( t("location not set") );
+   	    		$("#" + onsenNavigator.topPage.id + " .formatted_address").html( t("location not set"));
+   	    	}   	    	 
+   	    } else {   	    	
+	   	    current_latlng = getCurrentLocation();
+	   	    if(!empty(current_latlng)){
+	   	    	if(!empty(current_latlng.address)){ 
+	   	    	   //$(".print_location_address").html( current_latlng.address );
+	   	    	   $("#" + onsenNavigator.topPage.id + " .formatted_address").html( current_latlng.address );
+	   	    	} else {
+	   	    		//$(".print_location_address").html( t("location not set") );
+	   	    		$("#" + onsenNavigator.topPage.id + " .formatted_address").html( t("location not set"));
+	   	    	}
+	   	    	params = "search_type=byLatLong";	
+	   	    	processDynamicAjax('searchMerchant', params , 'search_results_wrapper');
+	   	    } else {
+	   	    	//$(".print_location_address").html( t("location not set") );
+	   	    	$("#" + onsenNavigator.topPage.id + " .formatted_address").html( t("location not set"));
+	   	    }
+   	    }
+   	        	    
+   	    /*LOAD ALL PAGES IN HOMEPAGE*/  
+   	    loadHomePage();
+   	    
+   	    initPullHook('home', 'home_pull_hook');
+   	    
+   	    AnalyticsTrack("page home"); 
+   	    
+   	    ageRestriction();
+   	    
+   	    home_all_as_list = false;
+  	    if(app_settings = getAppSettings()){
+  	       home_all_as_list = app_settings.home_all_as_list;
+  	    }	 	  
+			  	  
+  	    if(home_all_as_list==1){
+   	       initInfiniteScroll(page, 'home_all_restaurant', 'list_all_restaurant');   	  
+  	    }
+   	    
+   	  break;
+   	  
+   	  case "restaurant_list":
+   	     
+   	     /*page_white = document.querySelector('#restaurant_list');
+         ons.modifier.remove(page_white, 'page_white');
+         ons.modifier.add(page_white, 'page_column');*/
+   	        	     
+   	     clearForm('frm_filter');
+   	        	     
+   	     placeholder(".search_for_restaurant", t("Search for restaurant") );
+            	  
+   	     search_type = page.data.search_type;
+   	     dump("search_type =>"+ search_type);   	        	     
+   	     $(".search_type").val( search_type );
+   	        	     
+   	     setCurrentAddress();
+   	     
+   	     params = "search_type="+search_type;
+   	     params+="&with_distance=1";
+   	     
+   	     $top_page_id = onsenNavigator.topPage.id;
+   	     
+   	     params+="&sort_by=" + $("#"+ $top_page_id +  " .sort_by").val();
+   	     
+   	     if(!empty(page.data.cuisine_id)){
+   	        cuisine_id = page.data.cuisine_id;
+   	        params+="&cuisine_id="+ cuisine_id;
+   	        $(".cuisine_id").val( cuisine_id );
+   	     }
+   	         	     
+   	     if(!empty(page.data.banner_id)){
+   	     	params+="&banner_id="+ page.data.banner_id;
+   	     	$(".banner_id").val( page.data.banner_id );
+   	     }
+   	        	        	        	       	       	     
+   	     processAjax('searchMerchant',params , 'GET',  'skeleton2');
+   	     
+   	     initPullHook('restaurant_list', 'restaurant_list_pull_hook');
+   	        	              
+         resetPaginate("#restaurant_list");
+   	     initInfiniteScroll(page, 'restaurant_list', 'list_restaurant');
+   	     
+   	     AnalyticsTrack("page restaurant list"); 
+   	     
+   	     /*try {   	     	   	     
+	   	     var divGD = ons.GestureDetector(document.querySelector('#restaurant_list'));
+			 divGD.on('dragup', function(event) {			
+			    showPage("restaurant_list_map.html");		    
+			 });
+		 } catch(err) {	      
+	     } */
+   	     
+   	  break;
+   	  
+   	  case "search_merchant":   	     	
+   	       	    
+   	    placeholder(".search_field_by_name", t("Search for restaurant") );   	  
+   	    setCurrentAddress();
+   	       	    
+   	    setTimeout(function() {		
+ 		   setFocus('search_field_by_name');
+        }, 500); 
+   	    
+   	    $( "#search_field_by_name" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
 			} else {
-				$(".order_change").removeAttr("data-validation");
-			}
-		} else {
-			$(".order_change").removeAttr("data-validation");
-		}
-		
-		switch( $(this).val() )
-		{
-			case "paypal":
-			case "pyp":			  			  
-			  if (paypal_card_fee>0){
-				  var total_order_plus_fee=parseFloat(getStorage("order_total_raw")) + parseFloat(paypal_card_fee);
-				  total_order_plus_fee= number_format(total_order_plus_fee,2);
-				  $(".total-amount").html( getStorage("cart_currency_symbol")+" "+total_order_plus_fee);
-			  }
-			  
-			  $(".order-change-wrapper").hide();
-			  $(".payon-delivery-wrapper").hide();
-			  break;
-			 
-			case "cod":
-			if (paypal_card_fee>0){
-				$(".total-amount").html( getStorage("order_total"));
-			}
-			if ( transaction_type =="delivery" || transaction_type =="pickup" || transaction_type =="dinein" ) {
-				$(".order-change-wrapper").show();						
-			}
-			$(".payon-delivery-wrapper").hide();
-			break;
-			
-			case "pyr":			
-			if (paypal_card_fee>0){
-				$(".total-amount").html( getStorage("order_total"));
-			}
-			$(".order-change-wrapper").hide();
-			$(".payon-delivery-wrapper").show();
-			break;
-			
-			case "ocr":
-						
-			var options = {
-		      animation: 'slide',
-		      onTransitionEnd: function() { 						      	  		      	  
-		      	  var params="merchant_id=" +  getStorage("merchant_id") ;
-		      	  params+="&client_token="+getStorage("client_token");
-			      callAjax("getMerchantCClist",params);
-			      translatePage();
-		      } 
-		    };   
-		    sNavigator.pushPage("cclist.html", options);		 
-			
-			break;
-						
-			default:
-			if (paypal_card_fee>0){
-				$(".total-amount").html( getStorage("order_total"));
-			}
-			$(".order-change-wrapper").hide();
-			$(".payon-delivery-wrapper").hide();
-			break;
-		}
-	});
-	
-	$( document ).on( "click", ".logo-wrap img", function() {
-		var page = sNavigator.getCurrentPage();	
-		dump("pagename=>"+page.name);		
-		if ( page.name=="merchantInfo.html"){			
-			return;
-		}
-		
-		var options = {
-	      animation: 'none',
-	      onTransitionEnd: function() { 	 	      	  
-	      	  displayMerchantLogo2( 
-		      	     getStorage("merchant_logo") ,
-		      	     '' ,
-		      	     'page-merchantinfo'
-		      );	  		      
-		      callAjax("getMerchantInfo","merchant_id="+ getStorage('merchant_id'));  		      
-	      } 
-	    };     
-		
-		var found=false;
-		var _pages = sNavigator.getPages();
-		dump( _pages.length );
-		if ( _pages.length>0){
-			$.each( _pages, function( key, val ) { 	
-				if (!empty(val)){
-					dump(val.name);
-					if ( val.name=="merchantInfo.html"){
-						dump('found');
-						found=true;
-						//sNavigator.resetToPage("merchantInfo.html",options);			
-						sNavigator.popPage();
+				
+				destroyList('search_field_by_name_result');
+				
+				search_field_by_name = $(this).val();
+				dump("search_field_by_name=>"+ search_field_by_name);
+				if(!empty(search_field_by_name)){
+					data = "merchant_name="+ search_field_by_name;					
+				    processDynamicAjax('searchByMerchantName',data,'search_field_by_name_result','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
 					}
 				}
-			});	
-		}
-		
-		if (found){
-			dump('exit');
-			return;
-		}
-						
-	    sNavigator.pushPage("merchantInfo.html", options);						
-	});
-		
-	$( document ).on( "click", ".setAddress", function() {		
-		var address=$(this).data("address");		
-		var address_split=address.split("|");
-		dump(address_split);
-		if ( address_split.length>0){
-			$(".street").val( address_split[0] );
-			$(".city").val( address_split[1] );
-			$(".state").val( address_split[2] );
-			$(".zipcode").val( address_split[3] );
-			$(".location_name").val( address_split[4] );			
-			
-			var number='';
-			if (!empty(address_split[5])){
-				number=address_split[5];								
-				//number=number.replace("+","");				
 			}
-			
-			$(".contact_phone").val( number );
-			
-			var complete_address = address_split[0];
-			complete_address+=" "+ address_split[1];
-			complete_address+=" "+ address_split[2];
-			complete_address+=" "+ address_split[3];
-			
-			$(".delivery-address-text").html( complete_address ); 
-			$(".google_lat").val( '' );	
-			$(".google_lng").val( '' );	
-			$(".formatted_address").val( '' );			
-			
-			dialogAddressBook.hide();
-			
-			sNavigator.popPage({cancelIfRunning: true}); //back button
-			
-		} else {
-			onsenAlert(  getTrans("Error: cannot set address book",'cannot_set_address')  );
-			dialogAddressBook.hide();
-		}
-	});
-	
-}); /*end ready*/
+   	    });
+   	    
+   	    AnalyticsTrack("page search merchant"); 
+   	     
+   	  break;
+   	  
+   	  
+   	  case "cuisine_list":   	  
+   	       	    
+   	    placeholder(".search_for_cuisine", t("Search for cuisine") );
+   	    getCuisine();   	    
+   	    initPullHook('cuisine_list',  'cuisine_list_pull_hook');   	       	    
+   	    $(".frm_cuisine .paginate_total").val( 0 );
+   	    $(".frm_cuisine .paginate_page").val( 0 );
+   	    initInfiniteScroll(page, 'cuisine_list', 'list_cuisine');
+   	    
+   	    AnalyticsTrack("page cuisine list"); 
+   	  break;
+   	  
+   	  case "search_cuisine":
+   	       	       	   
+   	    placeholder(".search_for_cuisine", t("Search for cuisine") );
+   	  
+   	    setTimeout(function() {		
+ 		   setFocus('search_field_by_name');
+        }, 500); 
+   	    
+   	     $( "#search_field_by_name" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {				
+				destroyList('search_field_by_cuisine_result');				
+				search_field_by_name = $(this).val();
+				dump("search_field_by_name=>"+ search_field_by_name);
+				if(!empty(search_field_by_name)){
+					data = "cuisine_name="+ search_field_by_name;
+					data+= "&sort_fields=cuisine_name";														   
+				    processDynamicAjax('searchByCuisine',data,'search_field_by_cuisine_result','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
+					}
+				}
+			}
+   	    });   	   
+   	    
+   	    AnalyticsTrack("page Search for cuisine"); 
+   	    
+   	  break;
+   	  
+   	  case "restaurant_page":
 
-function setCartValue()
-{	
-	/*set the default total price based on selected price*/
-	var selected_price=parseFloat($(".price:checked").val());
-	var discount= parseFloat( $(".discount_amt").val() );	
-	if (isNaN(discount)){
-		discount=0;
-	}
+   	     setCartTheme();	    
+   	  
+   	     removeStorage("click_tab");
+   	     
+   	     merchant_id = page.data.merchant_id;   
+   	     item_id = page.data.item_id;  
+   	     cat_id = page.data.cat_id;     	     
+   	     
+   	     $("#restaurant_page .merchant_id").val( merchant_id );
+   	     processAjax('getRestaurantInfo', 'merchant_id='+merchant_id, 'GET', 'skeleton1');
+   	     
+   	     params = "merchant_id="+ merchant_id;
+   	     if(!empty(item_id)){
+   	     	params+='&item_id='+ item_id;
+   	     	params+='&cat_id='+ cat_id;
+   	     }   	     
+	     processDynamicAjax('getMerchantMenu',params,'menu_loader','GET',1 );
+   	     
+   	     initPullHook('restaurant_page', 'restaurant_page_pull_hook');
+   	     
+   	     resetPaginate("#restaurant_page");
+   	     initInfiniteScroll(page, 'restaurant_page', 'resto_list_category');
+   	        	        	    
+   	     setTimeout(function() {		
+ 		   getCartCount();
+         }, 1000); 
+         
+         AnalyticsTrack("page merchant page"); 
+                  
+         cart_theme = getCartTheme();
+         if(cart_theme==2){		
+	         setTimeout(function() {			         	
+	 		   processDynamicAjax('getActiveMerchantCategory',params );
+	         }, 1); 
+         }
+   	     
+   	  break;
+   	  
+   	  case "item_page":
+   	     	       	       	  
+   	    setCartTheme();
+   	    setCloseMerchant();
+   	    
+   	    cat_id = page.data.cat_id;   	
+   	    $("#item_page .cat_id").val( cat_id );
+   	       	    
+   	    merchant_id = getActiveMerchantID();
+   	    
+   	    params = "merchant_id="+ merchant_id;
+   	    params+="&cat_id=" + cat_id ;
+	    params+= "&"+$( ".frm_filter_item" ).serialize(); 
+	    
+	    processAjax('getItemByCategory', params , 'GET', 'skeleton2');
+	    
+	    initPullHook('item_page', 'resto_list_item_pull_hook');
+	    
+	    resetPaginate("#item_page");
+   	    initInfiniteScroll(page, 'item_page', 'resto_list_item');
+   	    
+   	    getCartCount();
+   	    
+   	    AnalyticsTrack("page category id" + cat_id); 
+	    
+   	  break;
+   	  
+   	  case "search_item":   	     
+   	     
+   	     placeholder(".search_item_name", "Search" );    
+   	     setTimeout(function() {		
+ 		   setFocus('search_item_name');
+        }, 500); 
+   	     
+   	     $( "#search_item_name" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
+				
+				destroyList('search_item_name_result');
+				
+				search_item_name = $(this).val();
+				merchant_id = getActiveMerchantID();				
+				
+				if(!empty(search_item_name)){
+					data = "item_name="+ search_item_name;
+					data+= "&merchant_id="+ merchant_id;
+				    processDynamicAjax('searchFoodItem',data,'search_item_name_result','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
+					}
+				}
+			}
+   	    });
+   	    
+   	    AnalyticsTrack("page search item"); 
+   	    
+   	  break;
+   	  
+   	  case "item_details":
+   	     	    
+   	    setCloseMerchant();
+   	    
+   	    merchant_id = getActiveMerchantID();
+   	    data = "cat_id="+page.data.cat_id;   	
+   	    data += "&item_id="+page.data.item_id;   
+   	    data += "&merchant_id="+merchant_id;   	   
+   	       	       	   
+   	    if(!empty(page.data.row)){
+   	    	data += "&row="+page.data.row;   	   
+   	    }
+   	    
+   	    processAjax("itemDetails",data,"GET", 'skeleton3');
+   	    
+   	    AnalyticsTrack("page item_details"); 
+   	    
+   	  break;
+   	  
+   	  case "cart":   	    
+   	    
+   	    if(app_settings = getAppSettings()){   	    	
+   	    	//$(".no_order_wrap img").attr("src", app_settings.images.image1 );
+   	    }
+   	    $(".min_delivery_order").val('');
+   	    
+   	    if(onsenNavigator.topPage.id=="cart"){
+   	      loadCart();
+   	    }
+   	       	    
+   	    initPullHook('load_cart', 'cart_pull_hook', '' );
+   	    
+   	    AnalyticsTrack("page cart"); 
+   	    
+   	  break;
+   	  
+   	  case "profile":   	     
+   	     processDynamicAjax("getFirstCart", "" , "temp_loader");   	     
+   	     AnalyticsTrack("page profile"); 
+   	  break;
+   	  
+   	  /*case "dialog_transaction_type":
+		  processAjax('servicesList', 'merchant_id=' +  getActiveMerchantID() );
+	  break;*/
+	  
 	
-	if (isNaN(selected_price)){
-		selected_price=0;
-	}	
-	
-	dump("discount=>"+discount);
-	dump("selected_price=>"+selected_price);
-	var qty=parseFloat($(".qty").val());
-	var total_value=qty* (selected_price-discount);    
-	
-	//adon	
-	dump('addon totalx');	
-	var addon_total=0;
-	
-	var addon_prices = [];
-	
-	$('#page-itemdisplay .sub_item:checkbox:checked').each(function(){        		
-        var addo_price=explode("|",$(this).val());        
-        if ( $(this).data("withqty")==2 ){
-        	var p=$(this).parent().parent().parent();        	
-        	var qtysub= parseFloat(p.find('.subitem-qty').val());
-        	        	        
-        	addon_total+=qtysub* parseFloat(addo_price[1]);
-        	//addon_prices.push(addon_total);
-        } else {        	
-        	addon_total+=qty* parseFloat(addo_price[1]);
-        	//addon_prices.push(addon_total);
-        }        
-    });
-       
-    $('#page-itemdisplay .sub_item:radio:checked').each(function(){        		
-    	    	
-        var addo_price=explode("|",$(this).val());       
-
-        dump(addo_price);
-        dump(addo_price[1]);
-               
-        addon_total+=qty * parseFloat(addo_price[1]);
-        addon_prices.push( parseFloat(addo_price[1]) );
-    });
+	  case "address_form_select": 
+   	    processAjax('getAddressBookDropDown', '');
+   	       	    
+   	    placeholder(".contact_phone", t("Contact Number") );
+   	    placeholder(".delivery_instruction", t("Delivery instructions") );
+   	    
+   	    customer_number = getStorage("customer_number");
+	   	if(!empty(customer_number)){
+	   	   $(".contact_phone").val( customer_number );
+	   	}
+   	    
+   	  break;
+   	  
+   	  case "enter_phone":
+   	    placeholder(".moobile_prefix" , t("Prefix") );
+   	    placeholder(".mobile_no" , t("Mobile no.") );
+   	       	    
+   	    setTimeout(function() {		
+ 		   setFocus("mobile_no");
+        }, 500); 
         
-    total_value+=addon_total;
-    
-    dump("total_value =>"+total_value);    
-    if ( $(".two_flavors").val()==2 ){
-    	dump("two_flavors");
-    	dump(addon_prices);
-    	total_value = Math.max.apply(Math,addon_prices); 
-    	dump('get the highest value => ' + total_value );
-    	total_value = parseInt($("#page-itemdisplay .qty").val()) * total_value;	
-    }
-    
-    //$(".total_value").html(  $(".currency_symbol").val() +" "+ total_value);
-    $(".total_value").html( prettyPrice(total_value)  );
-}
+        fillEnterPhone();
+   	    
+   	    old_phone = $(".contact_phone").val();   	       	       	       	    
+   	    if(settings = getAppSettings()){
+   	       if(!empty(settings.mobile_prefix)){   	       	  
+   	       	  $(".moobile_prefix").val( settings.mobile_prefix );   	       	  
+   	       	  if(!empty(old_phone)){
+   	       	     res = old_phone.replace( settings.mobile_prefix , "");
+   	       	     $(".mobile_no").val( res );
+   	       	  }
+   	       } else {
+   	       	 //
+   	       }   	    
+		}     	   		
+   	  break;
+   	  
+   	   case "payment_option":   	    	         	     
+   	     
+   	      $(".pay_now_label").html( t("PAY")+ " " + $(".cart_total_value").val() );
+   	      params = "transaction_type=" + $(".transaction_type").val();
 
-function addCartQty(bolean)
-{	
-	var qty=parseInt($("#page-itemdisplay .qty").val());	
-	if ( bolean==2){
-		qty=qty+1;
-	} else {
-		qty=qty-1;
-	}
-	if ( qty>1){
-	    $("#page-itemdisplay .qty").val(qty)
-	} else {
-		$("#page-itemdisplay .qty").val(1)
-	}
-	setCartValue();
-}
-	
-function addToCart()
-{		
-	var proceed=true;
-	/*check if sub item has required*/
-	if ( $(".require_addon").exists()){
-		$(".small-red-text").remove();	
-		$('.require_addon').each(function () {
-			if ( $(this).val()==2 ) {
-				var required_addon_id=$(this).data("id");
-	   	   	   	var required_addon_name=$(this).data("name");
-	   	   	   	var required_addon_selected=$(".sub_item_name_"+required_addon_id+":checked").length; 
-	   	   	   	if ( required_addon_selected <=0){
-	   	   	   		proceed=false;
-	   	   	   			   	   	  
-	   	   	   		var err_msg= getTrans("You must select at least one addon","select_addon") +  " - "+ required_addon_name;
-	   	   	   		   	   	   		
-	   	   	   		$(".require_addon_"+required_addon_id).after( 
-					"<span class=\"small-red-text\">"+err_msg 
-					+'</span');
-					onsenAlert(err_msg);
-	   	   	   	}
-			}
-		});
-	}
+   	      opt_contact_delivery = $("input[name=opt_contact_delivery]:checked").val();		
+		  if(!empty(opt_contact_delivery)){
+		      params+="&opt_contact_delivery=" + opt_contact_delivery;
+		  }
+   	       	     
+   	      params+= addMerchantParams();
+   	      processAjax('loadPaymentList', params );   	      
+   	      
+   	      AnalyticsTrack("page payment option"); 
+   	      
+   	      
+   	  break;
+   	  
+   	  case "cod_forms":
+   	  case "dinein_forms":
+   	  
+   	     if(page_id=="dinein_forms"){   	
+   	     	     	 
+   	     	setTimeout(function() {		
+ 		      setFocus('dinein_number_of_guest');
+            }, 500);   
+            
+   	     } else if( page_id=="cod_forms" ){
+   	     	
+   	     	setTimeout(function() {		
+ 		      setFocus('order_change');
+            }, 500);   
+                       
+   	     }
+   	     
+   	     $(".pay_now_label").html( t("PAY")+ " " + $(".cart_total_value").val() );
+   	        	     
+   	     placeholder("#dinein_number_of_guest", "Number Of Guests" );   	     
+   	     placeholder("#dinein_table_number", "Table number" );
+   	     placeholder(".contact_phone", "Contact Number" );  
+   	     placeholder(".dinein_special_instruction", "Special instructions" );  
+   	     
+   	     placeholder(".order_change", "Enter amount" );  
+   	        	     
+   	     /*if(settings = getAppSettings()){
+	   	  	 dump(settings);
+	   	  	 if(settings.cod_change_required=="2"){	   	  	 	
+	   	  	 	$(".order_change").attr("required",'required');
+	   	  	 }   	  	 
+	   	  } */
+   	  
+	   	  customer_number = getStorage("customer_number");
+	   	  if(!empty(customer_number)){
+	   	  	  $(".contact_phone").val( customer_number );
+	   	  }	   	     	     
+   	  break;
+   	  
+   	   case "receipt":   	   	   
+   	    clearSetDeliveryDate();    
+   	    $(".order_place_label").html( page.data.message );      	    
+   	    $(".receipt_order_id").val( page.data.order_id );
+   	    AnalyticsTrack("page receipt"); 
+   	  break;
+   	  
+   	  case "address_form":   	      	    
+   	    placeholder(".street", "Street" );
+   	    placeholder(".city", "City" );
+   	    placeholder(".state", "State" );
+   	    placeholder(".zipcode", "Zip Code" );
+   	    placeholder(".location_name", "Floor/unit/Room #" );
+   	    placeholder(".delivery_instruction", "Delivery instructions" );   	    
+   	    placeholder(".contact_phone", "Contact Number" );   	    
+   	     
+   	    params='';   	    
+   	    processAjax('GetAddressFromCart',params);
+   	  break;
+   	  
+   	  case "settings":   	       	    
+   	    if(isLogin()){ 
+   	    	settingsMenu(true);
+   	    } else {
+   	    	settingsMenu(false);
+   	    }   	     	    
+   	    processDynamicAjax('getPushSettings','','pushsetting_loader','GET',1 ); 
+   	    
+   	    AnalyticsTrack("page settings"); 
+   	  break;   	  
+   	  
+   	  case "location":   	    
+   	    $(".print_merchant_name").html( $(".merchant_name").val() );
+   	    $(".print_merchant_address").html( $(".merchant_adddress").val() );
+   	    merchantLocation('#location_map', $(".merchant_lat").val(), $(".merchant_lng").val(), $(".merchant_adddress").val() );
+   	    
+   	    AnalyticsTrack("page location"); 
+   	    
+   	  break;
+   	 
+   	  case "order_list":   	     	
+   	    /*fillOrderTabs('order_tabs','all',0);   	   
+   	    params = "tab="+ $(".order_tab_active").val(); 
+   	    processAjax('OrderList', params , 'GET',  'skeleton2');
+   	    initPullHook('order_list', 'order_list_pull_hook', params);
+   	    resetPaginate("#order_list");
+   	    initInfiniteScroll(page, 'order_list', 'order_list' , params);   	  */
+   	  break;
+   	  
+   	  case "booking_history":   	        	        	     
+   	     fillBookingTabs('booking_tabs','all',0);	      	     
+   	     params = "tab="+ $(".booking_tab_active").val(); 
+   	     processAjax('BookingList', params , 'GET',  'skeleton2');   	    
+   	     
+   	     initPullHook('booking_history', 'booking_history_pull_hook');
+   	     resetPaginate("#booking_history");
+   	     initInfiniteScroll(page, 'booking_history', 'booking_history');   	        	     
+   	     AnalyticsTrack("page booking history"); 
+   	  break;
+   	  
+   	  case "favorite_list":   	     
+   	     //processDynamicAjax('FavoriteList','','favorite_loader','GET',1 ); 
+   	     processAjax('FavoriteList','' , 'GET',  'skeleton5');
+   	     
+   	     initPullHook('favorite_list', 'favorite_list_pull_hook');
+   	     resetPaginate("#favorite_list");
+   	     initInfiniteScroll(page, 'favorite_list', 'favorite_list');
+   	     
+   	     AnalyticsTrack("page favorite list"); 
+   	  break;
+   	  
+   	  case "creditcard_list":   	      
+   	      //processDynamicAjax('CrediCartList','','creditcard_loader','GET',1 ); 
+   	      processAjax('CrediCartList','' , 'GET',  'skeleton2');
+   	      
+   	      initPullHook('creditcard_list', 'creditcard_list_pull_hook');
+   	      resetPaginate("#creditcard_list");
+   	      initInfiniteScroll(page, 'creditcard_list', 'creditcard_list');
+   	      
+   	      AnalyticsTrack("page credit card"); 
+   	  break;
+   	  
+   	  case "addressbook_list":   	      
+   	      //processDynamicAjax('AddressBookList','','addressbook_loader','GET',1 ); 
+   	      processAjax('AddressBookList', '' , 'GET',  'skeleton2');
+   	      initPullHook('addressbook_list', 'addressbook_list_pull_hook');
+   	      resetPaginate("#addressbook_list");
+   	      initInfiniteScroll(page, 'addressbook_list', 'addressbook_list');
+   	      
+   	      AnalyticsTrack("page address book"); 
+   	  break;
+   	  
+   	  case "language_list":   	    
+   	    processDynamicAjax('getlanguageList','','language_list_loader','GET',1 ); 
+   	    initPullHook('language_list', 'language_list_pull_hook');
+   	    AnalyticsTrack("page language list"); 
+   	  break;
+   	  
+   	  case "add_review":   	       	    
+   	    placeholder(".review", "What do you think of your order?" );
+   	    order_id = page.data.order_id;
+   	    processAjax('getOrderDetails','order_id='+ order_id, 'GET', 'skeleton4');   	    
+   	    
+   	    AnalyticsTrack("page add review"); 
+   	    
+   	  break;
+   	     	  
+   	  case "track_history":
 
-	dump("proceed=>"+proceed);
-	if (!proceed){
-		return;
-	}	
-	
-	var sub_item=[];
-	var cooking_ref=[];	
-	var ingredients=[];
-	var item_id='';
-	var qty=0;
-	var price=0;
-	var order_notes='';
-	var discount='';
-	var category_id='';  //cart category
-	//dump('add to cart');
-	//var params = $( "#page-itemdisplay .frm-foodorder").serialize();
-	var params = $( "#page-itemdisplay .frm-foodorder").serializeArray();	
-	if (!empty(params)){
-		$.each( params, function( key, val ) { 			
-			/*item*/
-			if (val.name=="item_id"){
-				item_id=val.value;
-			}			
-			if (val.name=="qty"){
-				qty=val.value;
-			}
-			if (val.name=="price"){
-				price=val.value;
-			}
-			if (val.name=="category_id"){
-				category_id=val.value;
-			}
-			/*sub item*/
-			/*if ( val.name=="sub_item"){				
-				sub_item[sub_item.length]={"value":val.value};
-			}*/
-			/*cooking_ref*/
-			if ( val.name=="cooking_ref"){				
-				cooking_ref[cooking_ref.length]={"value":val.value};
-			}
-			/*ingredients*/
-			if ( val.name=="ingredients"){				
-				ingredients[ingredients.length]={"value":val.value};
-			}					
-			if ( val.name=="order_notes"){				
-				order_notes=val.value;
-			}							
-			if ( val.name=="discount"){				
-				discount=val.value;
-			}				
-		});	
+   	    if(app_settings = getAppSettings()){ 
+   	    	track_interval_timeout = app_settings.tracking_interval;   	    	
+   	    }
+   	  
+   	    order_id = page.data.order_id;   	    
+   	    $(".track_order_id").val( order_id );   	    
+   	    params = 'order_id='+ order_id;
+   	    
+   	    //processDynamicAjax('getOrderHistory', params, 'track_history_loader', 'GET',1 );   	
+   	    processAjax('getOrderHistory',params , 'GET',  'skeleton2');
+   	    
+   	    initPullHook('track_history', 'track_history_pull_hook', params );    
+   	    
+   	    AnalyticsTrack("page track order history"); 
+   	    
+   	    stopTrackHistory;
+   	    setTimeout(function() {	   	       
+   	       processDynamicAjax("checkRunTrackHistory",params);
+   	    }, 400); 
+   	    
+   	  break;
+   	  
+   	  case "order_search":
+   	    
+   	    placeholder(".search_field_by_name", "Enter Order ID or Restaurant Name" );	    
+   	  	    
+   	    setTimeout(function() {		
+ 		   setFocus('search_field_by_name');
+        }, 500); 
+   	    
+   	    $( "#search_field_by_name" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
 				
-		/*get sub item */
-		
-		if ( $(".two_flavors").val()==2 ){			
-			var sub_item_selected=$(".sub_item:checked").length; 			
-			if ( sub_item_selected<2){
-   	   	  	  onsenAlert(  getTrans("You must select price for left and right flavor",'two_flavor_required') ); 
-   	   	      return;
-   	   	   }   	   
-   	   	   
-   	   	   var xx=0; var addon_price_array=[];
-   	   	   $.each( $(".sub_item:checked") , function( key, val ) { 	
-				var parent=$(this).parent().parent().parent();		
-				var sub_item_qty = parent.find(".subitem-qty").val()
-				if (empty(sub_item_qty)){
-					sub_item_qty="itemqty";
-				}
-				var subcat_id=$(this).data("id");	
-
-				var addon_price=$(this).val();
-				addon_price=addon_price.split("|");				
+				destroyList('search_order_result');				
+				search_field_by_name = $(this).val();
+				dump("search_field_by_name=>"+ search_field_by_name);
 				
-			
-				if (!empty(addon_price[3])){
-				   addon_price_array[xx]=addon_price[1];
-				} else {
-				   addon_price_array[xx]=0;
-				}
-							
-				sub_item[sub_item.length] = {
-					'subcat_id':subcat_id,
-					'value':$(this).val(),
-					'qty':sub_item_qty
-				};
-				
-				xx++;
-			});	
-			
-			dump(addon_price_array);			
-			
-			largest=0;
-			
-			two_flavor_option = getStorage("two_flavor_option");
-			dump("two_flavor_option=>"+two_flavor_option);
-			
-			if(two_flavor_option==2){
-				if($.isArray(addon_price_array)) {
-					var two_flavor_sum = 0;
-					$.each( addon_price_array , function( key_1, val_1 ) {							
-						two_flavor_sum+= parseFloat(val_1);
-					});
-					
-					dump("two_flavor_sum =>" +two_flavor_sum);
-					if(two_flavor_sum>0){
-					  largest = two_flavor_sum/2;
+				if(!empty(search_field_by_name)){
+					data = "search_str="+ search_field_by_name;
+				    processDynamicAjax('searchOrder',data,'search_order_result','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
 					}
 				}
-			} else {
-			   largest = Math.max.apply(Math,addon_price_array);
 			}
-			
-			dump("largest price => "+largest);
-			price=largest;	
-			   	   	   
-		} else {
-			$.each( $(".sub_item:checked") , function( key, val ) { 	
-				var parent=$(this).parent().parent().parent();		
-				var sub_item_qty = parent.find(".subitem-qty").val()
-				if (empty(sub_item_qty)){
-					sub_item_qty="itemqty";
-				}
-				var subcat_id=$(this).data("id");						
-				sub_item[sub_item.length] = {
-					'subcat_id':subcat_id,
-					'value':$(this).val(),
-					'qty':sub_item_qty
-				};
-			});	
-		}
-			
-		cart[cart.length]={		  
-		  "item_id":item_id,
-		  "qty":qty,
-		  "price":price,
-		  "sub_item":sub_item,
-		  "cooking_ref":cooking_ref,
-		  "ingredients":ingredients,
-		  'order_notes': order_notes,
-		  'discount':discount,
-		  'category_id':category_id  //cart category
-		};
-		
-		var cart_value={		  
-		  "item_id":item_id,
-		  "qty":qty,
-		  "price":price,
-		  "sub_item":sub_item,
-		  "cooking_ref":cooking_ref,
-		  "ingredients":ingredients,
-		  'order_notes': order_notes,
-		  'discount':discount,
-		  'category_id':category_id  //cart category
-		};
-		
-		dump(cart);
+   	    });
+   	    
+   	    AnalyticsTrack("page order search"); 
+   	    
+   	  break;
+   	  
+   	  
+   	  case "view_order":   	    
+   	    order_id = page.data.order_id;
+   	    processAjax('ViewOrder','order_id='+ order_id ,'GET','skeleton2');   	    
+   	    AnalyticsTrack("page view order"); 
+   	  break;
+   	  
+   	  case "favorite_search":
+   	  
+   	     placeholder(".search_field_by_name", "Enter restaurant name" );	    
+   	       	     
+   	     setTimeout(function() {		
+ 		   setFocus('search_field_by_name');
+        }, 500); 
+   	     
+   	    $( "#search_field_by_name" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
 				
-		if( saveCartToDb() ){
-		   callAjax("addToCart", "cart="+ JSON.stringify(cart_value) + "&device_id=" + getStorage("device_id") );
-		   sNavigator.popPage({cancelIfRunning: true}); //back button
-		} else {
-			sNavigator.popPage({cancelIfRunning: true}); //back button
-			toastMsg(  getTrans("Item added to cart",'item_added_to_cart') );
-		}
-		
-		showCartNosOrder();
+				destroyList('favorite_search_result');				
+				search_field_by_name = $(this).val();
+				dump("search_field_by_name=>"+ search_field_by_name);
+				
+				if(!empty(search_field_by_name)){
+					data = "search_str="+ search_field_by_name;
+				    processDynamicAjax('searchFavorites',data,'favorite_search_result','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
+					}
+				}
+			}
+   	    });
+   	    
+   	  break;
+   	  
+   	  case "creditcard_add":
+   	     	   
+   	    placeholder("#card_name", "Cardholders Name" );
+   	    placeholder("#credit_card_number", "Credit Card Number" );
+   	    placeholder("#cvv", "CVV" );
+   	    placeholder("#billing_address", "Billing Address" );   	    
+   	  
+   	    generateMonth(); generateYear();
+   	    cc_id = page.data.cc_id;
+   	    if(!empty(cc_id)){
+   	       processAjax('getCedittCardInfo',"cc_id=" + cc_id );
+   	    }   	    
+   	    document.getElementById('credit_card_number').oninput = function() {
+	       this.value = CreditCardFormat(this.value)
+	    };		  
+	    
+	    AnalyticsTrack("page credit card add");
+   	  
+   	  break;
+   	  
+   	  case "address_book":   	     	   
+   	    placeholder(".street", "Street" );
+   	    placeholder(".city", "City" );
+   	    placeholder(".state", "State" );
+   	    placeholder(".zipcode", "Zip Code" );
+   	    placeholder(".location_name", "Floor/unit/Room #" );
+   	    placeholder(".delivery_instruction", "Delivery instructions" );   	    
+   	  
+   	    id = page.data.id;
+   	    if(!empty(id)){
+   	       processAjax('getAddressBookByID',"id=" + id );
+   	    } else {
+   	       processAjax('getCountryList',"");
+   	       initMapAdress('#map_address', true);
+   	    }
+   	    
+   	    AnalyticsTrack("page address book");
+
+   	  break;
+   	  
+   	  case "edit_profile":   	   
+   	    placeholder("#first_name", "First Name" );
+   	    placeholder("#last_name", "Last Name" );
+   	    placeholder("#contact_phone", "Mobile no." );   	       	  
+   	    processAjax('GetProfile',"",'GET', 'skeleton3');   	    
+   	    
+   	    AnalyticsTrack("page edir profile");
+   	  break;
+   	  
+   	  case "change_password":   	     	    
+   	    placeholder("#current_password", "Enter Current Password" );
+   	    placeholder("#new_password", "Enter New Password" );
+   	    placeholder(".cnew_password", "Confirm New Password" );
+   	    processAjax('GetProfile',"");
+   	    
+   	    AnalyticsTrack("page change password");
+   	    
+   	  break;
+   	  
+   	  case "device_id":   	    
+   	    $(".print_device_uiid").html( device_uiid );
+   	    $(".print_device_id").html( device_id );
+   	    
+   	    AnalyticsTrack("page device");
+   	  break;
+   	  
+   	  case "about":   	   
+   	    merchant_id = getActiveMerchantID();
+   	    params = "merchant_id="+ merchant_id;
+   	    processAjax('GetMerchantAbout',params, 'GET', 'skeleton3');
+   	    AnalyticsTrack("page about");
+   	  break;
+   	  
+   	  case "reviews":   	    
+   	     merchant_id = getActiveMerchantID();
+   	     params = "merchant_id="+ merchant_id;
+   	     //processDynamicAjax('ReviewList',params,'reviews_loader','GET',1 ); 
+   	     processAjax('ReviewList',params , 'GET',  'skeleton2');
+   	     
+   	     initPullHook('reviews', 'reviews_list_pull_hook', params );
+   	     resetPaginate("#reviews");
+   	     initInfiniteScroll(page, 'reviews', 'reviews');
+   	     AnalyticsTrack("page reviews");
+   	  break;
+   	  
+   	  case "book_table":   	     
+   	     placeholder("#number_guest", "Number Of Guests" );
+   	     placeholder("#booking_name", "Name" );
+   	     placeholder("#email", "Email" );
+   	     placeholder("#mobile", "Mobile" );
+   	     placeholder("#booking_notes", "Your Instructions" );   	     
+   	     
+   	     merchant_id = getActiveMerchantID();
+   	     $(".book_merchant_id").val( merchant_id );
+   	     processAjax('GetMerchantDateList', 'merchant_id=' +  merchant_id  ,'GET' , 'skeleton4' );
+   	     AnalyticsTrack("page book table");
+   	  break;
+   	  
+   	  case "booking_receipt":   	    
+   	    message = page.data.message;
+   	    $(".print_booking_message").html( message );
+   	    AnalyticsTrack("page booking receipt");
+   	  break;
+   	  
+   	  case "photo_gallery":   	     
+   	     merchant_id = getActiveMerchantID();   	 
+   	     params = "merchant_id="+ merchant_id;       	     
+   	     //processDynamicAjax('GetGallery',params,'gallery_loader','GET',1 ); 
+   	     processAjax('GetGallery',params , 'GET',  'skeleton6');
+   	     initPullHook('photo_gallery', 'photo_gallery_pull_hook', params );
+   	     AnalyticsTrack("page photo_gallery");
+   	  break;
+   	  
+   	  case "information":   	    
+   	    merchant_id = getActiveMerchantID();   	 
+   	    params = "merchant_id="+ merchant_id;       	     
+   	    //processDynamicAjax('GetMerchantInformation',params,'information_loader','GET',1 );    	    
+   	    processAjax('GetMerchantInformation',params , 'GET',  'skeleton3');
+   	    
+   	    initPullHook('information', 'information_pull_hook', params );
+   	    AnalyticsTrack("page information");
+   	  break;
+   	  
+   	  case "promos":   	    
+   	    merchant_id = getActiveMerchantID();   	 
+   	    params = "merchant_id="+ merchant_id;       	     
+   	    //processDynamicAjax('GetMerchantPromo',params,'promos_loader','GET',1 ); 
+   	    processAjax('GetMerchantPromo',params , 'GET',  'skeleton2');
+   	    initPullHook('promos', 'promos_pull_hook', params );
+   	    AnalyticsTrack("page promos");
+   	  break;
+   	  
+   	  case "points_list":   	    
+   	    //processDynamicAjax('GetPointSummary','','points_list_loader','GET',1 ); 
+   	    processAjax('GetPointSummary',params , 'GET',  'skeleton2');
+   	    initPullHook('points_list', 'points_list_pull_hook', '' );
+   	    AnalyticsTrack("page points_list");
+   	  break;
+   	  
+   	  case "points_details":   	    
+   	     point_type = page.data.point_type;
+   	     params = "point_type="+ point_type;
+   	     processDynamicAjax('GetPointDetails',params,'points_details_loader','GET',1 ); 
+   	     initPullHook('points_details', 'points_details_pull_hook', params );
+   	     
+   	     resetPaginate("#points_details");
+   	     initInfiniteScroll(page, 'points_details', 'points_details', params);   	  
+   	     AnalyticsTrack("page points_details");
+   	  break;
+   	  
+   	  case "search_category":   	   	     
+   	     placeholder(".search_category_name", "Search" );    
+   	     setTimeout(function() {		
+ 		   setFocus('search_category_name');
+         }, 500); 
+   	     
+   	     $( "#search_category_name" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
+				
+				destroyList('search_category_name_result');
+				
+				search_item_name = $(this).val();
+				merchant_id = getActiveMerchantID();				
+				
+				if(!empty(search_item_name)){
+					data = "item_name="+ search_item_name;
+					data+= "&merchant_id="+ merchant_id;
+				    processDynamicAjax('searchFoodCategory',data,'search_category_name_result','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
+					}
+				}
+			}
+   	    });
+   	    
+   	    AnalyticsTrack("page search_category"); 
+   	    
+   	  break;
+   	  
+   	  case "search_form":   	        	    
+   	    placeholder(".search_restaurant_name", "Search for restaurant,food and cuisine" );
+   	  
+   	     setTimeout(function() {		
+ 		   setFocus('search_restaurant_name');
+         }, 500);    	     
+   	     
+   	     search_string = page.data.search_string;   	     
+   	     if(!empty(search_string)){
+   	     	data = "search_string="+ search_string;					
+		    processDynamicAjax('searchMerchantFood',data,'search_form_result','GET',1);
+		    $(".search_restaurant_name").val( search_string );
+   	     }
+   	     
+   	     $( "#search_restaurant_name" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
+				
+				destroyList('search_form_result');
+				
+				search_item_name = $(this).val();
+				merchant_id = getActiveMerchantID();				
+				
+				if(!empty(search_item_name)){
+					data = "search_string="+ search_item_name;					
+				    processDynamicAjax('searchMerchantFood',data,'search_form_result','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
+					}
+				}
+			}
+   	    });   	   
+   	    
+   	    AnalyticsTrack("page search_form"); 
+   	    
+   	  break;
+   	  
+   	  case "search":
+   	    placeholder(".xx", "Search for restaurant,food and cuisine" );
+   	    
+   	    processDynamicAjax('GetRecentSearch','','recent_search_item_loader','GET',1 );   	      
+		initPullHook('search', 'recent_search_item_pull_hook');
+		resetPaginate("#search");
+		initInfiniteScroll(page, 'search', 'search','');
+   	  break;
+   	  
+   	  case "driver_signup":
+   	     	     
+   	     placeholder(".first_name", "First Name" );   
+   	     placeholder(".last_name", "Last Name" );   
+   	     placeholder(".email", "Email address" );   
+   	     placeholder(".phone", "Phone" );  
+   	     placeholder("#username", "Username" );  
+   	     placeholder("#password", "Password" );  
+   	     placeholder("#cpassword", "Confirm Password" );  
+   	     placeholder("#transport_description", "Transport Description (Year,Model)" );  
+   	     placeholder("#licence_plate", "License Plate" );  
+   	     placeholder("#color", "Color" );  
+   	  
+   	     html = transportationList();
+   	     $(".transportation_wrap").html( html );
+   	     
+   	     AnalyticsTrack("page driver_signup"); 
+   	  break;
+   	  
+   	  case "restaurant_list_map":
+   	     	     	        	  
+   	     if(isLocation()){		
+   	     	if(app_settings = getAppSettings()){
+   	     		current_latlng = app_settings.default_map_location;
+   	     	}   	     	
+   	     } else {
+   	     	current_latlng = getCurrentLocation();
+   	     }   	        	        	     
+   	     
+   	     if(empty(current_latlng)){
+   	     	current_latlng = {
+   	     		lat : 0,
+   	     		lng : 0
+   	     	};  	
+   	     }
+   	     
+   	     merchantMapList("#map_list", current_latlng.lat, current_latlng.lng);
+   	     
+   	     search_type = $(".search_type").val();   	     
+   	     params = "search_type="+search_type; 
+   	     params+="&map_page=1";   	     
+   	     cuisine_id = $(".cuisine_id").val();
+   	     if(!empty(cuisine_id)){
+   	     	params+="&cuisine_id=" + cuisine_id;
+   	     }
+   	     
+   	     params+= "&"+$( ".frm_filter" ).serialize(); 
+   	     
+   	     processAjax('searchMerchant',params);
+   	     
+   	     AnalyticsTrack("page restaurant_list_map");    	        	     
+   	  break;
+   	  
+   	  case "order_verification":   	    
+   	     placeholder(".order_sms_code", "Enter Code" ); 
+         sendOrderSMSCode();
+   	  break;
+   	  
+   	  case "select_creditcards":
+   	      $("#select_creditcards .pay_now_label").html( t("PAY")+ " " + $(".cart_total_value").val() );
+   	      processDynamicAjax('CrediCartList','','select_creditcards_loader','GET',1 ); 
+   	      initPullHook('select_creditcards', 'select_creditcards_pull_hook');
+   	  break;
+   	  
+   	  case "select_payondelivery":
+   	     $("#select_payondelivery .pay_now_label").html( t("PAY")+ " " + $(".cart_total_value").val() );
+   	     params  = addMerchantParams();
+   	     processDynamicAjax('PayOnDeliveryCardList', params ,'payondelivery_loader','GET',1 ); 
+   	     initPullHook('payondelivery_list', 'payondelivery_pull_hook', params );
+   	  break;
+   	  
+   	  case "authorize_form":   	    
+   	   
+   	    placeholder(".first_name", "First Name" ); 
+   	    placeholder(".last_name", "Last Name" ); 
+   	    placeholder(".credit_card_number", "Credit Card Number" ); 
+   	    placeholder(".address", "Address" ); 
+   	    placeholder(".state", "State" ); 
+   	    placeholder(".city", "City" ); 
+   	    placeholder(".zip_code", "Zip Code" ); 
+   	    placeholder(".cvv", "CVV" ); 
+   	    
+   	  
+   	    generateMonth(); generateYear();
+   	    
+   	    document.getElementById('credit_card_number').oninput = function() {
+	       this.value = CreditCardFormat(this.value)
+	    };
+   	    
+   	    total_amount = page.data.total_amount;   	  
+   	    $("#authorize_form .pay_now_label").html( t("PAY") + " "+ prettyPrice(total_amount) );
+   	    $("#authorize_form .order_id").val( page.data.order_id  );
+   	    processAjax('getCountryList',"");
+   	  break;
+   	  
+   	  case "custom_page":   	    
+   	    page_id = page.data.page_id;   
+   	    dump("page_id=>"+page_id);
+   	    processAjax("GetPage","page_id="+ page_id ,'GET','skeleton4');   	    
+   	    initPullHook('GetPage', 'custom_page_pull_hook', "page_id="+ page_id );
+   	    
+   	    AnalyticsTrack("page custom_page"); 
+   	  break;
+   	  
+   	  case "track_driver":   	    
+   	     stopTrackHistory();
+   	     //document.querySelector('ons-progress-bar').setAttribute('value',0);
+   	     track_order_id = $(".track_order_id").val();
+   	     //processAjax("TaskInformation","order_id="+ track_order_id ,'GET');   	     
+   	     if(app_settings = getAppSettings()){   	     	
+   	     	fillTrackTemplate(app_settings.tracking_theme);
+   	     } else {
+   	     	fillTrackTemplate(1);
+   	     }
+   	     
+   	    setTimeout(function() {		
+ 		   document.querySelector('ons-progress-bar').setAttribute('value',0);
+   	       processAjax("TaskInformation","order_id="+ track_order_id ,'GET');   	     
+        }, 100);    	     
+   	     
+   	     AnalyticsTrack("page track_driver"); 
+   	  break;
+   	  
+   	  case "driver_info":
+   	     stopTrack(); 
+   	     driver_id = page.data.driver_id; 
+   	     params = "driver_id="+ driver_id; 
+   	     processAjax("DriverInformation", params ,'GET');   	     
+   	     initPullHook('driver_details', 'driver_details_pull_hook', params );   	        	     
+   	  break;
+   	  
+   	  case "task_add_rating":
+   	    placeholder(".review", "What do you think of your delivery?" );
+   	    placeholder(".review_order", "What do you think of your order?" );
+   	    
+   	    task_id = page.data.task_id; 
+   	    params = "task_id="+ task_id; 
+   	    processAjax("GetTask", params ,'GET');
+   	  break;
+   	  
+   	  case "cancel_order_form":
+   	     placeholder(".cancel_reason", "state your reason for cancellation" );	
+   	     order_id = page.data.order_id;
+   	     processAjax('getOrderDetailsCancel','order_id='+ order_id, 'GET', 'skeleton4');   	    
+   	  break;
+   	  
+   	  case "notifications":
+   	  
+   	      processAjax('GetNotifications','' , 'GET',  'skeleton2');
+   	      
+   	      initPullHook('notifications', 'notifications_list_pull_hook');
+   	      resetPaginate("#notifications");
+   	      initInfiniteScroll(page, 'notifications', 'notifications');
+   	      
+   	      AnalyticsTrack("page notifications"); 
+   	  
+   	  break;
+   	  
+   	  case "booking_search":
+   	  
+   	     placeholder(".search_field_by_name", t("Enter booking ID or Restaurant Name") );
+   	  
+   	     setTimeout(function() {		
+ 		   setFocus('search_field_by_name');
+        }, 500); 
+   	    
+   	    $( "#search_field_by_name" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
+				
+				destroyList('booking_search_result');				
+				search_field_by_name = $(this).val();
+				dump("search_field_by_name=>"+ search_field_by_name);
+				
+				if(!empty(search_field_by_name)){
+					data = "search_str="+ search_field_by_name;
+				    processDynamicAjax('searchBooking',data,'booking_search_result','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
+					}
+				}
+			}
+   	    });
+   	    
+   	    AnalyticsTrack("page order search");   
+   	  
+   	  break;
+   	  
+   	  case "booking_details":
+   	    booking_id = page.data.booking_id;   
+   	    params = "booking_id="+ booking_id;
+   	    processAjax("GetBookingDetails", params ,'GET','skeleton4');   	    
+   	    
+   	    initPullHook('booking_details', 'booking_details_pull_hook', params );   	 
+   	  break;
+   	  
+   	  case "page_startup2":
+   	    less = 220;
+   	    if (ons.platform.isIPhoneX()) {
+   	    	less = 300;
+   	    }   	    
+   	    banner_height = $("body").height();
+   	    banner_height = parseInt(banner_height)-less;   	    
+   	    $(".startup_carousel").css("height", banner_height+"px");
+   	    
+   	    fillStartupBanner('.startup_carousel');
+   	    setTimeout(function() {
+   	    	initStartUpBanner();
+   	    }, 100);
+   	  break;
+   	  
+   	  case "page_startup_select_language":
+   	    processDynamicAjax('getlanguageList2','','language2_list_loader','GET',1 ); 
+   	    initPullHook('language_list2', 'language2_list_pull_hook');
+   	  break;
+   	     	     	  
+   	  case "select_location":   	    
+   	     	    
+        removeStorage("location_data_state");
+   	    removeStorage("location_data_city2");
+   	    
+   	    LocationSearchForm('#select_location .search_wrapper');   	    
+   	    setTimeout(function() {			
+		  $(".search-input").removeClass("search-input--material");
+	   }, 100);
+	   
+	   location_mode = locationMode();	   
+	   	   
+	   if(location_mode==1){
+		  $( ".area_name" ).keyup(function( event ) {
+	   	    	if ( event.which == 13 ) {
+				    event.preventDefault();
+				} else {
+					$(this).val('');
+				}
+	   	  }); 
+	   } else if( location_mode==2) {	   	  
+	   	  $( ".city_name" ).keyup(function( event ) {
+	   	    	if ( event.which == 13 ) {
+				    event.preventDefault();
+				} else {
+					$(this).val('');
+				}
+	   	  }); 
+	   }
+	   
+   	  break;
+   	  
+   	  case "location_city":
+   	       	    
+   	    location_mode = locationMode();
+   	  
+   	    placeholder("#location_city .location_city", "City" );   	     
+   	     
+   	    setTimeout(function() {		
+ 		   setFocus('field_location_city');
+        }, 200); 
+        
+        params_city='';
+        is_address_book = page.data.address_book;        
+        if(is_address_book==1){
+           params_city = "state_id="+ page.data.state_id;
+           $(".is_address_book").val(1);
+        } else {
+        	removeStorage("location_data_area2");        	
+        	if(location_mode==2){
+        	    params_city+="&state_id=" + $("#select_location .state_id").val();
+            }
+        }                   
+   	     
+   	    processDynamicAjax('CityList',params_city,'location_city_result_loader','GET',1 ); 
+   	    initPullHook('location_city_result', 'location_city_pull_hook', params_city);
+   	    initInfiniteScroll(page, 'CityList', 'location_city', params_city);		
+   	    
+   	    $( "#field_location_city" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
+				
+				destroyList('location_city_result');				
+				search_field_by_name = $(this).val();
+				dump("search_field_by_name=>"+ search_field_by_name);
+				
+				if(!empty(search_field_by_name)){
+					data = "search_str="+ search_field_by_name;					
+					data+="&"+params_city;
+				    processDynamicAjax('CityList',data,'location_city_result_loader','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
+					}
+				}
+			}
+   	    });   	     
+   	  break;
+   	  
+   	  case "location_area":
+   	    placeholder("#location_area .field_location_area", "District / Area" );
+   	    
+   	    setTimeout(function() {		
+ 		   setFocus('field_location_area');
+        }, 200); 
+        
+        if(page.data.address_book==1){
+           $(".is_address_book").val(1);
+        }
+        
+        params_area = "city_id="+ page.data.city_id;
+        processDynamicAjax('AreaList', params_area ,'location_area_result_loader','GET',1 ); 
+        initPullHook('location_area_result', 'location_area_pull_hook', params_area);
+        initInfiniteScroll(page, 'AreaList', 'location_area' , params_area);		
+   	    
+         $( "#field_location_area" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
+				
+				destroyList('location_area_result');				
+				search_field_by_name = $(this).val();
+				dump("search_field_by_name=>"+ search_field_by_name);
+				
+				if(!empty(search_field_by_name)){
+					data = "search_str="+ search_field_by_name;
+					data+= "&"+params_area;
+				    processDynamicAjax('AreaList',data,'location_area_result_loader','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
+					}
+				}
+			}
+   	    });   	     
+   	    
+   	  break;
+   	  
+   	  case "address_book_location":
+   	  
+   	    removeStorage("location_data_state1");
+   	    removeStorage("location_data_city1");
+   	    removeStorage("location_data_area1");
+   	    
+   	    $( ".city_name" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
+				$(this).val('');
+			}
+   	    }); 
+   	    
+   	    $( ".area_name" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
+				$(this).val('');
+			}
+   	    }); 
+   	    
+   	    placeholder("#frm_address_book_location .street", "Street" );
+   	    placeholder("#frm_address_book_location .state_name", "State/Region" );
+   	    placeholder("#frm_address_book_location .city_name", "City" );
+   	    placeholder("#frm_address_book_location .area_name", "Distric/Area/neighborhood" );
+   	    placeholder("#frm_address_book_location .location_name", "Floor/unit/Room #" );
+   	    placeholder("#frm_address_book_location .delivery_instruction", "Delivery instructions" );
+   	    
+   	    id = page.data.id;
+   	    if(!empty(id)){
+   	       processAjax('getAddressBookLocationByID',"id=" + id );
+   	    } else {
+   	       //processAjax('getCountryList',"");
+   	       initMapAdress('#map_address', true);
+   	    }
+   	    
+   	  break;
+   	  
+   	  case "location_state":   	    
+   	     	    
+   	    dump("is_address_book=>"+page.data.address_book);
+   	    if(page.data.address_book==1){
+   	       $(".is_address_book").val(page.data.address_book);
+   	    }   	    
+   	    placeholder("#location_state .field_location_state", "State/Region" );
+   	    
+   	    setTimeout(function() {		
+ 		   setFocus('field_location_state');
+        }, 200); 
+                
+        processDynamicAjax('StateList', '' ,'location_state_result_loader','GET',1 ); 
+        initPullHook('StateList', 'location_state_pull_hook');
+        initInfiniteScroll(page, 'StateList', 'location_state');	
+        
+        $( "#field_location_state" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
+				
+				destroyList('location_state_result');				
+				search_field_by_name = $(this).val();
+				dump("search_field_by_name=>"+ search_field_by_name);
+				
+				if(!empty(search_field_by_name)){
+					data = "search_str="+ search_field_by_name;					
+				    processDynamicAjax('StateList',data,'location_state_result_loader','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
+					}
+				}
+			}
+   	    });   	     
+        
+      break;  
+      
+      case "address_form_location":
+                        
+        is_agree_map = getStorage("is_agree_map");
+        
+        if(is_agree_map!=1){
+	        ons.platform.select('ios');  
+		    ons.notification.confirm( t("Please point your exact location on the map") ,{
+				title: t("Delivery Address"),
+				id : "dialog_remove_item",
+				buttonLabels : [ t("OK") ]
+			}).then(function(input) {
+				if (input==0){			
+					setStorage("is_agree_map",1);
+				}
+			});
+        }
+               
+        removeStorage("location_data_state1");
+   	    removeStorage("location_data_city1");
+   	    removeStorage("location_data_area1");
+   	    
+   	    $( ".city_name" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
+				$(this).val('');
+			}
+   	    }); 
+   	    
+   	    $( ".area_name" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
+				$(this).val('');
+			}
+   	    }); 
+   	    
+   	    placeholder("#frm_address_form_location .street", "Street" );
+   	    placeholder("#frm_address_form_location .state_name", "State/Region" );
+   	    placeholder("#frm_address_form_location .city_name", "City" );
+   	    placeholder("#frm_address_form_location .area_name", "Distric/Area/neighborhood" );
+   	    placeholder("#frm_address_form_location .location_name", "Floor/unit/Room #" );
+   	    placeholder("#frm_address_form_location .delivery_instruction", "Delivery instructions" );
+   	    placeholder("#frm_address_form_location .contact_phone", "Contact Number" );
+   	    
+   	    processAjax('GetAddressFromCartLocation','');  	    
+   	    
+      break;  
+      
+      case "address_form_select_location":
+        processAjax('getAddressLocationBookDropDown', '');
+   	       	    
+   	    placeholder(".contact_phone", t("Contact Number") );
+   	    placeholder(".delivery_instruction", t("Delivery instructions") );
+   	    
+   	    customer_number = getStorage("customer_number");
+	   	if(!empty(customer_number)){
+	   	   $(".contact_phone").val( customer_number );
+	   	}
+      break;  
+      
+      case "location_postal_code":
+        dump("is_address_book=>"+page.data.address_book);
+   	    if(page.data.address_book==1){
+   	       $(".is_address_book").val(page.data.address_book);
+   	    }   	    
+   	    placeholder("#location_postal_code .field_location_postal_code", "Postal Code/Zip Code" );
+   	    
+   	    setTimeout(function() {		
+ 		   setFocus('field_location_postal_code');
+        }, 200); 
+        
+        processDynamicAjax('PostalCodeList', '' ,'location_postal_code_result_loader','GET',1 ); 
+        initPullHook('PostalCodeList', 'location_postal_code_pull_hook');
+        initInfiniteScroll(page, 'PostalCodeList', 'location_postal_code','');	
+        
+         $( "#field_location_postal_code" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {
+				
+				destroyList('location_postal_code_result');				
+				search_field_by_name = $(this).val();
+				dump("search_field_by_name=>"+ search_field_by_name);
+				
+				if(!empty(search_field_by_name)){
+					data = "search_str="+ search_field_by_name;					
+				    processDynamicAjax('PostalCodeList',data,'location_postal_code_result_loader','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
+					}
+				}
+			}
+   	    });   	      
+         
+   	    
+      break;  
+         	 
+   	  case "contact_us":
+   	    fillContactUsForm('contact_field_list');   	       	     
+   	  break; 
+   	  
+   	  case "contact_us_ty":
+   	    $(".contact_us_message").html( page.data.message );
+   	    var page = onsenNavigator.topPage; 
+   	    page.onDeviceBackButton = function(event) {   	    	
+   	    	resetToPage('tabbar.html','none');
+   	    };
+   	  break;
+   	  
+   	  case "promo_food_list":   	    
+   	    infinite_page=0;
+   	    placeholder(".search_food_promo", t("Search") );
+   	    params = $( ".frm_promo_food" ).serialize();   
+   	    processAjax('foodPromo',params,'GET','skeleton6');
+   	    initPullHook('promo_food_list',  'promo_food_list_pull_hook'); 
+   	    initInfiniteScroll(page, 'promo_food_list', 'list_promo_food');   	    
+   	  break;
+   	  
+   	  case "search_food_promo":
+   	  
+   	     placeholder(".search_food_promo_field", t("Search") );
+   	  
+   	    setTimeout(function() {		
+ 		   setFocus('search_food_promo_field');
+        }, 500); 
+   	    
+   	     $( "#search_food_promo_field" ).keyup(function( event ) {
+   	    	if ( event.which == 13 ) {
+			    event.preventDefault();
+			} else {				
+				destroyList('search_field_by_foodpromo_result');				
+				search_field_by_name = $(this).val();
+				dump("search_field_by_name=>"+ search_field_by_name);
+				if(!empty(search_field_by_name)){
+					data = "item_name="+ search_field_by_name;
+					data+= "&sort_fields=item_name";														   
+				    processDynamicAjax('searchFoodPromo',data,'search_field_by_foodpromo_result','GET',1);
+				} else {										
+					if(!empty(ajax_array[1])){						
+					    ajax_array[1].abort();
+					}
+				}
+			}
+   	    });   	     
+   	  
+   	  break;
+   	     	  
+   	  case "change_password_sms":
+   	     showToast( page.data.message ,'success' );
+   	     forgot_password_token = page.data.forgot_password_token;    
+   	     $("#"+ onsenNavigator.topPage.id + " .forgot_password_token").val( forgot_password_token );
+   	     
+   	     placeholder("#"+ onsenNavigator.topPage.id + " .sms_code", "Enter verification code" );
+   	     placeholder("#"+ onsenNavigator.topPage.id + " .new_password", "Your new password" );
+   	     placeholder("#"+ onsenNavigator.topPage.id + " .confirm_new_password", "Confirm password" );
+   	     
+   	   break; 
+   	   
+   	   
+   	   case "pickup_forms":
+   	    customer_number = getStorage("customer_number");
+	   	if(!empty(customer_number)){
+	   	   $(".contact_phone").val( customer_number );
+	   	}
+	   break;	   	   	  
+	   	
+   	  case "cart_temp":
+   	   getOperational();
+   	  break;
+   	  
+   	  case "graphical_tracking":   	   	   
+   	     StopAutoCarousel();     	     
+   	     $page_id = getCurrentPage(); 
+   	        	        	           	     
+   	     merchantMapList('#map_static', page.data.merchant_location_lat , page.data.merchant_location_long );
+   	     setTimeout(function() {				           	     	
+			map_setCenter(page.data.merchant_location_lat,page.data.merchant_location_long);
+		 }, 300);    			     	     			           	     
+   	     
+   	     $("#"+ $page_id + " .receipt_order_id").val( page.data.order_id );
+   	     $("#"+ $page_id + " .estimation_time").html( page.data.estimation_time );
+   	     $("#"+ $page_id + " .estimation_minutes").html( page.data.estimation_minutes );
+   	     $("#"+ $page_id + " .estimation_ready").html( page.data.estimation_ready );
+   	     $("#"+ $page_id + " .estimation_order_status").html( page.data.estimation_order_status );
+   	     $("#"+ $page_id + " .estimation_merchant").html( page.data.estimation_merchant );
+   	     $("#"+ $page_id + " .estimation_notes1").html( page.data.estimation_notes1 );
+   	     $("#"+ $page_id + " .estimation_notes2").html( page.data.estimation_notes2 );
+   	     $("#"+ $page_id + " .receipt_status").val( page.data.status_raw );
+   	     $("#"+ $page_id + " .receipt_contact").val( page.data.merchant_contact_number );   	        	     
+   	        	     
+   	     if ((typeof  page.data.track_version !== "undefined") && ( page.data.track_version !== null)) {
+   	     	  $("#"+ $page_id + " ons-progress-circular").attr("value",page.data.percent);
+	   	      if(page.data.percent==100){	              	
+	          	 stopTrackGraphical();	              	           	
+	          	 if (page.data.failed_order){
+	          	 	$page_id = 'graphical_tracking'; 
+	          	 	$("#"+ $page_id + " .gpahical_content").addClass("failed");
+	          	 	$("#"+ $page_id + " .estimation_order_status").html('');	  	              	 	            	 
+	          	 	$("#"+ $page_id + " .estimation_time").html( page.data.estimation_order_status );
+	          	 	$("#"+ $page_id + " .estimation_ready").html( page.data.estimation_notes2 );
+	          	 } else {
+	          	 	$("#"+ $page_id + " .estimation_order_status").html('');
+	          	 	$(".success-checkmark").show();	                 
+	          	 }	              
+	          		                 
+	             if ( page.data.add_review){
+	             	setTimeout(function(){						   
+					   showPage(page.data.page_review,'fade',{
+					   	'order_id': page.data.order_id,
+					   	'task_id': page.data.task_id
+					   });
+					},4*1000);
+	             } else {
+	             	//
+	             }
+	          }
+   	     }
+   	     
+   	     runTrackGraphical();   	        	     
+   	     
+   	  break;
+   	  
+   	  default:
+   	  break;
+   }  
+   
+});
+
+/*end init page
+end page init
+*/
+
+translatePage = function(){
+	dump("TRANSLATE PAGE");
+	
+	lang = getLanguageCode();	
+	
+	dump("lang=>"+ lang);
+	
+	translator = $('body').translate({lang:  lang , t: dict});	
+	
+	jQuery.extend(jQuery.validator.messages, {
+	   required: t("This field is required."),
+	   email: t("Please enter a valid email address."),
+	   number : t("Please enter a valid number")
+	});
+};
+
+getLanguageCode = function(){
+	lang='';
+	if(app_settings = getAppSettings()){
+	   lang = app_settings.mobileapp2_language;
+	}	
+	client_set_lang = getStorage("client_set_lang");
+	if(!empty(client_set_lang)){
+		lang = client_set_lang;
 	}
+	
+	return lang;
+};
+
+setLanguage = function(lang_code){	
+	if(!empty(lang_code)){
+	   setStorage("client_set_lang", lang_code);
+	   setStorage("change_language", 1);
+	   InitRTL(lang_code);
+	   resetToPage('tabbar.html','none');
+	}
+};
+
+placeholder = function(field, value){
+	$(field).attr("placeholder", t(value) );
+};
+
+loadHomePage = function(){	
+    app_settings = getAppSettings();	
+            
+    if(app_settings.home.mobile2_home_offer==1){
+       params = 'search_type=special_Offers';       
+       processDynamicAjax('searchMerchant', params, 'special_offers_wrapper');
+    } else {
+    	$("#special_offers_wrapper").hide();
+    }
+    
+    if(app_settings.home.mobile2_home_featured==1){
+       params = 'search_type=featuredMerchant';       
+       processDynamicAjax('searchMerchant', params , 'featured_list_wrapper');
+    } else {
+    	$("#featured_list_wrapper").hide();
+    }
+    if(app_settings.home.mobile2_home_all_restaurant==1){
+       $("#home .home_infinite_done").val(0);
+       processDynamicAjax('searchMerchant', 'search_type=allMerchant', 'all_restaurant_wrapper');
+    } else {
+    	$("#all_restaurant_wrapper").hide();
+    }
+    if(app_settings.home.mobile2_home_cuisine==1){
+       processDynamicAjax('cuisineList', 'carousel=1&', 'cuisine_list_wrapper');
+    } else {
+    	$("#cuisine_list_wrapper").hide();
+    }
+    
+    if(isLogin()){
+	    if(app_settings.home.mobile2_home_favorite_restaurant==1){
+	       processDynamicAjax('searchMerchant', 'search_type=favorites', 'favorite_restaurant_wrapper');
+	    } else {
+	    	$("#favorite_restaurant_wrapper").hide();
+	    }
+    } else {
+    	$("#favorite_restaurant_wrapper").hide();
+    }
+    
+    $change_language = getStorage("change_language") ;  
+    
+    /*HOME BANNER*/
+    if(app_settings.home.mobile2_home_banner==1){
+    	home_banner_count = app_settings.home_banner.length ;    	
+    	if(home_banner_count>0){    		  	
+    		
+    		if($change_language==1){    			
+    			processDynamicAjax('getHomebanner','');
+    		} else {
+    		   fillHomeBanner( app_settings.home_banner , '.home_banner_wrapper');
+    		}
+    		
+    		if(app_settings.home.mobile2_home_banner_auto_scroll==1){
+	    		auto_carousel_name[0] ='banner_carousel';
+	    		initAutoCarousel();
+    		}
+    		    		
+    		
+    	} else $("#home_banner_wrapper").hide();    	
+    } else {
+    	$("#home_banner_wrapper").hide();
+    }
+    
+    /*HOME CATEGORIES*/    
+    $show_categories = false;
+    if ((typeof  app_settings.home.mobile2_home_categories !== "undefined") && ( app_settings.home.mobile2_home_categories !== null)) {
+	    if(app_settings.home.mobile2_home_categories==1){    	
+	    	if ((typeof  app_settings.home_categories !== "undefined") && ( app_settings.home_categories !== null)) {
+	    		$show_categories = true;	    		
+	    		
+	    		if($change_language==1){    			
+    			   processDynamicAjax('getHomeCategories','');
+     		    } else {
+     		    	fillCategories( app_settings.home_categories , '#category_list_wrapper');
+     		    }  
+	    		
+	    	}
+	    }
+    } 
+    
+    
+    if($change_language==1){   
+       removeStorage("change_language");
+    }
+    
+    if(!$show_categories){
+       $("#category_list_wrapper").hide();
+    }
+    
+    /*FOOD PROMO*/
+    if(app_settings.home.mobile2_home_food_discount==1){
+    	$("#food_list_wrapper").show();
+    	processDynamicAjax('foodPromo', '', 'food_list_wrapper');    
+    } else {
+    	$("#food_list_wrapper").hide();
+    }    
 }
 
-function showCart()
-{
-	usethislocation_lat = '';
-	usethislocation_lng = '';
-	
-	dump('showCart');
-	var options = {
-      animation: 'none',
-   };     
-   sNavigator.pushPage("cart.html", options);
-}
+addMerchantParams = function(){
+	params = "&merchant_id=" + getActiveMerchantID();
+	return params;
+};
 
-function showCartNosOrder()
-{
-	dump('showCartNosOrder');
-	dump(  cart.length );
-	if ( cart.length>0 ){		
-		//$(".cart-num").show();	    
-		$(".cart-num").css({ "display":"inline-block","position":"absolute","margin-left":"-10px" });
-		$(".cart-num").text(cart.length);
-	} else {
-		$(".cart-num").hide();
-	}
-}
+document.addEventListener('reactive', function(event) {
+	dump("reactive");
+	dump(event);
+});
 
-function displayCart(data)
-{	
-	// display merchant logo
-	displayMerchantLogo(data,'page-cart');
-	
-	var htm='';	
-	
-	htm+='<input type="hidden" name="validation_msg" class="validation_msg" value="'+data.validation_msg+'">';	
-	htm+='<input type="hidden" name="required_time" class="required_time" value="'+data.required_time+'">';	
-		
-	/*set storage merchant logo*/
-    setStorage("merchant_logo",data.merchant_info.logo);
-    setStorage("order_total",data.cart.grand_total.amount_pretty); 
-    
-    setStorage("order_total_raw",data.cart.grand_total.amount);
-    setStorage("cart_currency_symbol",data.currency_symbol);
-    
-    setStorage("order_sub_total_raw",data.cart.sub_total.amount);
-    
-    /*for pts computation refference*/
-    setStorage("cart_sub_total", data.cart.sub_total.amount );
-    if(!empty(data.cart.delivery_charges)){
-       setStorage("cart_delivery_charges", data.cart.delivery_charges.amount );
-    }
-    if(!empty(data.cart.packaging)){
-       setStorage("cart_packaging", data.cart.packaging.amount );
-    }
-    if(!empty(data.cart.tax)){
-       //setStorage("cart_tax_amount", data.cart.tax.amount );
-       setStorage("cart_tax", data.cart.tax.tax );
-    }
-    	
-	/*if (!empty(data.delivery_date)){
-	    $(".delivery_date").val( data.delivery_date);
-	}		
-	if (!empty(data.estimation_delivery_date)){
-	    $(".delivery_date").val( data.estimation_delivery_date);
-	}*/		
-	
-	if (!empty(data.cart)){
-		
-		if(!empty(data.cart.grand_total.amount_pretty)){
-		   $(".total-amount").html(data.cart.grand_total.amount_pretty);
-		}
-		
-		if(!empty(data.cart.sub_total.amount)){
-		   $(".cart_subtotal").val(data.cart.sub_total.amount  );
-		}
-		
-		var xx=1;
-		$.each( data.cart.cart, function( key, val ) { 			 
-			 if (val.discount>0){
-			 	 htm+=tplCartRowNoBorder(
-					 val.item_id,
-					 val.item_name,
-					 val.price+'|'+val.size,
-					 val.total_pretty,
-					 val.qty,
-					 'price', 
-					 val.size,
-					 xx,
-					 val.discounted_price,
-					 val.discount,
-					 val.category_id
-					 );
-			 	
-			 } else {
-			   htm+=tplCartRowNoBorder(
-					 val.item_id,
-					 val.item_name,
-					 val.price+'|'+val.size,
-					 val.total_pretty,
-					 val.qty,
-					 'price', 
-					 val.size,
-					 xx,
-					 val.price,
-					 val.discount,
-					 val.category_id
-					 );
-			 }	 
-			 
-			 if ( !empty(val.order_notes)){
-			 		htm+=tplCartRowHiddenFields( val.order_notes ,
-                        val.order_notes , 
-                        'order_notes',
-                        xx ,
-                        'row-no-border' );
-			 }
-			 
-			 if (!empty(val.cooking_ref)){
-			 	htm+=tplCartRowHiddenFields( val.cooking_ref ,
-			 	                        val.cooking_ref , 
-			 	                        'cooking_ref',
-			 	                        xx ,
-			 	                        'row-no-border' );
-			 }
-			 
-			 if (!empty(val.ingredients)){
-			 	//htm+='<ons-list-header class="subitem-row'+xx+'">Ingredients</ons-list-header>';			 	
-			 	htm+='<ons-list-header class="subitem-row'+xx+'">'+getTrans('Ingredients','ingredients')+'</ons-list-header>';
-			 	$.each( val.ingredients, function( key_ing, val_ing ) { 			 	
-			 		 htm+=tplCartRowHiddenFields( val_ing , val_ing ,'ingredients', xx ,'row-no-border' );
-			 	});	
-			 }
-			 
-			 /*if (!empty(val.sub_item)){
-			 	 var x=0
-				 $.each( val.sub_item , function( key_sub, val_sub ) {
-				 	 if (x==0){
-				 	     htm+='<ons-list-header>'+val_sub.category_name+'</ons-list-header>';
-				 	 }				 	 
-				 	 htm+=tplCartRowNoBorderSub(
-				 	        val_sub.sub_item_id,
-				 	        val_sub.sub_item_name,
-				 	        val_sub.price, 
-				 	        val_sub.total_pretty,
-				 	        val_sub.qty ,
-				 	        'sub_item',
-				 	        xx
-				 	        );
-				 	 x++;
-				 });	
-			 }*/			 			 
-			 
-			 /*sub item*/
-			 if (!empty(val.sub_item)){
-			 	var x=0;
-			 	$.each( val.sub_item , function( key_sub, val_sub ) {			 		 
-				 	 //htm+='<ons-list-header class="subitem-row'+xx+'">'+key_sub+'</ons-list-header>';
-				 	 htm+='<ons-list-header class="subitem-row'+xx+'">'+val_sub[0]['category_name']+'</ons-list-header>';
-				 	 $.each( val_sub  , function( key_sub2, val_sub2 ) {			 		 
-				 	      dump(val_sub2);	
-				 	      if ( val_sub2.qty =="itemqty"){
-				 	      	 subitem_qty=val.qty;
-				 	      } else {
-				 	      	 subitem_qty=val_sub2.qty;
-				 	      }				 	      
-				 	      
-				 	      htm+=tplCartRowNoBorderSub(
-				 	        val_sub2.subcat_id,
-				 	        val_sub2.sub_item_id,
-				 	        val_sub2.sub_item_name,
-				 	        val_sub2.price, 
-				 	        val_sub2.total_pretty,
-				 	        subitem_qty ,
-				 	        val_sub2.qty,
-				 	        xx
-				 	        );
-				 	     x++;
-				 	 });
-			 	});
-			 }
-			 
-			 htm+='<ons-list-item class="grey-border-top line-separator"></ons-list-item>';	
-			 xx++;
-		});	
-								
-		htm+='<ons-list-item class="line-separator"></ons-list-item>';	
-		
-		if (!empty(data.cart.discount)){			
-			htm+=tplCartRow(data.cart.discount.display, '('+data.cart.discount.amount_pretty+')' ,'price-normal' );
-		}				
-		if (!empty(data.cart.sub_total)){
-			htm+=tplCartRow( getTrans('Sub Total','sub_total') , data.cart.sub_total.amount_pretty ,'price-normal');
-		}		
-		if (!empty(data.cart.delivery_charges)){
-			htm+=tplCartRow( getTrans('Delivery Fee','delivery_fee') , data.cart.delivery_charges.amount_pretty, 'price-normal');
-		}		
-		if (!empty(data.cart.packaging)){
-			htm+=tplCartRow( getTrans('Packaging','packaging') , data.cart.packaging.amount_pretty, 'price-normal');
-		}		
-		if (!empty(data.cart.tax)){
-			htm+=tplCartRow(data.cart.tax.tax_pretty, data.cart.tax.amount, 'price-normal');
-		}		
-		
-		if (!empty(data.cart.tips)){			
-			htm+=tplCartRow(data.cart.tips.tips_percentage_pretty, data.cart.tips.tips_pretty, 'price-normal');
-			$(".tip_amount").removeClass("trn");
-			$(".tip_amount").html( data.cart.tips.tips_percentage_pretty );
-		} else {
-			$(".tip_amount").addClass("trn");
-			$(".tip_amount").html( getTrans("Tip Amount","tip_amount") );
-		}
-		
-		if (!empty(data.cart.grand_total)){
-			htm+=tplCartRow('<b class="trn" data-trn-key="total">Total</b>', data.cart.grand_total.amount_pretty );
-		}		
-		
-	}
 
-	var transaction_type=getStorage("transaction_type");
-	if (empty(transaction_type)){	
-		transaction_type='delivery';
-	}
-	dump("transaction_type=>"+transaction_type);
-	setStorage('transaction_type',transaction_type);
+document.addEventListener('postpop', function(event) {
+	dump("postpop");
+	current_page = document.querySelector('ons-navigator').topPage.id
+	dump("=>"+ current_page);
+	
+	ons.platform.select('android'); 
+	
+	$cart_with_qty = false;
+    if ((typeof  app_settings.cart_with_qty !== "undefined") && ( app_settings.cart_with_qty !== null)) {
+  	   $cart_with_qty = app_settings.cart_with_qty;
+    }
+    website_hide_foodprice = isHidePrice();
+	
+	switch (current_page){
+		case "page_startup":
+		break;
 		
-	htm+='<ons-list-header class="trn" data-trn-key="delivery_options">Delivery Options</ons-list-header>';
-	/*htm+=privateRowWithRadio('transaction_type','delivery','Delivery');
-	htm+=privateRowWithRadio('transaction_type','pickup','Pickup');*/		
+		case "page_startup2":
+		  initStartUpBanner();
+		break;
+		
+		case "tabbar":
+		      removeStorage("active_merchant_category");
+			  active_index = document.querySelector('ons-tabbar').getActiveTabIndex();
+			  dump("active_index=>"+ active_index);
+			  
+			  if(active_index==0){
+			  	 cart_re_order = getStorage("cart_re_order");
+			  	 dump("cart_re_order=>" + cart_re_order);
+			  	 if(cart_re_order==1){
+			  	 	removeStorage("cart_re_order");
+			  	 	getCartCount();
+			  	 }			  	 
+			  	 
+			  	 setCurrentAddress();
+			  	 
+			  	 $need_refresh = needRefresh();
+			  	 //dump2("=>"+$need_refresh);
+			  	 if($need_refresh){
+				  	 params = "search_type=byLatLong";
+	   	    	     processDynamicAjax('searchMerchant', params , 'search_results_wrapper');
+				  	 loadHomePage();
+			  	 }			  	 
+			  } else if ( active_index==2) {
+			  	
+			  	 stopTrack();
+	             stopTrackHistory();
+			  	 
+			  	 if(!isLogin()){ 
+			  	    document.querySelector('ons-tabbar').setActiveTab(0);
+			  	 }
+			  } else if ( active_index==4) {
+			  	 document.querySelector('ons-tabbar').setActiveTab(0);
+			  }			  			 
+			break;
+		
+	    case "restaurant_page":	      
+	      clearForm('filter_item');
+	      click_tab = getStorage("click_tab");
+	      if(!empty(click_tab)){
+		      document.querySelector('#carousel_resto_menu').setActiveIndex(click_tab,{
+		      	animation:"none"
+		      });		      
+		      click_tab=parseInt(click_tab)+1;		      
+		      $("#carousel_resto_menu ons-carousel-item").removeClass("selected");		      
+		      $("#carousel_resto_menu ons-carousel-item:nth-child("+click_tab+")").addClass("selected");		      
+	      }
+	      
+	      ReSetBasket();
+	      if($cart_with_qty && !website_hide_foodprice){
+	      	 processAjax("GetCartItem", "" ,"POST", 'normal_loader');
+	      }
+	      
+	    break;
+	    
+	    case "favorite_list":
+	      params="&page_action=pull_refresh";
+		  processDynamicAjax('FavoriteList',params,'favorite_loader','GET',1 ); 
+	    break;
+	    
+	    case "track_driver":
+	      runTrack();
+	    break;
+	    
+	    case "track_history":
+	      stopTrack();
+	      stopTrackHistory();
+	      params = 'order_id='+ $(".track_order_id").val();;
+   	      processDynamicAjax('getOrderHistory', params, 'track_history_loader', 'GET',1 );  
+   	      runTrackHistory(); 	
+	    break;
+	    
+	    case "cuisine_list":
+	      $(".sortby_selected").html( t("Sequence") );
+	      
+	      var params = $(".frm_cuisine").serialize();
+	      params+="&page_action=pull_refresh";		    	
+	      processDynamicAjax('cuisineList',params,'cuisine_loader','GET','1');
+		    	
+	    break;
+	    
+	    case "order_list":
+	      stopTrackHistory();
+	    break;
+	    	    
+	    case "cart":
+	       enabledAsap();
+	    break;
+	    
+	    case "address_book_location":
+	    case "address_form_location":
+	       data_state = getStorage("location_data_state1");	       
+	       if(!empty(data_state)){
+	       	  data_state = JSON.parse( data_state );	 
+	          $(".state_name").val( data_state.state_name );
+	          $(".state_id").val( data_state.state_id );	          	         	         
+	       }
+	       
+	       data_city = getStorage("location_data_city1");	       	       
+	       if(!empty(data_city)){
+	       	  data_city = JSON.parse( data_city );	 	       	  
+	          $(".city_name").val( data_city.city_name );
+	          $(".city_id").val( data_city.city_id );
+	       } else {
+	       	   $(".city_name").val('');
+	          $(".city_id").val('');
+	       }
+	       
+	       data_area = getStorage("location_data_area1");	       	       
+	       if(!empty(data_area)){
+	       	  data_area = JSON.parse( data_area );	 	       	  
+	          $(".area_name").val( data_area.area_name );
+	          $(".area_id").val( data_area.area_id );
+	       } else {
+	       	  $(".area_name").val('');
+	          $(".area_id").val('');
+	       }	       
+	    break;
+	    
+	    case "select_location":
+	    
+	       location_mode = locationMode();
+	       
+	       if(location_mode==1){
+		       data_city = getStorage("location_data_city2");	
+		       if(!empty(data_city)){
+		       	  data_city = JSON.parse( data_city );	 	       	  
+		          $("#select_location .city_name").val( data_city.city_name );
+		          $("#select_location .city_id").val( data_city.city_id );
+		       } else {
+		       	   $("#select_location .city_name").val('');
+		           $("#select_location.city_id").val('');
+		       }
+		       
+		       data_area = getStorage("location_data_area2");	       	       
+		       if(!empty(data_area)){
+		       	  data_area = JSON.parse( data_area );	 	       	  
+		          $("#select_location .area_name").val( data_area.area_name );
+		          $("#select_location .area_id").val( data_area.area_id );
+		       } else {
+		       	  $("#select_location .area_name").val('');
+		          $("#select_location .area_id").val('');
+		       }	   
+	       } else if ( location_mode == 2) {
+	       	  data_state = getStorage("location_data_state");	
+	       	  if(!empty(data_state)){
+	       	  	 data_state = JSON.parse( data_state );		       	  	 
+	       	  	 $("#select_location .state_id").val( data_state.state_id );
+	       	  	 $("#select_location .state_name").val( data_state.state_name );
+	       	  } else {
+	       	  	 $("#select_location .state_id").val( '' );
+	       	  	 $("#select_location .state_name").val( '' );
+	       	  }
+	       	  
+	       	  data_city = getStorage("location_data_city2");	
+	       	  if(!empty(data_city)){	       	  	 
+	       	  	 data_city = JSON.parse( data_city );		       	  	 	       	  	 
+	       	  	 $("#select_location .city_id").val( data_city.city_id );
+	       	  	 $("#select_location .city_name").val( data_city.city_name );
+	       	  } else {
+	       	  	 $("#select_location .city_id").val( '' );
+	       	  	 $("#select_location .city_name").val( '' );
+	       	  }
+	       	  
+	       } else if ( location_mode == 3) {	       	   
+	       	   data_postal = getStorage("location_data_postal2");	
+	       	   if(!empty(data_postal)){
+	       	   	   data_postal = JSON.parse( data_postal );
+	       	   	   dump(data_postal);
+	       	   	   $("#select_location .postal_code").val( data_postal.postal_code );
+	       	   	   $("#select_location .city_id").val( data_postal.city_id );
+	       	   	   $("#select_location .state_id").val( data_postal.state_id );
+	       	   } else {
+	       	   	  $("#select_location .postal_code").val( '' );
+	       	   	  $("#select_location .city_id").val( '' );
+	       	   	  $("#select_location .state_id").val( '');
+	       	   }
+	       }
+	       
+	       
+	    break;	   
+	    
+	    case "item_page":	      
+	      ReSetBasket();	
+	      if($cart_with_qty && !website_hide_foodprice){
+	         processAjax("GetCartItem", "" ,"POST", 'normal_loader');
+	      }
+	    break;	   
+	    	    
+	    case "restaurant_list":	      	 
+	      $search_type = $("#restaurant_list .search_type").val();     
+	      
+	      params = '';
+	      	      	      	      
+	      if( $search_type=="ByTag" ){
+	      	 $banner_id = parseInt( $("#restaurant_list .banner_id").val() );
+	      	 params+= "search_type=ByTag&banner_id=" + $banner_id ;
+	      	 
+	      } else if ( $search_type == "special_Offers") {
+	      	  params+= "search_type=" + $search_type;
+	      	  
+	      } else if ( $search_type == "allMerchant") {
+	      	 params+= "search_type=" + $search_type;
+	      	 
+	      } else if ( $search_type == "byCuisine") {
+	      	 $cuisine_id = parseInt( $("#restaurant_list .cuisine_id").val() );
+	         params+= "search_type=" + $search_type  ; 
+	         params+= "&cuisine_id=" + $cuisine_id  ; 
+	         
+	      } else if ( $search_type == "favorites") {	
+	      	  params+= "search_type=" + $search_type;
+	      	  
+	      } else {
+	      	 params+= "search_type=byLatLong";
+	      }     
+	      
+	      params+= "&page_action=pull_refresh";
+	      $sort_by =  $("#restaurant_list .sort_by").val();     
+	      if(!empty($sort_by)){
+	      	  params+= "&sort_by="+ $sort_by;
+	      }	      
+	      
+	      $sort_asc_desc = $("#sortbyresto .sort_asc_desc").val();
+	      if(!empty($sort_asc_desc)){
+	         params+="&sort_asc_desc=" +  $sort_asc_desc;
+	      }
+	      
+	      params+= "&"+$( ".frm_filter" ).serialize();
+	      	      
+	      $need_refresh = needRefresh();
+	      if($need_refresh){
+	         processDynamicAjax('searchMerchant', params , 'restaurant_list_loader');
+	      }	      
+	    break;	
+	    
+	    case "graphical_tracking":
+	    resetToPage('tabbar.html','none');
+	    break;	
+	    	    
+	}
+});
+/*END postpop*/
+
+document.addEventListener('preopen', function(event) {
+	dump("preopen");
+});	
+
+document.addEventListener('postchange', function(event) {
+	dump("postchange");
+			
+	current_page = document.querySelector('ons-navigator').topPage.id
+	dump("=>"+ current_page);
+	switch (current_page){
+		case "restaurant_page":
+		  if(event.carousel.id=="resto_page_carousel"){
+			  console.log('Changed to ' + event.activeIndex);	
+			  $(".dots li").removeClass("active");
+			  $(".c"+ event.activeIndex).addClass("active");
+		  }
+		break;
+		
+		case "page_startup2":
+		  if(event.carousel.id=="startup_carousel"){
+			  console.log('Changed to ' + event.activeIndex);	
+			  $(".dots li").removeClass("active");
+			  $(".c"+ event.activeIndex).addClass("active");
+			  $(".startup_banner_index").val(event.activeIndex);
+		  }
+		break;
+		
+		case "tabbar":
+		
+		  if (event.carousel){
+		  	  dump("carousel event");
+		  	  return false;
+		  }
+		
+		  index = event.activeIndex;	
+		  dump(index);
+		  if ( index == 0){ // near me
+		  	  //
+		  } else if ( index==1){ //search		  			  	 
+		  	  // 
+		  } else if ( index==2){		  	  
+		  	  if(isLogin()){  		  	  
+		  	  	$("#order_list_item").html('');	
+		  	  	$(".toolbar_search_order").attr("disabled",false);	
+				fillOrderTabs('order_tabs','all',0);   	   
+				params = "tab="+ $(".order_tab_active").val(); 
+				processAjax('OrderList', params , 'GET',  'skeleton2');
+				initPullHook('order_list', 'order_list_pull_hook', params);
+				resetPaginate("#order_list");
+				initInfiniteScroll(event.tabItem._loadedPage, 'order_list', 'order_list' , params); 
+		  	  } else {			  	  	
+		  	  	$(".toolbar_search_order").attr("disabled",true);
+		  	  	Pagelogin(2);
+		  	  }
+		  } else if ( index==3){ //account		  	    	
+		  	  if(isLogin()){  
+		  	     processAjax("verifyCustomerToken",'action=account_menu','GET','skeleton2');
+		  	  } else {
+		  	  	 accountMenu(false);
+		  	  }
+		  } else if ( index==4){ //cart
+		  	  showCart();
+		  }
+		break;
+		
+		case "cart":
+		  enabledAsap();
+		break;
+	}	
+});
+
+document.addEventListener('preshow', function(event) {
+	dump("preshow");
+	var page = event.target;
+	var page_id = event.target.id;   
+	dump("pre show : "+ page_id);
 	
-	/*fixed transaction type*/
+	translatePage();
 	
-	dump("services =>"+data.merchant_info.service);
-	
-	switch (data.merchant_info.service)
+	switch (page_id)
 	{
-		case 1:
-		case "1":
-		   htm+=privateRowWithRadio('transaction_type','delivery', getTrans('Delivery','delivery') );
-		   htm+=privateRowWithRadio('transaction_type','pickup',  getTrans('Pickup','pickup') );
+		case "filter":
+		  if(app_settings = getAppSettings()){		  	 	  	
+		  	 filters(app_settings.filters);
+		  }
+		break;
+				
+		case "sortbyresto":
+		  if(app_settings = getAppSettings()){		
+		  	 count = $("#resto_sortlist ons-list-item").length;
+		  	 if(count<=0){
+		  	    sortList(app_settings.sort.restaurant, 'resto_sortlist');
+		  	    
+		  	    $( document ).on( "click", "#sortbyresto input[name=sortby]", function() {		  	    	
+		  	    	if($(this).val()=="ratings"){		  	    		
+		  	    		$(".sort_asc_desc").val("desc");
+		  	    	}
+		  	    });
+		  	    
+		  	 }
+		  }
 		break;
 		
-		case 2:
-		case "2":
-		   htm+=privateRowWithRadio('transaction_type','delivery', getTrans('Delivery','delivery') );
+		case "sort_cuisine":		
+		if(app_settings = getAppSettings()){		
+		  	 count = $("#cuisine_sortlist ons-list-item").length;
+		  	 if(count<=0){
+		  	    sortList(app_settings.sort.cusine, 'cuisine_sortlist');
+		  	 }
+		  }
 		break;
 		
-		case 3:
-		case "3":
-		   transaction_type='pickup';
-		   setStorage('transaction_type',transaction_type);
-		   htm+=privateRowWithRadio('transaction_type','pickup',  getTrans('Pickup','pickup') );
-		break;
 		
-		case 4:
-		case "4":		    
-			htm+=privateRowWithRadio('transaction_type','delivery', getTrans('Delivery','delivery') );
-		    htm+=privateRowWithRadio('transaction_type','pickup',  getTrans('Pickup','pickup') );
-		    htm+=privateRowWithRadio('transaction_type','dinein',  getTrans('Dinein','dinein') );
+	  case "dialog_delivery_date":				
+		   $(".delivery_date_wrap").html(icon_loader);
+		   processAjax('deliveryDateList', 'merchant_id=' +  getActiveMerchantID()  );
 		break;
+	  
+	  case "dialog_delivery_time":
+		  $(".delivery_time_wrap").html(icon_loader);
+		  params = 'merchant_id=' +  getActiveMerchantID();
+		  params+= '&delivery_date=' +  $(".delivery_date").val();
+		  processAjax('deliveryTimeList', params);
+	   break;
+	   
+	   case "modal_notification":	       
+	     $(".modal_notification").html(modal_content);
+	     initRatyStatic();
+	   break;
+	   
+	   case "filter_item":
+	     if(app_settings = getAppSettings()){		  	 	  	
+		  	 filtersItem(app_settings.filters);
+		  }
+	   break;
+	   
+	   case "sort_food_promo":		
+		if(app_settings = getAppSettings()){		
+		  	 count = $("#foodpromo_sortlist ons-list-item").length;
+		  	 if(count<=0){
+		  	    sortList(app_settings.sort.food_promo, 'foodpromo_sortlist');
+		  	 }
+		  }
+		break;
+
+		case "dialog_transaction_type":		  
+		   processAjax('servicesList', 'merchant_id=' +  getActiveMerchantID() );
+		break;			
 		
-		case 5:
-		case "5":
-			htm+=privateRowWithRadio('transaction_type','delivery', getTrans('Delivery','delivery') );	    
-		    htm+=privateRowWithRadio('transaction_type','dinein',  getTrans('Dinein','dinein') );
-		break;
-		
-		case 6:
-		case "6":
-			htm+=privateRowWithRadio('transaction_type','pickup',  getTrans('Pickup','pickup') );
-		    htm+=privateRowWithRadio('transaction_type','dinein',  getTrans('Dinein','dinein') );
-		break;
-		
-		case 7:
-		case "7":
-		    transaction_type='dinein';
-		    setStorage('transaction_type',transaction_type);
-			htm+=privateRowWithRadio('transaction_type','dinein',  getTrans('Dinein','dinein') );
-		break;
-		
-		default:		    
-			htm+=privateRowWithRadio('transaction_type','delivery', getTrans('Delivery','delivery') );
-		    htm+=privateRowWithRadio('transaction_type','pickup',  getTrans('Pickup','pickup') );
-		break;
 	}
-		
-	createElement('cart-item',htm);
-	
-	//$('.transaction_type[value="' + transaction_type + '"]').prop('checked', true);
-	$.each( $(".transaction_type") , function() {		
-		if ( $(this).val()==transaction_type ){
-			$(this).attr("checked",true);
-		}
-	});		
-	
-	/*if ( transaction_type=="delivery"){
-		$(".delivery_time").attr("placeholder",  getTrans("Delivery Time",'delivery_time') );
-		$(".delivery_asap_wrap").show();
-	} else {
-		$(".delivery_time").attr("placeholder", getTrans("Pickup Time",'pickup_time') );
-		$(".delivery_asap_wrap").hide();
-	}*/
-	switch(transaction_type)
-	{
-		case "pickup":
-			$(".delivery_time").attr("placeholder", getTrans("Pickup Time",'pickup_time') );
-			$(".delivery_asap_wrap").hide();
+});
+
+document.addEventListener('postshow', function(event) {
+	dump("postshow");
+	var page = event.target;
+	var page_id = event.target.id;   
+	dump("postshow : "+ page_id);
+	switch (page_id)
+	{	
+		//
+	}	
+});
+
+document.addEventListener('prehide', function(event) {
+	dump("prehide");
+	var page = event.target;
+	var page_id = event.target.id;   
+	dump("prehide : "+ page_id);
+	switch (page_id)
+	{		
+		case "modal_notification":
+		  current_page_id = onsenNavigator.topPage.id;
+		  dump("current_page_id=>"+current_page_id);		  
+		  modal_action = $(".modal_action").val();		  
+		  if(current_page_id=="track_driver"){
+		  	dump("modal_action=>"+modal_action);
+		  	if(modal_action=="close_page"){
+		  		popPage();
+		  	} else {
+		  	   runTrack(); 
+		  	}
+		  }
 		break;
 		
-		case "dinein":
-		   $(".delivery_time").attr("placeholder", getTrans("Dine in time",'dinein_time') );
-		   $(".delivery_asap_wrap").hide();
+		case "filter_item":
+		  //ReSetBasket();
 		break;
 		
 		default:
-			$(".delivery_time").attr("placeholder",  getTrans("Delivery Time",'delivery_time') );
-			$(".delivery_asap_wrap").show();
+		ons.platform.select('android');
 		break;
-	}
-	
-	
-	/*loyalty points*/
-	if (data.has_pts==2){		
-		setStorage("earned_points", data.points );
-		$(".pts_earn_label").show();
-		$(".pts_earn_label").html(data.points_label);
-	} else {
-		$(".pts_earn_label").hide();
-		removeStorage("earned_points");
-	}
-	
-	initMobileScroller();
-	translatePage();
-}
-
-function editOrderInit()
-{
-	$("#page-cart .numeric_only").show();
-	$(".order-apply-changes").show();
-	$(".edit-order").hide();
-	$(".qty-label").hide();
-	$(".row-del-wrap").show();
-	
-	var x=1;
-	$.each( $(".item-qty") , function( key, val ) {
-		$.each( $(".subitem-qty"+x) , function( key2, val2 ) {
-			if ( $(this).data("qty")!="itemqty"){
-				$(this).show();
-			}
-		});
-		x++;
-	});
-}
-
-function applyCartChanges()
-{	
-	$("#page-cart .numeric_only").hide();
-	$(".order-apply-changes").hide();
-	$(".edit-order").show();
-	$(".qty-label").show();
-	$(".subitem-qty").hide();
-	$(".row-del-wrap").hide();
-	
-	dump( "qty L=>"+ $(".item-qty").length );
-	if (!empty( $(".item-qty") )){
-		cart=[];		
-		var x=1;
-		$.each( $(".item-qty") , function( key, val ) { 	
-
-			var x=$(this).data("rowid");
-			dump("rowid=>"+x);
-			
-			var sub_item=[];
-			var ingredients=[];
-			var cooking_ref=[];	
-			var order_notes='';
-			var discount='';
-									
-			/*$.each( $(".subitem-qty"+x) , function( key2, val2 ) {
-				sub_item[sub_item.length]={
-				  'value': $(".sub_item_id"+x).val() + "|" + $(".sub_item_price"+x).val() +'|' + $(".sub_item_name"+x).val()
-			    };					    			  
-			});*/			
-
-			if ( $(".ingredients"+x).exists() ){				
-		    	ingredients[ingredients.length]={
-		    		'value': $(".ingredients"+x).val()
-		    	};
-		    }
-		    		    
-		    if ( $(".cooking_ref"+x).exists() ){
-		    	cooking_ref[cooking_ref.length]={
-		    		'value': $(".cooking_ref"+x).val()
-		    	};
-		    }
-		    
-		    if ( $(".order_notes"+x).exists() ){
-		    	/*order_notes[order_notes.length]={
-		    		'value': $(".order_notes"+x).val()
-		    	};*/
-		    	order_notes=$(".order_notes"+x).val();
-		    }
-		    		    
-		    /*get sub item*/		    
-		    $.each( $(".subitem-qty"+x) , function( key2, val2 ) { 		    	 
-		    	 subqty = $(this).data("qty");
-		    	 if ( $(this).data("qty") != "itemqty"){
-		    	 	subqty = $(this).val();
-		    	 }
-		    	 var parent=$(this).parent().parent();		 
-		    	 var subcat_id=parent.find(".subcat_id").val();   	 
-		    	 var subcat_value= parent.find(".sub_item_id").val()+'|'+
-		    	 parent.find(".sub_item_price").val()+'|'+parent.find(".sub_item_name").val();
-		    	 
-		    	 sub_item[sub_item.length]={
-		    	 	 'qty':subqty,
-		    	 	 'subcat_id': subcat_id ,
-		    	 	 'value': subcat_value
-		    	 };
-		    });		    		    			    				
-			cart[cart.length]={
-			   'item_id':$(".item_id"+x).val(),
-			   'category_id':$(".category_id"+x).val(),
-			   'qty': $(this).val(),
-			   'price': $(".price"+x).val(),
-			   "sub_item":sub_item,
-			   'cooking_ref': cooking_ref ,
-			   "ingredients":ingredients,
-			   "order_notes":order_notes,
-			   "discount":$(".discount"+x).val(),
-			};
-			x++;
-		});	
-		
-		dump('updated cartx');
-		dump(cart);
-								
-		var cart_params=JSON.stringify(cart);      
-		
-		var extra_params= "&delivery_date=" +  $(".delivery_date").val();  
-		if ( !empty($(".delivery_time").val()) ){
-			extra_params+="&delivery_time="+$(".delivery_time").val();
-		}
-		
-		if ( empty(getStorage("tips_percentage")) ){
-	       setStorage("tips_percentage",0);
-	    }
-	    
-      	callAjax("loadCart","merchant_id="+ getStorage('merchant_id')+"&search_address=" + 
-      	  encodeURIComponent(getStorage("search_address")) + "&update_cart="+ encodeURIComponent(cart_params) +"&transaction_type=" + 
-      	  getStorage("transaction_type") + extra_params  + "&device_id="+ getStorage("device_id") +"&tips_percentage=" + getStorage("tips_percentage") );
-		
-	}
-}
-
-function checkOut()
-{	
-	var validation_msg=$(".validation_msg").val();
-	dump(validation_msg);
-	dump(cart);
-	if ( cart.length<1){
-		onsenAlert( getTrans("Your cart is empty",'your_cart_is_empty') );
-		return;
-	}
-	
-	if ( validation_msg!="" ){		
-		onsenAlert(validation_msg);
-		return;
-	}		
-	
-	var tr_type = $(".transaction_type:checked").val();
-	dump("tr_type=>"+tr_type);
-	
-	switch (tr_type)
-	{
-		case "pickup":
-		if ( $(".delivery_time").val()==""){
-			onsenAlert(  getTrans("Pickup time is required",'pickup_time_is_required') );
-			return;
-		}
-		break;
-		
-		case "dinein":
-		if ( $(".delivery_time").val()==""){
-			onsenAlert(  getTrans("Dinein time is required",'dinein_time_is_required') );
-			return;
-		}
-		break;
-		
-		case "delivery":
-		  search_mode = getSearchMode();
-		  if ( search_mode=="postcode"){		  	  
-		  	  if(!showLocationSelect()){
-		  	  	 return;
-		  	  }
-		  }
-		break;
-	}
-	
-		
-	if ( $(".required_time").val()==2){
-		if ( $(".delivery_time").val() ==""){			
-			if ( $(".delivery_asap:checked").length<=0){
-				onsenAlert( tr_type+ " "+ getTrans('time is required','time_is_required') );
-				return;
-			}
-		}
-	}		
-		    
-    var extra_params= "&delivery_date=" +  $(".delivery_date").val();  
-	if ( !empty($(".delivery_time").val()) ){
-		extra_params+="&delivery_time="+$(".delivery_time").val();
-	}			
-	
-	extra_params+="&delivery_asap="+ $(".delivery_asap:checked").val();
-	
-	extra_params+="&client_token="+getStorage("client_token");
-	//extra_params+="&transaction_type2=" + $(".transaction_type:checked").val();
-	
-	extra_params+="&cart_subtotal"+ $(".cart_subtotal").val();
-	
-	setTrackView("checkout");
-	
-    callAjax("checkout","merchant_id="+ getStorage('merchant_id')+"&search_address=" + 
-      	  encodeURIComponent(getStorage("search_address")) + "&transaction_type=" + 
-      	  getStorage("transaction_type") + extra_params );	
-}
-
-function clientRegistration()
-{
-	$.validate({ 	
-	    form : '#frm-checkoutsignup',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	
-
-	      if ($('.iagree-wrap').is(':visible')) {	
-		      var iagree = $(".iagree:checked").val();	
-		      if(empty(iagree)){
-		      	 onsenAlert( getTrans("You must agree to terms & conditions",'agree_terms') );
-		      	 return;
-		      }
-	      }
-	      
-	      // save mobile number
-	      setStorage("customer_contact_number",  $(".contact_phone").val()  );	     
-	    	     
-	      var params = $( "#frm-checkoutsignup").serialize();	      
-	      params+="&transaction_type=" +  getStorage("transaction_type") ;
-	      params+="&device_id="+ getStorage("device_id");
-	      
-	      if (isDebug()){
-	      	  params+="&device_platform=Android";
-	      } else {
-	      	  params+="&device_platform="+ device.platform;
-	      }	
-	      
-	      callAjax("signup",params);	       
-	      return false;
-	    }  
-	});
-}
-
-function clientShipping()
-{	
-	var google_lat = $(".google_lat").val();
-	var google_lng = $(".google_lng").val();
-	enabled_delivery_select_map = getStorage("enabled_delivery_select_map");
-		
-	if (empty(google_lat) && enabled_delivery_select_map==1){						
-		sNavigator.pushPage("map_delivery.html", {
-       	  animation: 'none',       	  
-       });	
-	} else {	
-		$.validate({ 	
-		    form : '#frm-shipping',    
-		    borderColorOnError:"#FF0000",
-		    onError : function() {      
-		    },	    
-		    onSuccess : function() {  
-		       var params = $( "#frm-shipping").serialize();			      	       
-		       setStorage('shipping_address',params);
-		       dump(params);	       
-		       var options = {
-			      animation: 'slide',
-			      onTransitionEnd: function() { 						      	  
-			      	  displayMerchantLogo2( 
-			      	     getStorage("merchant_logo") ,
-			      	     getStorage("order_total") ,
-			      	     'page-paymentoption'
-			      	  );
-			      	  params+="&merchant_id="+ getStorage("merchant_id");
-			      	  params+="&street="+ urlencode($(".street").val());
-			      	  params+="&city="+ urlencode($(".city").val());
-			      	  params+="&state="+ urlencode($(".state").val());
-			      	  params+="&zipcode="+ urlencode($(".zipcode").val());
-			      	  params+="&location_name="+ urlencode($(".location_name").val());
-			      	  params+="&save_address="+$('.save_address:checked').val();
-			      	  params+="&transaction_type=" +  getStorage("transaction_type") ;
-			      	  params+="&client_token="+ getStorage('client_token');
-			      	  params+="&contact_phone="+ $(".contact_phone").val();
-			      	  
-			      	  params+="&cart_subtotal="+ $(".cart_subtotal").val();
-			      	  		      	  
-			      	  callAjax("getPaymentOptions",params);
-			      } 
-			    };   
-			    sNavigator.pushPage("paymentOption.html", options);		       
-		       return false;
-		    }  
-		});
-	}
-}
-
-function displayPaymentOptions(data)
-{
-	var htm='';
-	$.each( $(data.details.payment_list) , function( key, val ) { 			
-		dump(val);
-		htm+=tplPaymentList('payment_list', val.value, val.label, val.icon);
-	});		
-	createElement('payment-list',htm);
-	
-	var htm='';
-	if (data.details.pay_on_delivery_flag==1){
-		$.each( $(data.details.pay_on_delivery_list) , function( key, val ) { 			
-		    //dump(val);
-		    htm+=tplPaymentProvider('payment_provider_name', val.payment_name, val.payment_name, val.payment_logo);
-	    });		    
-	    createElement('payon-deliver-list',htm);
-	}
-	
-	//$(':radio[value=cod]').attr('checked',true);
-}
-
-function placeOrder()
-{	
-	if ( $('.payment_list:checked').length > 0){
-		
-		var selected_payment=$('.payment_list:checked').val();
-		dump(selected_payment);
-		if ( selected_payment=="pyr"){
-			dump( $('.payment_provider_name:checked').length );
-			if ( $('.payment_provider_name:checked').length <= 0){
-				onsenAlert( getTrans("Please select payment provider",'please_select_payment_provider') );
-				return;
-			}
-		}
-		
-		if ( selected_payment=="ocr"){
-			if ( empty( getStorage("cc_id") )){
-				onsenAlert( getTrans("Please select credit card",'please_select_cc') );
-				return;
-			}
-		}
-		
-		/*if ( selected_payment=="cod"){
-			if ( $(".order_change").val()=="" ){
-				onsenAlert( getTrans("Change is required",'change_is_required') );
-				return;
-			}
-		}*/
-		
-		
-		var params = $( "#frm-paymentoption").serialize();	
-		var cart_params = JSON.stringify(cart);		
-		
-		if ( saveCartToDb() ){
-			cart_params=''; 
-		}		
-		
-		var extra_params= "&delivery_date=" +  $(".delivery_date").val();  
-		if ( !empty($(".delivery_time").val()) ){
-			extra_params+="&delivery_time="+$(".delivery_time").val();
-		}		
-		
-		extra_params+="&delivery_asap="+ $(".delivery_asap:checked").val();		
-		extra_params+="&formatted_address="+ urlencode($(".formatted_address").val());	
-		extra_params+="&google_lat="+ $(".google_lat").val();	
-		extra_params+="&google_lng="+ $(".google_lng").val();
-		
-		//extra_params+="&payment_method="+ $(".payment_list:checked").val();
-		//extra_params+="&order_change="+ $(".order_change").val();
-		//extra_params+="&"+ urlencode(getStorage("shipping_address")) ;
-		extra_params+="&"+getStorage("shipping_address") ;
-		extra_params+="&client_token="+ getStorage('client_token');
-		extra_params+="&search_address="+ urlencode(getStorage('search_address'));
-		/*pts*/
-		extra_params+="&earned_points="+ getStorage('earned_points');
-		extra_params+="&device_id="+ getStorage('device_id');
-		extra_params+="&"+params;	
 				
-		/*tips*/
-		if ( empty(getStorage("tips_percentage")) ){
-	        setStorage("tips_percentage",0);
-	    }	    
-	    extra_params+="&tips_percentage="+ getStorage('tips_percentage');
-	    
-	    if ( selected_payment=="ocr"){
-	    	extra_params+="&cc_id="+ getStorage('cc_id');
-	    }
-							
-      	callAjax("placeOrder","merchant_id="+ getStorage('merchant_id') + 
-      	  "&cart="+ urlencode(cart_params) +      	  
-      	  "&transaction_type=" + 
-      	  getStorage("transaction_type") + extra_params );
-      	  
-	} else {
-		onsenAlert( getTrans("Please select payment method",'please_select_payment_method') );
-	}
-}
-
-function showMerchantInfo(data)
-{
-	dump(data);
-	setTrackView("restaurant information: " + data.merchant_info.restaurant_name );
-	
-	$("#page-merchantinfo h3").html(data.merchant_info.restaurant_name);
-	$("#page-merchantinfo h5").html(data.merchant_info.cuisine);
-	$("#page-merchantinfo address").html( data.merchant_info.address+"<br/>"+data.merchant_info.contact_phone );
-	$("#page-merchantinfo .rating-stars").attr("data-score",data.merchant_info.ratings.ratings);	
-	if (!empty(data.reviews)){
-	   $(".total-reviews").html(data.reviews.total_review + " "+ getTrans("reviews",'reviews') );
-	}	
-	$(".opening-hours").html(data.opening_hours);
-	
-	if (!empty(data.payment_method)){
-		var p='';
-		p+='<ons-list-header class="center trn" data-trn-key="payment_methods">Payment Methods</ons-list-header>';
-		 $.each( $(data.payment_method) , function( key, val ) { 			
-		   p+=tplPaymentListStatic(val.value , val.label, val.icon);
-		});
-		createElement('merchant-payment-list', p );
-	}
-	
-	/*if (!empty(data.reviews)){
-		$(".latest-review").html( data.reviews.date_created +" - " + data.reviews.client_name);
-	}*/
-	
-	/*if (!empty(data.maps)){
-		$("#merchant-map").show();	
-			
-		var locations={
-		"name":data.merchant_info.restaurant_name,
-		"lat":data.maps.merchant_latitude,
-		"lng":data.maps.merchant_longtitude
-		};		
-		initMerchantMap(locations);			
 				
-	} else {
-		$("#merchant-map").hide();
-	}*/
-	
-	/*check if booking is enabled*/
-	/*if ( data.enabled_table_booking==2){
-		$("#book-table").show();
-	} else $("#book-table").hide();*/
-	
-	
-	$("#book-table").hide();
-	
-	initRating();	
-}
-
-function loadBookingForm()
-{
-	var options = {
-      animation: 'slide',
-      onTransitionEnd: function() { 	
-      					      	 
-      	  displayMerchantLogo2( 
-      	     getStorage("merchant_logo") ,
-      	     '' ,
-      	     'page-booking'
-      	  );      	  
-      	  
-      	  initMobileScroller();
-      	  
-      	  /*translate booking form*/
-      	  $(".number_guest").attr("placeholder", getTrans('Number Of Guests','number_of_guest') );
-      	  $(".date_booking").attr("placeholder", getTrans('Date Of Booking','date_of_booking') );
-      	  $(".booking_time").attr("placeholder", getTrans('Time Of Booking','time_of_booking') );
-      	  $(".booking_name").attr("placeholder", getTrans('Name','name') );
-      	  $(".email").attr("placeholder", getTrans('Email Address','email_address') );
-      	  $(".mobile").attr("placeholder", getTrans('Mobile Number','mobile_number') );
-      	  $(".booking_notes").attr("placeholder", getTrans('Your Instructions','your_instructions') );
-      	  
-      	  translateValidationForm();
-      	        	  
-      } 
-    };   
-    sNavigator.pushPage("booking.html", options);		 
-}
-
-function submitBooking()
-{
-	$.validate({ 	
-	    form : '#frm-booking',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	      var params = $( "#frm-booking").serialize();	      
-	      params+="&merchant_id=" +  getStorage("merchant_id") ;
-	      params+="&client_token="+ getStorage("client_token");
-	      callAjax("bookTable",params);	       
-	      return false;
-	    }  
-	});
-}
-
-function loadMoreReviews()
-{
-	var page = sNavigator.getCurrentPage();		
-	if ( page.name=="reviews.html"){		
-		var params="merchant_id=" +  getStorage("merchant_id") ;
-		params+="&client_token="+ getStorage("client_token");
-	    callAjax("merchantReviews",params);	             	       
-		return;
 	}
 	
-	var options = {
-      animation: 'slide',
-      onTransitionEnd: function() { 						      	  
-      	  displayMerchantLogo2( 
-      	     getStorage("merchant_logo") ,
-      	     '' ,
-      	     'page-reviews'
-      	  );       	  
-      	  var params="merchant_id=" +  getStorage("merchant_id") ;
-      	  params+="&client_token="+ getStorage("client_token");
-	      callAjax("merchantReviews",params);	             	       
-      } 
-    };   
-    sNavigator.pushPage("reviews.html", options);		 	
-}
+});
 
-function displayReviews(data)
-{
-	var htm='';
-	$.each( data, function( key, val ) {        		  
-		htm+=tplReviews(val.avatar, val.rating, val.client_name, val.review, val.date_created , val.id , val.can_modify, val.replies );
-	});	
-	createElement('review-list-scroller',htm);
-	initRating();
-}
+/*END ONSEN INIT*/
 
-function showReviewForm()
-{
-	var options = {
-      animation: 'none',
-      onTransitionEnd: function() { 						      	  
-      	  displayMerchantLogo2( 
-      	     getStorage("merchant_logo") ,
-      	     '' ,
-      	     'page-addreviews'
-      	  );          	  
-      	  
-      	  translatePage();
-      	  $(".rating").attr("placeholder", getTrans('Your Rating 1 to 5','your_rating') );
-          $(".review").attr("placeholder", getTrans('Your reviews','your_reviews') );     
-          translateValidationForm();      
-          
-          $('.raty-stars').raty({ 
-			   score:0,
-			   readOnly: false, 		
-			   path: 'lib/raty/images',
-			   click: function (score, evt) {					   	   
-			   	   $(".rating").val( score );
-			   }
-		  });              
-          	  
-      }                   
-    };   
-    sNavigator.pushPage("addReviews.html", options);		 	
-}
-
-function addReview()
-{
-	$.validate({ 	
-	    form : '#frm-addreview',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	      var params = $( "#frm-addreview").serialize();	  
-	      
-	      merchant_id = getStorage("merchant_id");
-	      if (typeof merchant_id === "undefined" || merchant_id==null || merchant_id=="" || merchant_id=="null" ) {	      	
-	      } else {
-	      	 params+="&merchant_id=" +  merchant_id  ;
-	      }
-	          	      
-	      params+="&client_token="+ getStorage("client_token");
-	      callAjax("addReview",params);	       
-	      return false;
-	    }  
-	});
-}
-
-
-
-function showFilterResto()
-{	
-	if (typeof dialogBrowseResto === "undefined" || dialogBrowseResto==null || dialogBrowseResto=="" ) { 	    
-		ons.createDialog('filterBrowseResto.html').then(function(dialog) {
-			$(".restaurant_name").val('');
-	        dialog.show();
-	        
-	        translatePage();
-	        translateValidationForm();
-	        $(".restaurant_name").attr("placeholder", getTrans('Enter Restaurant name','enter_resto_name')  );
-	        
-	    });	
-	} else {
-		$(".restaurant_name").val('');
-		dialogBrowseResto.show();
+showLoader = function(show, loader_id) {	
 		
-		/*translatePage();
-	    translateValidationForm();
-	    $(".restaurant_name").attr("placeholder", getTrans('Enter Restaurant name','enter_resto_name')  );*/
-	}		
-}
-
-
-function submitFilterBrowse()
-{
-	$.validate({ 	
-	    form : '#frm-filterbrowse',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	      dialogBrowseResto.hide();	
-	      browse_params = $( "#frm-filterbrowse").serialize();	      	      	      
-	      removeStorage("browse_total");  
-	      callAjax("initBrowseMerchant",browse_params);	       
-	      //callAjax("browseRestaurant",params);	       
-	      return false;
-	    }  
-	});
-}
-
-function showProfile()
-{
-	if (isLogin()){
-		menu.setMainPage('profile.html', {closeMenu: true});
+	dump("loader_id=>"+ loader_id);
+	if(!empty(loader_id)){
+		var modal = document.querySelector('#'+ loader_id);
 	} else {
-		menu.setMainPage('prelogin.html', {closeMenu: true})
+		var modal = document.querySelector('#default_loader');	
 	}
-}
+	
+	if(empty(modal)){
+		return ;
+	}
+		
+	if(show){
+	  modal.show();
+	} else {	  
+	  modal.hide();
+	}		  
+};
 
-function saveProfile()
-{
-	$.validate({ 	
-	    form : '#frm-profile',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	   	      
-	      var params = $( "#frm-profile").serialize();	      	      
-	      params+="&client_token="+ getStorage("client_token");
-	      callAjax("saveProfile",params);	       
-	      return false;
-	    }  
-	});	
-}
+showToast = function(data, modifier) {
 
-function login()
-{
-	$.validate({ 	
-	    form : '#frm-login',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	   
-	    onSuccess : function() {     	   	      
-	      var params = $( "#frm-login").serialize();
-	      params+="&device_id="+ getStorage("device_id");
-	      if (isDebug()){
-	      	  params+="&device_platform=Android";
-	      } else {
-	      	  params+="&device_platform="+ device.platform;
-	      }	      
-	      callAjax("login",params);	       
-	      return false;
-	    }  
-	});	
-}
+  if (empty(data)){
+  	  data=' ';
+  }	  
+  if (empty(modifier)){
+  	  modifier='danger';
+  }	  
+  is_animation = '';
+  
+  if(modifier=="danger"){
+  	is_animation='fall';
+  }
+  
+  toast_handler  = ons.notification.toast(data, {
+     timeout: 2500, //
+     animation: is_animation ,
+     modifier: modifier+ ' thick',
+  });
+   
+};
 
-function logout()
-{		
-	ons.notification.confirm({
-	  //message: 'Are you sure?',	  
-	  message: getTrans('Are you sure','are_you_sure') + "?" ,	  
-	  title: dialog_title_default ,
-	  buttonLabels: [ getTrans('Yes','yes') ,  getTrans('No','no') ],
-	  animation: 'default', // or 'none'
-	  primaryButtonIndex: 1,
-	  cancelable: true,
-	  callback: function(index) {
-	    if(index<=0){
-	    	
-	    	/*LOGOUT TO GOOGLE */
-			var social_strategy = getStorage("social_strategy");
-			enabled_googlogin = getStorage("enabled_googlogin");
-			dump(social_strategy); 
-			dump(enabled_googlogin);
+
+showAlert = function(data) {  
+  if (empty(data)){
+  	  data='';
+  }
+  ons.platform.select('ios'); 
+  ons.notification.alert({
+  	  message: t(data) ,
+      title: krms_config.AppTitle,
+      buttonLabels : [ t("OK") ]
+  });
+};
+
+t = function(data){
+	return translator.get(data);
+};
+
+requestParams = function(action){
+	data ='';
+	data+="&device_id=" + device_id;
+	data+="&device_platform=" + device_platform;
+	data+="&device_uiid=" + device_uiid;
+	data+="&code_version=" + code_version;
+	
+	token = getStorage("user_token");
+	if (!empty(token)){
+		data+="&user_token=" + token;
+	} else {
+		data+="&user_token=";
+	}
+	
+	
+	if(!empty(krms_config.ApiKey)){
+		data+="&api_key=" + krms_config.ApiKey;
+	}
+	
+	data+="&lang="+ getLanguageCode();
+	
+	dump("requestParams=>"+action);
+	
 			
-			if (!isDebug()){
-				if(!empty(social_strategy)){
-					switch(social_strategy)
-					{
-						case "google_mobile":
-						  window.plugins.googleplus.logout(
-							    function (msg) {
-							      removeStorage("social_strategy");						      
-							    }
-							);
-						break;
-						
-						case "fb_mobile":
-						  if(social_strategy=="fb_mobile"){
-						    fbLogout();
-					      }
-						break;
+	switch(action){
+   	  case "setDeliveryAddress":
+   	  case "SetLocation":
+   	  case "StateList":
+   	  case "CityList":
+   	  case "AreaList":
+   	  case "saveAddressBookLocation":
+   	  case "setDeliveryLocation":
+   	  case "mapboxgeocode":
+   	  case "saveAddressBook":
+   	  break;
+   	  
+   	  default:     	
+   	  	if(settings = getAppSettings()){
+			if(settings.search_mode=="address"){			
+				if(lat_res = getCurrentLocation()){			     
+					data+="&lat="+ lat_res.lat + "&lng=" + lat_res.lng;
+				}
+			} else {				
+				if ( location_res = getLocationData() ){
+					if(location_res.location_mode==1){
+						data+="&city_id="+ location_res.city_id + "&area_id=" + location_res.area_id;
+					} else if( location_res.location_mode==2){
+						data+="&state_id="+ location_res.state_id + "&city_id=" + location_res.city_id;
+					} else if( location_res.location_mode==3){
+						data+="&city_id="+ location_res.city_id + "&postal_code=" + location_res.postal_code;
 					}
 				}
 			}
+		}   	   	 
+   	  break;
+    }						   
+	
+	return data;
+};
+
+/*mycall*/
+processAjax = function(action, data , method, loader_type){
+	
+	try {
 		
-			pushUnregister();
-			removeStorage("client_token");								
-			toastMsg(  getTrans("You are now logout",'you_are_now_logout') );
-			menu.setMainPage('home.html', {closeMenu: true});	
-	    	
-	    }
-	  }
-	});
-}
-
-function isLogin()
-{
-	if (!empty(getStorage("client_token"))){
-		return true;
-	}
-	return false;
-}
-
-function showLogin(next_steps)
-{
-   var options = {
-      animation: 'slide',
-      onTransitionEnd: function() {       	  
-      	  if ( !empty(next_steps)){
-      	  	 $(".page-login-fb").show();
-    	     $(".next_steps").val( getStorage("transaction_type") );
-          } else {
-          	 $(".page-login-fb").hide();
-          	 $(".next_steps").val( '' );
-          }
-      } 
-    };       
-    sNavigator.pushPage("login.html", options);		 	
-}
-
-function showForgotPass()
-{
-	$(".email_address").val('');
-	if (typeof dialogForgotPass === "undefined" || dialogForgotPass==null || dialogForgotPass=="" ) { 	    
-		ons.createDialog('forgotPassword.html').then(function(dialog) {
-	        dialog.show();
-	        translatePage();
-	        translateValidationForm();	        
-	        $(".email_address").attr("placeholder",  getTrans('Email Address','email_address') );
-	    });	
-	} else {
-		dialogForgotPass.show();		
-	}	
-}
-
-function forgotPassword()
-{
-	$.validate({ 	
-	    form : '#frm-forgotpass',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	   	      
-	      var params = $( "#frm-forgotpass").serialize();	      	      	      
-	      callAjax("forgotPassword",params);	       
-	      return false;
-	    }  
-	});	
-}
-
-function showSignupForm()
-{
-	var options = {
-      animation: 'slide',
-      onTransitionEnd: function() {          	  
-      	  callAjax("getCustomFields",'');   
-      	  initIntelInputs();	  
-      } 
-    };   
-    sNavigator.pushPage("signup.html", options);		 	
-}
-
-function signup()
-{	
-	$.validate({ 	
-	    form : '#frm-signup',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     
-
-	      if ($('.iagree-wrap').is(':visible')) {	
-		      var iagree = $(".iagree:checked").val();	
-		      if(empty(iagree)){
-		      	 onsenAlert( getTrans("You must agree to terms & conditions",'agree_terms') );
-		      	 return;
-		      }
-	      }
-	     	    
-	      var params = $( "#frm-signup").serialize();	      
-	      params+="&device_id="+ getStorage("device_id");
-	      
-	      if (isDebug()){
-	      	  params+="&device_platform=Android";
-	      } else {
-	      	  params+="&device_platform="+ device.platform;
-	      }	      
-	      
-	      callAjax("signup",params);	       
-	      return false;
-	    }  
-	});
-}
-
-function showOrders()
-{
-	if (isLogin()){		
-		menu.setMainPage('orders.html', {closeMenu: true});
-	} else {
-		menu.setMainPage('prelogin.html', {closeMenu: true});
-	}
-}
-
-function showAddressBook()
-{
-  if (isLogin()){
-		menu.setMainPage('addressBook.html', {closeMenu: true});
-	} else {
-		menu.setMainPage('prelogin.html', {closeMenu: true});
-	}
-}
-
-function displayOrderHistory(data)
-{
-	var htm='<ons-list>';
-	$.each( data, function( key, val ) {   	     
-	     htm+='<ons-list-item modifier="tappable" class="list-item-container" onclick="showOrderOptions('+val.order_id+');" >';
-           htm+='<ons-row class="row">';
-              htm+='<ons-col class="col-orders concat-text">';
-                htm+=val.title;
-              htm+='</ons-col>';
-              htm+='<ons-col class="col-order-stats center" width="98px">';
-                 htm+='<span class="notification concat-text '+val.status_raw+' ">'+val.status+'</span>';
-              htm+='</ons-col>';
-           htm+='</ons-row>';
-         htm+='</ons-list-item>';
-	});
-	htm+='</ons-list>';
-	createElement('recent-orders',htm);	
-}
-
-function showOrderDetails(order_id)
-{
-    dump(order_id);
-	var options = {
-      animation: 'slide',
-      onTransitionEnd: function() {        	
-      	var params="client_token="+ getStorage("client_token")+"&order_id="+order_id;
-      	callAjax("ordersDetails",params);
-      } 
-    };
-    sNavigator.pushPage("ordersDetails.html", options);	
-}
-
-function displayOrderHistoryDetails(data)
-{
-	//$("#page-orderdetails .title").html("Total : "+ data.total);
-	//$("#page-orderdetails #search-text").html("Order Details #"+data.order_id);
-	$("#page-orderdetails .title").html( getTrans('Total','total') + " : "+ data.total);
-	$("#page-orderdetails #search-text").html( getTrans('Order Details','order_details') + " #"+data.order_id);
 	
-	
-	var htm='<ons-list-header class="center trn" data-trn-key="items" >Items</ons-list-header>';
-	if ( data.item.length>0){
-		$.each( data.item, function( key, val ) {   			  
-			  htm+='<ons-list-item class="center">'+val.item_name+'</ons-list-item> ';
-		});	
-	} else {
-		htm+='<ons-list-item class="center">';
-		htm+='no item found';
-		htm+='</ons-list-item>';
+	if(empty(method)){
+		method='GET';
 	}
-	createElement('item-details', htm );
-	
-	var htm='<ons-list-header class="center trn" data-trn-key="status_history">Status History</ons-list-header>';	
-	if ( data.history_data.length>0){		
-		$.each( data.history_data, function( key, val ) {   		
-			dump(val);
-			htm+='<ons-list-item>';
-	        htm+='<ons-row class="row">';
-	           htm+='<ons-col class="" width="40%">';
-	             htm+= val.date_created;
-	           htm+='</ons-col>';
-	           htm+='<ons-col class="padding-left5" width="30%">';
-	             htm+=val.status;
-	           htm+='</ons-col>';
-	           htm+='<ons-col class="padding-left5"  width="25%">';
-	             htm+=val.remarks;
-	           htm+='</ons-col>';
-	        htm+='</ons-row>';
-	       htm+='</ons-list-item>';
-		});		
-	} else {
-		htm+='<ons-list-item class="center">';
-		htm+='No history found';
-		htm+='</ons-list-item>';
-	}
-	createElement('item-history', htm );
 		
-	if ( data.order_from.request_from=="mobile_app"){
-	var html='<button class="button green-btn button--large trn" onclick="reOrder('+data.order_id+');" data-trn-key="click_here_to_reorder" >';
-	html+='Click here to Re-order';
-	html+='<div class="search-btn"><ons-icon icon="ion-forward"></ons-icon></div>';
-    html+='</button>';
-    createElement('re-order-wrap', html );
-	}
+	var ajax_uri = ajax_url+"/"+action;
+		
+	data+=requestParams(action);
+	current_page = document.querySelector('ons-navigator').topPage.id;
+	data+="&current_page="+current_page;
+	
+	dump("ACTION=>" + action );
+	dump("METHOD=>" + method );
+	dump(ajax_uri + "?"+ data);	
+	
+	ajax_request = $.ajax({
+	  url: ajax_uri,
+	  method: method ,
+	  data: data ,
+	  dataType: "json",
+	  timeout: ajax_timeout,
+	  crossDomain: true,
+	  beforeSend: function( xhr ) {
+         dump("before send ajax");   
          
-   translatePage();
-}
-
-function reOrder(order_id)
-{
-	var params="client_token="+ getStorage("client_token")+"&order_id="+order_id;
-     callAjax("reOrder",params);
-}
-
-function displayAddressBook(data)
-{
-	var htm='<ons-list>';
-	if ( data.length>0){		
-	   $.each( data, function( key, val ) {   		
-	     htm+='<ons-list-item modifier="tappable" onclick="modifyAddressBook('+val.id+');" >';
-	         htm+='<ons-row class="row">';
-	            htm+='<ons-col class="" width="70%">';
-	            htm+='<p class="small-font-dim">'+val.address+'</p>';
-	            htm+='</ons-col>';
-	            htm+='<ons-col class="text-right" >';
-	              if (val.as_default==2){
-	                 htm+='<ons-icon icon="ion-ios-location-outline"></ons-icon>';
-	              }
-	            htm+='</ons-col>';
-	         htm+='<ons-row>';
-	     htm+='</ons-list-item>';
-	   });
-   }  
-   htm+='</ons-list>';
-   
-   createElement('address-book-list', htm );
-}
-
-function modifyAddressBook(id)
-{	
-	search_mode = getSearchMode();
-	dump("search_mode=>"+search_mode);
-	if(search_mode=="postcode"){
-		sNavigator.pushPage("postAddressDetails.html", {
-       	  animation: 'slide',
-       	  id : id
-       });	
-	} else {	
-       sNavigator.pushPage("addressBookDetails.html", {
-       	  animation: 'slide',
-       	  id : id
-       });	
-	}
-}
-
-function fillAddressBook(data)
-{
-	$(".action").val('edit');
-	$(".delete-addressbook").show();
-	
-	$(".id").val( data.id );
-	$(".street").val( data.street );
-	$(".city").val( data.city );
-	$(".state").val( data.state );
-	$(".zipcode").val( data.zipcode );
-	$(".location_name").val( data.location_name );	
-	$(".country_code").val( data.country_code );		
-	if (data.as_default==2){
-		$(".as_default").attr("checked","checked");
-	} else $(".as_default").removeAttr("checked");
-}
-
-function saveAddressBook()
-{
-	$.validate({ 	
-	    form : '#frm-addressbook',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	      var params = $( "#frm-addressbook").serialize();	    
-	      params+="&client_token="+ getStorage("client_token");
-	      callAjax("saveAddressBook",params);	       
-	      return false;
-	    }  
-	});
-}
-
-function newAddressBook()
-{
-	search_mode = getSearchMode();
-	if ( search_mode=="postcode"){
-		sNavigator.pushPage("postAddressDetails.html", {
-       	  animation: 'slide',
-       	  id : ''
-       });	
-	} else {
-		$(".delete-addressbook").hide();
-		var options = {
-	      animation: 'slide',
-	      onTransitionEnd: function() {        	
-	      	$(".id").val('');
-	      	$(".action").val('add');
-	      } 
-	    };
-	    sNavigator.pushPage("addressBookDetails.html", options);
-	}
-}
-
-function deleteAddressBook()
-{
-	ons.notification.confirm({
-	  message: getTrans('Delete this records?','delete_this_records') ,	  
-	  title: dialog_title_default,
-	  buttonLabels: ['Yes', 'No'],
-	  animation: 'default', // or 'none'
-	  primaryButtonIndex: 1,
-	  cancelable: true,
-	  callback: function(index) {
-	  	dump(index);
-	    if ( index==0){
-	    	var id=$(".id").val();		
-	        var params="&client_token="+ getStorage("client_token")+"&id="+id;
-	        callAjax("deleteAddressBook",params);	       
-	    }
-	  }
-	});	
-}
-
-
-function popUpAddressBook()
-{	
-	$(".manual-address-input").hide();
-	
-	if (typeof dialogAddressBook === "undefined" || dialogAddressBook==null || dialogAddressBook=="" ) { 	    
-		ons.createDialog('dialogAddressBook.html').then(function(dialog) {			
-	        dialog.show();
-	        translatePage();
-	    });	
-	} else {
-		callAjax('getAddressBookDialog',
-		  "client_token="+getStorage("client_token")
-		);		
-		dialogAddressBook.show();
-		//translatePage();
-	}	
-}
-
-function displayAddressBookPopup(data)
-{		
-	var htm='<ons-list>';
-	if ( data.length>0){		
-	   $.each( data, function( key, val ) {   		
-	   	 var complete_address=val.street+"|";
-	   	 complete_address+=val.city+"|";
-	   	 complete_address+=val.state+"|";
-	   	 complete_address+=val.zipcode+"|";
-	   	 complete_address+=val.location_name+"|";
-	   	 complete_address+=val.contact_phone+"|";
-	   	 
-	     htm+='<ons-list-item modifier="tappable" class="setAddress" data-address="'+complete_address+'" >';
-	         htm+='<ons-row class="row">';
-	            htm+='<ons-col class="" width="80%">';
-	            htm+='<p class="small-font-dim">'+val.address+'</p>';
-	            htm+='</ons-col>';
-	            htm+='<ons-col class="text-right" >';
-	              if (val.as_default==2){
-	                 htm+='<ons-icon icon="ion-ios-location-outline"></ons-icon>';
-	              }
-	            htm+='</ons-col>';
-	         htm+='<ons-row>';
-	     htm+='</ons-list-item>';
-	   });
-   }  
-   htm+='</ons-list>';
-   
-   createElement('addressbook-popup', htm );
-}
-
-function initSocialLogin()
-{	
-   dump('initSocialLogin');    
-   
-   enabled_social_login = 0;
-   
-   /*FACEBOOK*/
-   enabled_fblogin = getStorage("mobile_enabled_fblogin");
-   if ( !empty(enabled_fblogin)){
-   	  if ( enabled_fblogin == 1 || enabled_fblogin == "1" ){
-   	  	  $(".fb-login-wrap").show();
-   	  	  enabled_social_login++;
-   	  }
-   }
-   
-   // GOOGLE LOGIN
-   enabled_googlogin = getStorage("enabled_googlogin");
-   if ( !empty(enabled_googlogin)){
-   	   if ( enabled_googlogin==1 || enabled_googlogin == "1"){
-   	   	   $(".google-login-wrap").show();
-   	   	   enabled_social_login++;
-   	   }    	  
-   }   
-   
-   if(enabled_social_login<=0){
-   	  $(".or_use_email_wrap").hide();
-   }
-   
-}
-
-function myFacebookLogin()
-{			
-	openFB.login(
-    function(response) {
-        if(response.status === 'connected') {        	
-            //alert('Facebook login succeeded, got access token: ' + response.authResponse.token);             
-            getFbInfo();
-        } else {
-            alert('Facebook login failed: ' + response.error);
-        }
-    }, {scope: 'public_profile,email'});
-}
-
-function getFbInfo()
-{			
-	openFB.api({
-		path: '/me',
-		params: {
-			fields:"email,first_name,last_name"
-		},
-		success: function(data) {			
-		    dump(data);				    
-		    var params="&email="+ encodeURIComponent(data.email);
-	        params+="&first_name="+ encodeURIComponent(data.first_name);
-	        params+="&last_name="+ encodeURIComponent(data.last_name);
-	        params+="&fbid="+ encodeURIComponent(data.id);
-	        params+="&device_id="+ encodeURIComponent(getStorage("device_id"));
+         clearTimeout(timer);
+              
+         if(ajax_request != null) {	
+         	ajax_request.abort();
+            clearTimeout(timer);
+         } else {         	
+         	showLoader(true, loader_type);         	
+         	timer = setTimeout(function() {		
+         		if(ajax_request != null) {		
+				   ajax_request.abort();
+         		}         		
+         		showLoader(false, loader_type);
+				showToast( t('Request taking lot of time. Please try again') );
+	        }, ajax_timeout ); 
+         }
+      }
+    });
+    
+    
+    ajax_request.done(function( data ) {
+     	dump("done ajax");
+     	dump(action);
+     	dump(data);
+     	if(data.code==1){
+     		
+     		switch(action){
+     			case "getSettings":         			     
+     			     			     			    
+     			     setStorage("app_settings", JSON.stringify(data.details.settings) );  
+     			     dict = data.details.settings.dict; 
+     			          			     
+     			     current_lang_code = getLanguageCode();
+     			     InitRTL(current_lang_code);
+     			          
+     			     removeStorage("cart_merchant_id");
+     			     removeStorage("cart_item_count");
+     			     
+     			     is_login = data.details.valid_token;
+     			     lat = getStorage("location_lat");
+     			     lng = getStorage("location_lng");
+     			     
+     			     
+     			     initAppRateCountDown();
+     			     
+     			     /*SUBSCRIBE*/     			     
+     			     $subscribe_topic = 1;
+     			     if ((typeof data.details.settings.subscribe_topic !== "undefined") && (data.details.settings.subscribe_topic !== null)) {
+     			     	$subscribe_topic = data.details.settings.subscribe_topic;
+     			     }     			     
+     			     if($subscribe_topic>0){   
+     			     	setTimeout(function() {				     
+					 	  subscribe();
+					   }, 500);    			     	     			        
+     			     }   			          			          			    
+     			     
+     			     /*SET ANALYTIC*/
+     			     AnalyticsSet();
+     			     is_location = isLocation();
+     			     
+     			     if(is_location){
+     			        if(location_res = getLocationData()){
+     			           lat=1;     			           
+     			        } else { 
+     			           lat='';
+     			        }
+     			     }
+     			     
+     			     if(is_login==1 && !empty(lat)){
+     			     	if(!is_location){
+     			     	    recheckLocation();
+     			     	}     			     
+     			     	onsenNavigator.resetToPage("tabbar.html",{
+					  	   animation : "none" ,  	
+					  	   data : {
+					  	   	  lat : lat,
+					  	   	  lng : lng,
+					  	   }
+					    });
+     			     } else if( is_login==1 && empty(lat) ){        			     	  			     	
+     			     	  if(is_location){     	     		
+     			     	  	reset_to_page = 'select_location.html';	     	  	
+     			     	  } else {     			     	  	     			     	  	
+     			     	  	reset_to_page = 'map_select_location.html';
+     			     	  }     		     			     	  
+     			     	  onsenNavigator.resetToPage(reset_to_page,{
+					  	    animation : "fade",		  	
+					      });
+     			     } else {
+     			     	 
+     			     	 removeStorage("user_token");
+     			     	 
+     			     	 startup = 1;
+     			     	 select_language = '';
+     			     	 if(!empty(data.details.settings.startup)){
+     			     	   startup = data.details.settings.startup.options;
+     			     	 }
+     			     	 if(!empty(data.details.settings.startup)){
+     			     	   select_language = data.details.settings.startup.select_language;
+     			     	 }
+     			     	 
+     			     	 set_startup_lang = getStorage("client_set_lang");     			     	 
+     			     	 if(select_language==1 && empty(set_startup_lang)){
+     			     	 	onsenNavigator.resetToPage('page_startup_select_language.html',{
+				  	           animation : "fade",		  	
+				            });
+				            return;
+     			     	 }     			    
+     			     	 
+     			     	 setTimeout(function() { 
+	     			     	 if(startup==2){
+	     			     	 	onsenNavigator.resetToPage('page_startup2.html',{
+					  	           animation : "fade",		  	
+					             });
+	     			     	 } else {     			    
+			     			     onsenNavigator.resetToPage('page_startup.html',{
+					  	           animation : "fade",		  	
+					             });
+	     			     	 }
+     			     	 }, 500); 
+			             
+     			     }
+     			          			            
+     			break;
+     			
+     			case "getMobileCodeList":	        	  
+	        	  fillMobilePrefix(data.details.data);
+	        	break;
+	        	
+	        	case "customerLogin":	        
+	        	
+	        	  setStorage('user_token', data.details.client_info.token );
+	        	  if ((typeof  data.details.client_info.contact_phone !== "undefined") && ( data.details.client_info.contact_phone !== null)) {
+	        	     setStorage('customer_number', data.details.client_info.contact_phone );
+	        	  }
+	        	  
+	        	  next_step = getStorage("next_step");
+	        	  dump("next_step=>"+ next_step);
+	        	  if(!empty(next_step)){	        	  	 	        	  	
+	        	  	  nextStep( next_step );
+	        	  } else {	        	  		        	  	
+	        	  	  showHomeOrSelect();
+	        	  }	        		  	        	  
+	        	break;
+	        	
+	        	case "createAccount":	 
+	        	case "registerUsingFb":       
+	        	case "googleLogin":	
+	        	
+	        	  dump("next step=>"+ data.details.next_step );      	
+	        	
+	        	 if(data.details.next_step=="verification_mobile" || data.details.next_step=="verification_email" || data.details.next_step == "verification_firebase_otp" ){
+	        	 	
+	        	 	
+	        	 	if(data.details.next_step!="verification_firebase_otp"){
+	        	 	   showToast( data.msg ,'success' );	        	 	
+	        	 	}
+	        	 	
+	        	 	
+	        	 	next_step = '';
+	        	 	next_step = getStorage("next_step");
+	        	 	if(empty(next_step)){
+	        	 		next_step='map_select_location';
+	        	 	}	        	 		        	 
+	        	 	
+	        	 	if ((typeof data.details.contact_phone !== "undefined") && ( data.details.contact_phone !== null)) {
+	        	 	    setStorage('customer_number', data.details.contact_phone );
+	        	 	 }
+	        	 		
+	        	 	onsenNavigator.replacePage("verification.html" ,{
+					  	   animation : "none" ,  	
+					  	   data : {
+					  	   	  "contact_phone" : data.details.contact_phone,
+					  	   	  "customer_token" : data.details.customer_token,
+					  	   	  "email_address" : data.details.email_address,					  	   	  
+					  	   	  "next_step" : next_step ,
+					  	   	  "verification_type" : data.details.next_step,
+					  	   }
+					 });  
+					 
+	        	 /*} else if ( data.details.next_step =="map_select_location"){
+	        	 	setStorage('user_token', data.details.customer_token );
+	        	 	loadTabbar( data.details.next_step );*/
+	        	 	
+	        	 } else if ( data.details.next_step == "payment_option") {	  
+	        	 		        	 	 
+	        	 	 setStorage('user_token', data.details.customer_token );
+	        	 	 
+	        	 	 if (isOrderVerificationEnabled()){	
+	        	 	 	 //showPage('order_verification.html');
+	        	 	 	 replacePage('order_verification.html');
+	        	 	 } else {	        	 	 	 
+	        	         //showPage('payment_option.html');
+	        	         if(!oneTimePayment()){
+	        	            replacePage('payment_option.html');
+	        	         }
+	        	 	 }
+	        	 } else {
+	        	 	 setStorage('user_token', data.details.customer_token );
+	        	 	 
+	        	 	 if ((typeof data.details.contact_phone !== "undefined") && ( data.details.contact_phone !== null)) {
+	        	 	    setStorage('customer_number', data.details.contact_phone );
+	        	 	 }
+	        	 	 
+	        	 	 loadTabbar( data.details.next_step );
+	        	 }	        	 
+	        	break;
+	        	
+	        	case "verifyCode":	        	   	        	   
+	        	   setStorage('user_token', data.details.token );	        	   
+	        	   loadTabbar( data.details.next_step );	        	   
+	        	break;
+     			
+	        	case "searchMerchant":
+	        	  if ( data.details.map_page==1){
+	        	  	  merchantMapSetList(data.details.list);
+	        	  	  carouselMap(data.details.list,'.bottom-bar--bottom_toolbar_carousel');
+	        	  } else {	        
+		        	  $('.sort_btn').attr("disabled",false); 
+		        	  $(".total_number_found").html( data.msg );
+		        	  $(".sortby_selected").html( data.details.sortby_selected );
+		        	  	        	  
+		        	  setPaginate("#restaurant_list",  data.details.paginate_total);
+		        	  
+		        	  list_type = getListType(); 	
+		        	  dump("list_type=>"+ list_type);
+		        	  if(list_type==1){
+		        	  	 restaurantList(data.details.list,'list_restaurant');
+		        	  } else if ( list_type == 3) {
+		        	  	 restaurantListColumn(data.details.list,'list_restaurant');
+		        	  } else {
+		        	  	 restaurantListWithBanner(data.details.list, 'list_restaurant');
+		        	  }
+		        	  initRatyStatic();
+	        	  }	        	  	   
+	        	  	        	  
+	        	  setTimeout(function() {				     
+				 	  imageLoaded(); 
+				   }, 10);
+	        	   	        	
+	        	break;
+	        	
+	        	case "cuisineList":	        	  
+	        	  $(".total_number_found").html( data.msg );
+	        	  $(".sortby_selected").html( data.details.sortby_selected );
+	        	  $("#list_cuisine").html('');
+	        	  $(".frm_cuisine .paginate_total").val( data.details.paginate_total );
+	        	  $(".frm_cuisine .paginate_page").val( 1 );
+	        	  ListCuisine( data.details.list , 'list_cuisine' );
+	        	  imageLoaded(); 
+	        	break;
+	        	
+	        	case "getRestaurantInfo":
 	        
-	        if (isDebug()){
-	      	  params+="&device_platform=Android";
-	        } else {
-	      	  params+="&device_platform="+ encodeURIComponent(device.platform);
-	        }	     
-	        
-	        if ( $(".next_steps").exists()){
-	           params+="&next_steps="+ encodeURIComponent($(".next_steps").val());        
-	        }	        
-		    callAjax("registerUsingFb",params);	       
-		    
-    },
-    error: fbErrorHandler});
+	        	  AnalyticsTrack("page merchant page : " + data.details.data.restaurant_name); 
+	        	
+	        	  $(".merchant_open_status").val( data.details.data.status_raw);
+	        	  if(data.details.data.status_raw=="close"){
+	        	  	 showToast(data.details.data.close_message);
+	        	  }     		
+	        	  
+	        	  $(".merchant_lat").val( data.details.data.latitude);
+	        	  $(".merchant_lng").val( data.details.data.lontitude);
+	        	  $(".merchant_name").val( data.details.data.restaurant_name);
+	        	  $(".merchant_adddress").val( data.details.data.complete_address);
+	        	  
+	        	  fav = favoriteButton(data.details.data.added_as_favorite);
+	        	  $(".favorite_toolbar_wrap").html(fav);
+	        	
+	        	  $(".resto_name").html(data.details.data.restaurant_name);
+	        	  info = fillRestoPageInfo(data.details.data);
+	        	  $("#restaurant_page .white_list_wrapper").html( info );
+	        	  if ( data.details.data.gallery!=2){
+	        	  	  html = restoPageCarousel( data.details.data.gallery );
+	        	  	  $(".carousel_banner").html(html);
+	        	  } else {
+	        	  	  html = restoBanner( data.details.data );
+	        	  	  $(".carousel_banner").html(html);
+	        	  }	        	  	   
+	        	  
+	        	  if ( data.details.data.tab_menu_enabled==1){
+	        	     html = restoTabMenu( data.details.data.tab_menu );
+	        	     $(".carousel_resto_menu").html( html );
+	        	  }
+	        	  
+	        	  /*params = "merchant_id="+ data.details.data.merchant_id;
+	        	  processDynamicAjax('getMerchantMenu',params,'menu_loader','GET',1 ) */    	
+	        	  
+	        	  setStorage("share_options", JSON.stringify(data.details.data.share_options) );  
+	        	  
+	        	  initRatyStatic();
+	        	  imageLoaded(); 	        	  
+	        	  setCloseMerchant();
+	        	    
+	        	break;
+	        	
+	        	case "itemDetails":
+	        	  $("#item_details .center").html( data.details.data.item_name );
+	        	  $(".category_id").val(data.details.cat_id);
+	        	  tpl = displayItemDetails(data.details.data , data.details.cart_data);
+	        	  $(".item_details_wrap").html( tpl ) ;
+	        	  
+	        	   if ( data.details.ordering_disabled==1){
+	        	  	  showToast(data.details.ordering_msg);
+	        	  	  $("#item_details ons-bottom-toolbar").hide();
+	        	  }
+	        	  
+	        	   if(settings = getAppSettings()){
+					if(settings.website_hide_foodprice=="yes"){
+						$("#item_details ons-bottom-toolbar").hide();
+					}
+				  }
+	        	  
+				  imageLoaded(); 
+				  
+				  /*inventory*/				  
+				  removeStorage("inventory_enabled");
+				  if(!empty(data.details.inventory_enabled)){				  
+					  setStorage("inventory_enabled", data.details.inventory_enabled);
+					  if(data.details.inventory_enabled==1){				
+					  	
+					  	  $(".bottom-bar--bottom_toolbar").css({
+					  	  	"height":"130px"
+					  	  });
+					  		  	  
+						  setTimeout(function() {				     
+						 	  initStocks();
+						   }, 100);				  
+					  }
+				  }
+				  
+	        	break;
+	        	
+	        	case "loadCart":
+	        	
+	        	  clearBasket();
+	        	  
+	        	  setStorage("merchant_settings", JSON.stringify(data.details.merchant_settings) );  
+	        	  
+	        	  document.querySelector('ons-tabbar').setActiveTab(0);
+	        	   	        	   	        	  
+	        	  setStorage("next_step", 'payment_option' );
+	        	   
+	        	  if ( data.details.required_delivery_time=="yes"){
+        		  	 $(".required_delivery_time").val(1);
+        		  } else {
+        		  	 $(".required_delivery_time").val('');
+        		  }
+        		  
+        		  $(".has_addressbook").val( data.details.has_addressbook );
+        		  $(".sms_order_session").val( data.details.sms_order_session);
+        		  
+	        	  $(".no_order_wrap").hide();
+	        	  $(".bottom_toolbar_checkout").show();
+	        	  tpl = displayCartDetails(data.details);
+	        	  $(".cart_details").html( tpl ) ;
+	        	  
+	        	  if(data.details.cart_error.length>0){
+	        	  	 $('.bottom_toolbar_checkout ons-button').attr("disabled",true);
+	        	  	 cart_error='';     	  	
+	        	  	 $.each( data.details.cart_error  , function( cart_error_key, cart_error_val ) {
+	        	  		 cart_error+=cart_error_val + "\n";
+	        	  	 });	        	        	  	
+	        	  	 showAlert(cart_error);
+	        	  } else {
+	        	  	$('.bottom_toolbar_checkout ons-button').attr("disabled",false);
+	        	  }
+	        	  	        	  
+	        	  SetoneTimePayment(data);
+	        	  
+	        	  imageLoaded();
+	        	  initRatyStatic();
+	        	  	        	  	        	  
+	        	  setStorage("cart_item_count", data.details.cart_details.cart_count);
+	        	  
+	        	  
+	        	  //VALIDATE OPERATIONAL HOURS
+	        	  getOperational();
+	        	  
+	        	break;
+	        	
+	        	case "clearCart":
+	        	case "applyRedeemPoints":
+	        	case "removePoints":
+	        	case "applyVoucher":
+	        	case "removeVoucher":
+	        	case "applyTips":
+	        	case "removeTip":
+	        	  loadCart();	        	 
+	        	break;
+	        	
+	        	case "servicesList":
+	        	  tpl = displayList(data.details.data, 'transaction_type');
+	        	  $(".services_wrap").html( tpl );
+	        	break;
+	        	
+	        	case "deliveryDateList":
+	        	  tpl = displayList(data.details.data , 'delivery_date');
+	        	  $(".delivery_date_wrap").html( tpl  );
+	        	break;
+	        	
+	        	case "deliveryTimeList":
+	        	  tpl = displayList(data.details.data , 'delivery_time');
+	        	  $(".delivery_time_wrap").html( tpl  );
+	        	break;
+	        	
+	        	case "getAddressBookDropDown":
+	        	  tpl = fillAddressBook(data.details.data);
+	        	  $('.address_book_wrap').html( tpl );
+	        	break;	        	
+	        	
+	        	case "setDeliveryAddress":	       
+	        	case "setAddressBook": 		
+	        	case "setDeliveryLocation":
+	        	case "setAddressBookLocation":
+	        		        	        	   	        	   	        	   	  	        	  	        	   
+	        	   onsenNavigator.popPage();
+	        	   
+	        	   $(".delivery_address").val( data.details.complete_address );
+	        	   
+	        	   printDeliveryAddress(data.details.complete_address);
+	        	   
+	        	   if ( data.details.save_address==1){
+	        	   	   setStorage("save_address",1);
+	        	   } else {
+	        	   	   removeStorage('save_address');
+	        	   } 	        	   
+	        	   	        	   
+	        	   //if( action=="setDeliveryAddress" || action=="setAddressBook"){
+	        	   if( action=="setDeliveryAddress" || action=="setAddressBook"){
+	        	   	
+	        	   	   if($old_location = getCurrentLocation()){
+	        	   	  	  setStorage("location_old_lat", $old_location.lat );
+	        	   	  	  setStorage("location_old_lng", $old_location.lng );
+	        	   	   }
+	        	   	  
+		        	   setStorage("location_lat", data.details.lat );
+		               setStorage("location_lng", data.details.lng );		
+		               setStorage("location_address", data.details.complete_address );	
+		               
+		               $_address = {
+					 	'formatted_address': data.details.formatted_address,
+						'street' : data.details.street,
+						'city' : data.details.city,
+						'state' : data.details.state,
+						'zipcode' : data.details.zipcode,
+						'country' : data.details.country,
+						'lat' : data.details.lat ,
+						'lng' : data.details.lng
+					  };	  	 
+                      setStorage("geocoded_address", JSON.stringify($_address) );		
+	        	   }
+	        	   
+	        	   setTimeout(function() {				     
+				 	  loadCart();	
+				   }, 10);
+	        	break;
+	        	
+	        	case "loadPaymentList":
+		    	  tpl = displayPaymentList(data.details.data);
+		    	  $(".payment_list_wrap").html( tpl  );
+		    	break;
+		    	
+		    	case "payNow":
+		    	case "PayAuthorize":
+		    	case "razorPaymentSuccessfull":				    	 
+	        	   payNowNextStep(data);
+	        	break;
+	        	
+	        	case "verifyCustomerToken":	    
+	        	   setStorage("social_strategy", data.details.social_strategy);
+	        	   if ( data.details.action=="account_menu"){	        	   	
+	        	   	    accountMenu(true);
+	        	   } else {
+	        	   	    //
+	        	   }
+	        	break;
+	        	
+	        	case "GetAddressFromCart":	   
+	        	      	        	
+	        	   if(!empty(data.details.street)){	        	        	   	  
+	        	       filAddress('#address_form', data.details);
+	        	   } else {	        	   	   
+	        	   	   autoFillAddressForm();
+	        	   }     		
+	        	   
+	        	   fillCountry("#address_form", data.details.country_list, data.details.country_code);
+	        	   
+	        	   if(data.details.save_address==1){
+	        	      document.querySelector('ons-checkbox').checked = true;
+	        	   } else {
+	        	   	  document.querySelector('ons-checkbox').checked = false;
+	        	   }
+	        	   	        	   
+	        	   if(!empty(data.details.delivery_lat)){	 	        	   	  
+	        	      fillMapAddress('#map_address', true, data.details.delivery_lat, data.details.delivery_long );
+	        	      $(".lat").val( data.details.delivery_lat );
+	        	      $(".lng").val( data.details.delivery_long );
+	        	   } else {		        	   	  	        	   	  
+	        	   	  initMapAdress('#map_address', true);
+	        	   }
+	        	break;
+	        	
+	        	case "getOrderDetails":
+	        	  $(".review_as").html( data.details.data.review_as );
+	        	  $("#add_review h5").html( data.details.data.merchant_name );
+	        	  $("#add_review .print_trans").html( data.details.data.transaction );
+	        	  $("#add_review .print_payment_type").html( data.details.data.payment_type );
+	        	  
+	        	  $("#add_review .review").val( data.details.data.review );
+	        	  $("#add_review .order_id").val( data.details.data.order_id );
+	        	  $("#add_review .rating").val( data.details.data.rating );
+	        	  
+	        	  $("#add_review .thumbnail").attr("src", data.details.data.logo);
+	        	  
+	        	  if(data.details.data.as_anonymous>0){
+	        	     document.querySelector('ons-checkbox').checked = data.details.data.as_anonymous;
+	        	  } 
+	        	  
+	        	  initRaty(data.details.data.rating);
+	        	  imageLoaded(); 
+	        	break;
+	        	
+	        	case "addReview":	        	  
+	        	  onsenNavigator.popPage();
+	        	  $("#order_list_item").html('');
+	        	  params_tab = "tab="+ $(".order_tab_active").val();	        	  
+	        	  processDynamicAjax('OrderList', params_tab ,'order_loader','GET',1 ); 
+	        	break;
+	        	
+	        	case "CancelOrder":
+	        	  popPage(); 
+	        	  $("#order_list_item").html('');
+	        	  params_tab = "tab="+ $(".order_tab_active").val();
+	        	  processDynamicAjax('OrderList', params_tab ,'order_loader','GET',1 ); 
+	        	break;
+	        	
+	        	case "ViewOrder":
+	        	    tpl = formatOrder( data.details.data);
+	        	    $(".order_details_wrap").html( tpl );
+	        	    $(".order_details_html").html( data.details.html );
+	        	    	        	    
+	        	    if( data.details.apply_food_tax == 1){
+	        	    	$(".summary-wrap").after( data.details.new_total_html );
+	        	    	$(".summary-wrap").remove();
+	        	    }
+	        	break;
+	        	
+	        	case "ReOrder":
+	        	  	        	  
+	        	  setStorage("cart_merchant_id", data.details.merchant_id );
+	        	  setStorage("cart_re_order", 1 );	        	
+	        	  
+	        	  if ((typeof  data.details.trans_type !== "undefined") && ( data.details.trans_type !== null)) {
+	        	     setStorage("transaction_type", data.details.trans_type );
+	        	  }
+	        	  
+	        	  showPage("cart.html",'lift');	        	 
+	        	break;
+	        	
+	        	case "RemoveFavorites":
+	        	  current_page_id = onsenNavigator.topPage.id;	        	  
+	        	  if(current_page_id=="favorite_search"){
+	        	  	  popPage(); 
+	        	  } else {
+		        	  params="&page_action=pull_refresh";
+				      processDynamicAjax('FavoriteList',params,'favorite_loader','GET',1 ); 
+	        	  }
+	        	break;
+	        	
+	        	case "saveCreditCard":
+	        	  showToast( data.msg ,'success' ); 
+	        	  popPage(); 
+	        	  params="&page_action=pull_refresh";
+				  processDynamicAjax('CrediCartList',params,'creditcard_loader','GET',1 ); 
+	        	break;
+	        	
+	        	case "getCedittCardInfo":
+	        	  $("#card_name").val ( data.details.data.card_name);
+	        	  $("#credit_card_number").val ( data.details.data.credit_card_number);
+	        	  $("#cvv").val ( data.details.data.cvv);
+	        	  $("#billing_address").val ( data.details.data.billing_address);
+	        	  $("#expiration_yr").val ( data.details.data.expiration_yr);
+	        	  $("#expiration_month").val ( data.details.data.expiration_month);	      
+
+	        	  $(".frm_creditcard").append('<input type="hidden" name="cc_id" value="'+ data.details.data.cc_id +'"> ');
+	        	   	        	
+	        	break;
+	        	
+	        	case "DeleteCreditCard":
+	        	  showToast( data.msg ,'success' );
+	        	  params="&page_action=pull_refresh";
+				  processDynamicAjax('CrediCartList',params,'creditcard_loader','GET',1 ); 
+	        	break;
+	        	
+	        	case "DeleteAddressBook":
+	        	case "saveAddressBook":
+	        	case "saveAddressBookLocation":
+	        	  showToast( data.msg ,'success');
+	        	  current_page_id = onsenNavigator.topPage.id;
+	        	  if (current_page_id =="address_book" || current_page_id=="address_book_location"){
+	        	  	   popPage(); 
+	        	  }
+	        	  params="&page_action=pull_refresh";
+			      processDynamicAjax('AddressBookList',params,'addressbook_loader','GET',1 ); 
+	        	break;
+	        	
+	        	case "getCountryList":
+	        	  current_page_id = onsenNavigator.topPage.id;
+	        	  //fillCountry("#address_book", data.details.country_list, data.details.country_code);
+	        	  fillCountry("#"+ current_page_id, data.details.country_list, data.details.country_code);
+	        	break;
+	        		        	
+	        	case "getAddressBookByID":
+	        	  fillCountry("#address_book", data.details.data.country_list, data.details.data.country_code);
+	        	  setValue(".street", data.details.data.street);
+	        	  setValue(".city", data.details.data.city);
+	        	  setValue(".state", data.details.data.state);
+	        	  setValue(".zipcode", data.details.data.zipcode);
+	        	  setValue(".location_name", data.details.data.location_name);	        	  
+	        	  setValue(".delivery_instruction", data.details.data.delivery_instruction);
+	        	  
+	        	  $(".frm_address_book").append('<input type="hidden" name="id" value="'+ data.details.data.id +'"> ');
+	        	  
+	        	  if(data.details.data.as_default==2){
+	        	      document.querySelector('ons-checkbox').checked = true;
+	        	  } else {
+	        	   	  document.querySelector('ons-checkbox').checked = false;
+	        	  }
+	        	  
+	        	  lat = data.details.data.latitude;
+	        	  lng = data.details.data.longitude;
+	        	  if(!empty(lat)){	        	  	  
+	        	  	  $("#address_book .lat").val( lat );
+	        	  	  $("#address_book .lng").val( lng );
+	        	  	  fillMapAddress('#map_address', true, lat , lng );
+	        	  } else {
+	        	  	  initMapAdress('#map_address', true);
+	        	  }
+	        	   
+	        	break;
+	        	
+	        	case "GetProfile":
+	        	  current_page_id = onsenNavigator.topPage.id;
+	        	  dump("current_page_id=>"+ current_page_id);
+	        	  if ( current_page_id=="change_password"){
+	        	  	  
+	        	  } else {
+	        	  	  background_url='';
+					  if(app_settings = getAppSettings()){
+						 background_url = app_settings.images.image2;		
+					  }
+					  
+					  $("#edit_profile .header_about").css('background-image', 'url('+ "'" + background_url + "'" +')');
+					  //$("#edit_profile .header_about_img").attr("src", background_url );
+					  
+		        	  $(".print_customer_name").html( data.details.data.full_name);
+		        	  $(".print_customer_email").html( data.details.data.email_address);
+		        	  setValue("#first_name", data.details.data.first_name );
+		        	  setValue("#last_name", data.details.data.last_name );
+		        	  setValue("#contact_phone", data.details.data.contact_phone );		        	  
+		        	  $("#edit_profile img.small_avatar").attr("src", data.details.data.avatar );
+	        	  }	        	  
+	        	  imageLoaded(); 
+	        	break;
+	        	
+	        	case "GetMerchantAbout":
+	        	  merchantAbout( data.details.data , "#about_wrapper");
+	        	  initRatyStatic();
+	        	  imageLoaded(); 
+	        	break;
+	        	
+	        	case "GetMerchantDateList":
+	        		        		        	  
+	        	  if (data.details.customer.length>=1){
+	        	  	  setValue("#booking_name", data.details.customer[0].name );
+	        	  	  setValue("#email", data.details.customer[0].email_address );
+	        	  	  setValue("#mobile", data.details.customer[0].contact_phone );
+	        	  }
+	        	
+	        	  setDateList(data.details.data, '.date_select_wrap');
+	        	  merchant_id = getActiveMerchantID();
+	        	  params = "merchant_id="+ merchant_id;
+	        	  params +="&date="+ $(".date_booking").val();
+	        	  processDynamicAjax("GetMerchantTimeList", params, 'time_select_wrap', 'GET', 1 );
+	        	break;
+
+	        	case "SaveBooking":    
+	        	   replacePage("booking_receipt.html",'lift',{
+	        	   	  message : data.msg
+	        	   }) 		  
+	        	break;
+	        	
+	        	case "SetLocation": 
+
+	        	   setStorage("page_need_refresh",1);
+	        	
+	        	   if(isLocation()){
+	        	   	  //
+	        	   } else {
+	        	   	  if($old_location = getCurrentLocation()){
+	        	   	  	 setStorage("location_old_lat", $old_location.lat );
+	        	   	  	 setStorage("location_old_lng", $old_location.lng );
+	        	   	  }
+	        	   }     		
+	        		        	
+	        	   setStorage("location_lat", data.details.data.lat );
+	               setStorage("location_lng", data.details.data.lng );		
+	               setStorage("location_address", data.details.data.recent_search_address );
+	               
+	               if(isLocation()){
+	               	  //
+	               } else {
+	               	  $_address = {
+					 	'formatted_address': data.details.data.formatted_address,
+						'street' : data.details.data.street,
+						'city' : data.details.data.city,
+						'state' : data.details.data.state,
+						'zipcode' : data.details.data.zipcode,
+						'country' : data.details.data.country,
+						'lat' : data.details.data.lat ,
+						'lng' : data.details.data.lng
+					  };	  	 
+					  setStorage("geocoded_address", JSON.stringify($_address) );
+	               }     		
+
+	               	              
+	               if(tabbar_loaded){
+	               	  popPage();	               	  
+   	    	          setCurrentAddress();    	    	          
+	               } else {
+		               onsenNavigator.resetToPage("tabbar.html",{
+					  	   animation : "none" ,  	
+					  	   data : {
+					  	   	  lat : data.details.data.lat ,
+					  	   	  lng : data.details.data.lng ,
+					  	   	  location_address : data.details.data.recent_search_address
+					  	   }
+					   });	  
+	               }
+	               
+	               	               	               	              
+	        	break;
+	        	
+	        	case "AddFavorite":
+	        	   showToast( data.msg ,'success' );
+	        	   fav = favoriteButton(data.details.added);
+	        	   $(".favorite_toolbar_wrap").html(fav);
+	        	break;
+	        	
+	        	case "DriverSignup":
+	        	   showPage("driver_ty.html",{
+	        	   	  'message' : data.msg
+	        	   });
+	        	break;
+	        	
+	        	case "sendOrderSMSCode":
+	        	  showToast( data.msg ,'success' );
+	        	  $(".sms_order_session").val( data.details.sms_order_session );
+	        	break;
+	        	
+	        	case "verifyOrderSMScode":
+	        	  next_step = getStorage("next_step");
+   	              dump("next_step=>"+ next_step);
+   	              
+   	              if(!oneTimePayment()){
+   	                 replacePage('payment_option.html');
+   	              }
+	        	break;
+	        	
+	        	case "clearRecentLocation":
+	        	  processDynamicAjax('GetRecentLocation','','recent_location_loader','GET',1 );
+	        	break;
+	        	        
+	        	case "GetPage":
+	        	  $(".custom_page_title").html( data.details.data.title );
+	        	  $(".custom_page_content").html( data.details.data.content );
+	        	break;
+	        	
+	        	case "clearRecentSearches":
+	        	  processDynamicAjax('GetRecentSearch','','recent_search_item_loader','GET',1 );   
+	        	break;
+	        	
+	        	case "TaskInformation":
+	        	  
+	        	  dump("task status=>"+ data.details.data.status);
+	        	  dump("task rating=>"+ data.details.data.rating);
+	        	  	        	  
+	        	  if(data.details.data.status=="successful"){	        	  	 
+	        	  	  rating = parseInt(data.details.data.rating);	        	  	  
+	        	  	  if(rating>0){
+	        	  	  	  dump('already has rating');	        	  	  	  
+	        	  	  	  modal_content = NotificationContent(data.details.data.status, data.details.data );
+	        	  	  	  showModalNotification(true);
+	        	  	  } else {	        	  	  	  
+		        	  	  $(".bottom-bar--bottom_track").hide();
+	                      $("#track_driver .button--button_small").hide();
+		        	  	  setTimeout(function() {				     
+			        	  	  replacePage("task_add_rating.html",'none',{
+			        	  	  	'task_id' : data.details.data.task_id
+			        	  	  });
+		        	  	  }, 500); 	        	  	
+	        	  	  }
+	        	  } else if ( data.details.data.status=="failed" ){
+	        	  	  modal_content = NotificationContent(data.details.data.status, data.details.data );
+	        	  	  showModalNotification(true);
+	        	  } else if ( data.details.data.status=="cancelled" ){
+	        	  	  modal_content = NotificationContent(data.details.data.status, data.details.data);
+	        	  	  showModalNotification(true);
+	        	  } else if ( data.details.data.status=="declined" ){
+	        	  	  modal_content = NotificationContent(data.details.data.status, data.details.data);
+	        	  	  showModalNotification(true);
+	        	  } else {
+		        	  document.querySelector('ons-progress-bar').setAttribute('value',  data.details.data.completed );
+		        	  $(".track_driver_id").val( data.details.data.driver_id );
+		        	  setTrackList(data.details.data,'list_track');
+		        	  iniTrackMap('#map_track', data.details.data);	  
+		        	  runTrack();      	  
+	        	  }
+	        	break;
+	        	
+	        	case "DriverInformation":
+	        	  if ( data.details.page_action=="pull_refresh"){ 
+	        	  	  $("#driver_list_details").html('');			  	
+	        	  	  $(".driver_details").html('');			  	
+	        	  }
+	        	  setDriverInformation(data.details.data, '.driver_details','driver_list_details');
+	        	  initRatyStatic();
+	        	break;
+	        	
+	        	case "GetTask":
+	        	  $(".print_driver_name").html( data.details.data.driver_name );
+	        	  $(".print_driver_phone").html( data.details.data.driver_phone );
+	        	  $("#task_add_rating img.thumbnail").attr("src", data.details.data.profile_photo );
+	        	  $(".print_review_as").html( data.details.data.review_as );
+	        	  
+	        	  $("#task_add_rating .review").val( data.details.data.rating_comment );	        	  
+	        	  $("#task_add_rating .rating").val( data.details.data.rating );
+	        	  $("#task_add_rating .task_id").val( data.details.data.task_id );
+	        	  	        	  
+	        	   if(data.details.data.rating_anonymous==1){
+	        	      document.querySelector('ons-checkbox').checked = true;
+	        	   } else {
+	        	   	  document.querySelector('ons-checkbox').checked = false;
+	        	   }
+	        	  
+	        	  initRaty(data.details.data.rating);	        	  
+	        	  imageLoaded(); 
+	        	  
+	        	  initStar(0,".order_rating",'.order_rating_value');
+	        	  
+	        	  $add_review = false;
+	        	  if ((typeof  data.details.data.add_review !== "undefined") && ( data.details.data.add_review !== null)) {
+	        	     if(data.details.data.add_review){
+	        	     	$add_review = true;
+	        	     	$(".review_order_form").show();
+	        	     	
+	        	     	$data = data.details.data;
+	        	     	$page_id = getCurrentPage();
+	        	     	$("#"+ $page_id + " .merchant_thumbnail" ).attr("src", $data.merchant_logo );
+	        	     	$("#"+ $page_id + " .merchant_name" ).html( $data.merchant_name );
+	        	     	$("#"+ $page_id + " .review_as" ).html( $data.review_as );
+	        	     	$("#"+ $page_id + " .print_trans" ).html( $data.transaction );
+	        	     	$("#"+ $page_id + " .print_payment_type" ).html( $data.payment_type );
+	        	     	
+	        	     	$("#"+ $page_id + " .order_rating_value" ).val( $data.order_rating );
+	        	     	$("#"+ $page_id + " .order_id" ).val( $data.order_id );
+	        	     	
+	        	     }	        	  
+	        	  } 
+
+	        	  if(!$add_review){
+	        	    $(".review_order_form").remove();        	  
+	        	  }
+	        	  
+	        	break;
+	        	
+	        	case "addTaskReview":
+	        	   showToast( data.msg ,'success' );
+	        	   popPage();
+	        	break;
+	        	
+	        	 case "getItemByCategory":	
+    		  
+    		     $("#item_page .center span.print_category_name").html( data.details.category.category_name );
+    		     
+    		         		     
+    		     setCategoryCarousel( data.details.category_list , data.details.category.cat_id );    		     
+    		     
+    		     if ( data.details.page_action=="pull_refresh"){ 
+    		     	$("#resto_list_item").html('');			  	
+    			  	 setPaginate("#item_page", data.details.paginate_total);  
+    			  	 //setItemList( data.details.data ,'resto_list_item' );
+    			  	 setterMenu(data.details.data);
+    			 } else if (data.details.page_action=="infinite_scroll") {  	    			 	
+    			 	//setItemList( data.details.data,'resto_list_item' ); 
+    			 	setterMenu(data.details.data);
+    		     } else {
+    		     	setPaginate("#item_page", data.details.paginate_total);  
+    		        //setItemList( data.details.data ,'resto_list_item' );
+    		        setterMenu(data.details.data);
+    		     }
+    		     break;
+    		     
+    		     
+                case "OrderList":
+	        	   if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#order_list_item").html('');			  	
+    			  	  setPaginate("#order_list", data.details.paginate_total);  
+    			  	  setOrderList( data.details.data ,'order_list_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setOrderList( data.details.data ,'order_list_item' );
+	        	   } else {
+		        	   setPaginate("#order_list", data.details.paginate_total);  
+	    		       setOrderList( data.details.data ,'order_list_item' );
+	        	   }
+	        	   initRatyStatic();
+	        	   imageLoaded(); 
+	        	break;
+	        	
+	        	case "getOrderHistory":	              
+	        	  if(data.details.show_track){
+	        	  	$("#track_driver_button").attr("disabled",false);
+	        	  } else {
+	        	  	$("#track_driver_button").attr("disabled",true);
+	        	  }	        	  
+	        	  if ( data.details.page_action=="pull_refresh"){ 
+	        	  	  $(".order_details_header").html('');		
+	        	  	  $("#track_history_item").html('');		
+	        	  }
+	        	  setOrderDetails(data.details.order_info,'.order_details_header');
+	        	  setOrderHistory(data.details.data, 'track_history_item');
+	        	  initRatyStatic();
+	        	  imageLoaded(); 
+	        	break;
+	        	
+	        	 case "BookingList":	
+	              if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#booking_history_item").html('');			  	
+    			  	  setPaginate("#booking_history", data.details.paginate_total);  
+    			  	  setBookingList( data.details.data ,'booking_history_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setBookingList( data.details.data ,'booking_history_item' );
+	        	   } else {
+		        	   setPaginate("#booking_history", data.details.paginate_total);  
+	    		       setBookingList( data.details.data ,'booking_history_item' );
+	        	   }
+	        	   initRatyStatic();
+	        	   imageLoaded();
+	            break;
+	            
+	            case "FavoriteList":
+	               if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#favorite_list_item").html('');			  	
+    			  	  setPaginate("#favorite_list", data.details.paginate_total);  
+    			  	  setFavoriteList( data.details.data ,'favorite_list_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setFavoriteList( data.details.data ,'favorite_list_item' );
+	        	   } else {
+		        	   setPaginate("#favorite_list", data.details.paginate_total);  
+	    		       setFavoriteList( data.details.data ,'favorite_list_item' );
+	        	   }
+	        	   initRatyStatic();
+	        	   imageLoaded();
+	            break;
+	            
+	            case "CrediCartList":
+	             if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#creditcard_list_item").html('');			  	
+    			  	  setPaginate("#creditcard_list", data.details.paginate_total);  
+    			  	  setCreditCardList( data.details.data ,'creditcard_list_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setCreditCardList( data.details.data ,'creditcard_list_item' );
+	        	   } else {
+		        	   setPaginate("#creditcard_list", data.details.paginate_total);  
+	    		       setCreditCardList( data.details.data ,'creditcard_list_item' );
+	        	   }	        	   
+	            break;
+	          
+	            case "AddressBookList":
+	             if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#addressbook_list_item").html('');			  	
+    			  	  setPaginate("#addressbook_list", data.details.paginate_total);  
+    			  	  setAddressBookList( data.details.data ,'addressbook_list_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setAddressBookList( data.details.data ,'addressbook_list_item' );
+	        	   } else {
+		        	   setPaginate("#addressbook_list", data.details.paginate_total);  
+	    		       setAddressBookList( data.details.data ,'addressbook_list_item' );
+	        	   }	        	   
+	            break;
+	            
+	            case "ReviewList":
+	              if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#reviews_list_item").html('');			  		        	   	  
+    			  	  setPaginate("#reviews", data.details.paginate_total);  
+    			  	  setReviewList( data.details.data ,'reviews_list_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setReviewList( data.details.data ,'reviews_list_item' );
+	        	   } else {
+		        	   setPaginate("#reviews", data.details.paginate_total);  
+	    		       setReviewList( data.details.data ,'reviews_list_item' );
+	        	   }	
+	        	   initRatyStatic();
+	        	   imageLoaded();
+	            break;
+	            
+	            case "GetGallery":
+	        	 if ( data.details.page_action=="pull_refresh"){    
+    			  	  $("#list_photo_gallery").html('');			  	    			  	  
+	        	 } 
+	        	 setGallery( data.details.data.gallery,'list_photo_gallery');
+	        	 imageLoaded(); 
+	        	break;
+	        	
+	        	case "GetMerchantInformation":
+	             setMerchantInformation(data.details.data, '.information_loader');
+	             imageLoaded();
+	            break;	       
+	            
+	             case "GetMerchantPromo":
+		          if ( data.details.page_action=="pull_refresh"){    
+	    			  	$("#promo_list_item").html('');
+		          }			  	
+	              setPromo( data.details.data,'promo_list_item');
+	            break;    
+	            
+	            case "GetPointSummary":
+	              if ( data.details.page_action=="pull_refresh"){
+	              	$("#points_list_item").html('');
+	              }
+	              setPointSummary( data.details.data ,'points_list_item' );
+	            break;
+	            
+	            case "getOrderDetailsCancel":
+	              $("#cancel_order_form .order_id").val( data.details.data.order_id );
+	              $("#cancel_order_form h5").html( data.details.data.merchant_name );
+	        	  $("#cancel_order_form .print_trans").html( data.details.data.transaction );
+	        	  $("#cancel_order_form .print_payment_type").html( data.details.data.payment_type );
+	        	  $("#cancel_order_form .thumbnail").attr("src", data.details.data.logo);
+	        	  imageLoaded(); 
+	            break;
+	            
+	            case "GetNotifications":
+	              notiRemoveButton(true);
+	              if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#notifications_list_item").html('');			  	
+    			  	  setPaginate("#notifications", data.details.paginate_total);  
+    			  	  setNotificationList( data.details.data ,'notifications_list_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setNotificationList( data.details.data ,'notifications_list_item' );
+	        	   } else {
+		        	   setPaginate("#notifications", data.details.paginate_total);  
+	    		       setNotificationList( data.details.data ,'notifications_list_item' );
+	        	   }	    
+	            break;
+	            
+	            case "ReadNotification":
+	            case "markAllNotifications":
+	              params="&page_action=pull_refresh";
+			      processDynamicAjax('GetNotifications',params,'notifications_loader','GET',1 ); 
+	            break;
+	            	            
+	            case "GetBookingDetails":
+	               if ( data.details.page_action=="pull_refresh"){ 
+	               	   $("#booking_details_list").html('');	
+	               } 	               
+	               setBookingDetails(data.details.data,'booking_details_list');
+	            break;
+	            	            	            
+	            case "getAddressBookLocationByID":	              
+	              $.each(data.details.data, function(key, val){
+	              	  if(key!="as_default"){
+	              	     setValue("#address_book_location ."+key, val);	
+	              	  }
+	              });
+	              
+	              data_state = {
+					state_name :data.details.data.state_name,
+					state_id:data.details.data.state_id,
+					country_id:data.details.data.country_id,
+					country_name:''
+				  };	
+				  setStorage("location_data_state1", JSON.stringify(data_state) ); 
+				  
+				  data_city = {
+					city_name :data.details.data.city_name,
+					city_id:data.details.data.city_id,
+					state_id:data.details.data.state_id,
+					country_id:data.details.data.country_id
+				  };	
+				  setStorage("location_data_city1", JSON.stringify(data_city) ); 
+				  
+				  data_area = {
+					area_id :data.details.data.area_id,
+					area_name:data.details.data.area_name,		
+				 };	
+				  setStorage("location_data_area1", JSON.stringify(data_area) ); 
+				              
+	              if(data.details.data.as_default==1){
+	        	      document.querySelector('ons-checkbox').checked = true;
+	        	  } else {
+	        	   	  document.querySelector('ons-checkbox').checked = false;
+	        	  }
+	        	  
+	        	  lat = data.details.data.lat;
+	        	  lng = data.details.data.lng;
+	        	  if(!empty(lat)){	        	  	  
+	        	  	  $("#address_book_location .lat").val( lat );
+	        	  	  $("#address_book_location .lng").val( lng );
+	        	  	  fillMapAddress('#map_address', true, lat , lng );
+	        	  } else {
+	        	  	  initMapAdress('#map_address', true);
+	        	  }
+	        	  
+	            break;
+	            
+	            case "GetAddressFromCartLocation":
+	              $.each(data.details, function(key, val){
+	              	 if(key!="save_address"){
+	              	    setValue("#address_form_location ."+key, val);	
+	              	 }
+	              });
+	              
+	              data_state = {
+					state_name :data.details.state_name,
+					state_id:data.details.state_id,
+					country_id:data.details.country_id,
+					country_name:''
+				  };	
+				  setStorage("location_data_state1", JSON.stringify(data_state) ); 
+				  
+				  data_city = {
+					city_name :data.details.city_name,
+					city_id:data.details.city_id,
+					state_id:data.details.state_id,
+					country_id:data.details.country_id
+				  };	
+				  setStorage("location_data_city1", JSON.stringify(data_city) ); 
+				  
+				  data_area = {
+					area_id :data.details.area_id,
+					area_name:data.details.area_name,		
+				 };	
+				  setStorage("location_data_area1", JSON.stringify(data_area) ); 
+	              
+	              if(data.details.save_address==1){
+	        	      document.querySelector('ons-checkbox').checked = true;
+	        	   } else {
+	        	   	  document.querySelector('ons-checkbox').checked = false;
+	        	   }
+	              
+	              if(!empty(data.details.lat)){
+	              	 fillMapAddress('#map_address', true, data.details.lat, data.details.lng );
+	              } else {
+	              	 initMapAdress('#map_address', true); 
+	              }     	
+	              
+	              if(empty(data.details.street) && empty(data.details.state_name) ){
+	              	 fillAddressForm();
+	              }     		
+	              
+	            break;
+	            
+	            case "getAddressLocationBookDropDown":
+	        	  tpl = fillAddressBook(data.details.data);
+	        	  $('#address_form_select_location .address_book_wrap').html( tpl );
+	        	break;	 
+	        		        	
+	        	case "preCheckout":
+	        		        	
+	        	  if(data.details.future_order==1){	        	  	
+	        	  	 if(data.details.future_order_confirm==1){
+		        	  	ons.platform.select('ios');  
+						ons.notification.confirm( data.details.future_order_message ,{
+							title: dialog_title,
+							id : "dialog_cancel_order",
+							buttonLabels : [ t("Yes"), t("Cancel") ]
+						}).then(function(input) {
+							if (input==0){			
+								checkout();
+							}
+						});		        
+						return;  		  
+		        	  } 	        			        	  
+	        	  } 	        	  
+	        	  checkout();    		
+	        		        	
+	        	break;
+	        	
+	        	case "ContactSubmit":
+	        	  onsenNavigator.pushPage('contact_us_ty.html',{
+				  	animation : "slide",
+				  	data : { 					  	  
+				  	  'message': data.msg					  	  
+				  	 }
+				  });  	        	  
+	        	break;
+	        	
+	        	case "foodPromo":
+	        	   $("#list_promo_food").html('');	
+	        	   $("#promo_food_list .total_number_found").html( data.details.total );	        	   
+	        	   $("#promo_food_list .sortby_selected").html( data.details.sortby_default );
+	        	   setPromoList( data.details.list , 'list_promo_food'  );
+	        	   imageLoaded(); 
+	        	break;
+	        		        	
+	        	case "AddTip":	        	  
+                  loadCart();
+	        	break;
+	        	
+	        	case "cancelBooking":
+	        	  params="&page_action=pull_refresh&tab="+ $(".booking_tab_active").val();
+			      processDynamicAjax('BookingList',params,'booking_loader','GET',1 ); 
+	        	break;
+	        	
+	        	case "retrievePasswordBySMS":	        	  
+	        	  replacePage("change_password_sms.html", '' , {
+	        	  	'forgot_password_token' : data.details.forgot_password_token,
+	        	  	'message' : data.msg
+	        	  });
+	        	break;
+	        	
+	        	case "changePasswordBySMS":
+	        	  showToast( data.msg ,'success' );
+	        	  showHomeOrSelect();
+	        	break;
+	        	
+	        	case "saveSubsribe":	        	  
+	        	  showToast( data.msg ,'success' );
+	        	  subscribe_topic = parseInt(data.details.subscribe_topic);	        	  
+	        	  if(subscribe_topic>0){
+	        	  	 subscribe();
+	        	  } else {
+	        	  	 unsubscribe(); 
+	        	  }     		
+	        	break;
+	        		        
+	        	case "directAddCart":
+	        	  $page_id = getCurrentPage();	        	  
+	        	  if($page_id=="cart"){
+	        	  	 loadCartPull();
+	        	  } else {
+	        	  	 getCartCount();
+	        	  }     			        	
+	        	break;
+	        	
+	        	case "GetCartItem":
+	        	  $page_id = getCurrentPage();
+	        	  $("#"+$page_id +" .button_cart ons-input").val( 0 );
+	        	  
+	        	  $.each(data.details.data, function($key, $val){
+	        	  	 $class_div = "button_cart_"+$val.category_id+"_"+$val.item_id;	        	  	 
+	        	  	 $("#"+$page_id +" ."+$class_div +" ons-input").val( $val.qty );
+	        	  });
+	        	break;
+	        	
+	        	case "getOrderGraphical":	        	 
+	        	   showLoader(false,'modal_order_sent');
+	        	   resetToPage("graphical_tracking.html",'fade',data.details);
+	        	break;
+	        		        	      
+     			default:
+     			 showToast( data.msg ,'success' );
+     			break;
+     		}
+     		
+     	} else if ( data.code==3){ // token not valid
+     		
+     		 onsenNavigator.resetToPage('page_startup.html',{
+  	           animation : "fade",		  	
+             });
+     		
+     	} else if ( data.code==4){	
+     		
+     		if(action=="loadCart"){  
+     		   showToast( data.msg );	 
+     		   clearCartDiv();
+     		}
+     		
+        } else if ( data.code==5){			
+     		// silent     		
+     		if(action=="loadCart"){   
+     		   clearCartDiv();
+     		}
+     		     		
+     	} else if ( data.code== 6 ) {  // empty list
+    	  
+          $(data.details.element).html( templateError(data.msg, data.details.message) );
+          $(data.details.element_list).html('');
+          
+          if(action=="TaskInformation"){          	
+             $(".bottom-bar--bottom_track").hide();
+             $("#track_driver .button--button_small").hide();
+          }
+          if(action=="DriverInformation"){          	
+             $(".driver_details").html('');	
+          }
+          
+          if(action=="GetNotifications"){
+          	 notiRemoveButton(false);
+          }
+          	
+     	} else {
+     		/*FAILED CONDITION*/
+     		switch(action){
+     			     			
+     			case "getOrderGraphical":
+     			  showToast( data.msg );  
+     			  showLoader(false,'modal_order_sent'); 
+     			break;
+     			
+     			case "customerLogin":     			  
+     			  if( !empty(data.details.next_step) ){
+     			  	next_step = '';
+	        	 	next_step = getStorage("next_step");
+	        	 	if(empty(next_step)){
+	        	 		next_step='map_select_location';
+	        	 	}	        	 	
+	        	 	onsenNavigator.pushPage("verification.html" ,{
+					  	   animation : "none" ,  	
+					  	   data : {
+					  	   	  "contact_phone" : data.details.contact_phone,
+					  	   	  "customer_token" : data.details.customer_token,
+					  	   	  "email_address" : data.details.email_address,					  	   	  
+					  	   	  "next_step" : next_step ,
+					  	   	  "verification_type" : data.details.next_step,
+					  	   }
+					 });  					 
+     			  } else {
+     			  	  showToast( data.msg );    
+     			  }     	
+     			break;
+     			
+     			case "GetPage":
+     			  $(".custom_page_title").html( '' );	        	  
+     			  $('.custom_page_content').html( templateError(data.msg, t("Sorry but we cannot find what you are looking for") ) );
+     			break;
+     			
+     			case "getItemByCategory":	
+     			$("#resto_list_item").html('');			  	
+    		     $("#item_page .center span.print_category_name").html( data.details.category.category_name );
+    		     $(".item_loader").html( "<p class=\"small padding\">"+data.msg+"</p>" );
+    		    break; 
+    		    
+     			case "sendOrderSMSCode":
+     			 showToast( data.msg );
+	        	 $(".sms_order_session").val('');
+	        	break;
+	        	
+     			case "searchMerchant":
+	        	  $(".total_number_found").html( data.msg );
+	        	  $('.sort_btn').attr("disabled",true);
+	        	break;
+	        	
+	        	case "cuisineList":
+	        	  $("#list_cuisine").html('');
+	        	  $(".total_number_found").html( data.msg );
+	        	  break;
+	        	 
+	        	case "loadCart": 	        	
+	        	  clearCartDiv();
+	        	  //VALIDATE OPERATIONAL HOURS
+	        	  getOperational();
+	        	break;
+	        	
+	        	case "verifyCustomerToken":	   	        	   
+	        	   if ( data.details.action=="account_menu"){	        	   		        	   	    
+	        	   	    removeStorage("user_token");
+	        	   	    accountMenu(false);	        	   	    
+	        	   } else {
+	        	   	    //
+	        	   }
+	        	break;
+	        	
+	        	case "GetAddressFromCart":
+	        	  $("#address_form .contact_phone").val( data.details.customer_phone);
+	        	  fillCountry("#address_form", data.details.country_list, data.details.country_code);
+	        	  initMapAdress('#map_address', true);
+	        	break;
+	        	
+	        	case "getOrderDetails":	       
+	        	case "getOrderDetailsCancel":
+	        	  $(".white_wrapper").after( templateError( t('Record not found') ,data.msg) );	        	  
+	        	  $(".white_wrapper").remove();
+	        	  $(".button").attr("disabled", true);
+	        	break;
+	        	
+	        	case "getCedittCardInfo":
+	        	  $(".frm_creditcard").html( templateError( t('Record not found') ,data.msg) );
+	        	  $("#save_cc_button").attr("disabled", true);
+	        	break;
+	        	
+	        	case "AddFavorite":	        	   
+	        	   fav = favoriteButton(false);
+	        	   $(".favorite_toolbar_wrap").html(fav);
+	        	break;
+	        		        	
+	            case "foodPromo":
+	              destroyList('list_promo_food');	
+	              $("#promo_food_list .total_number_found").html( data.details.total );	        	   
+	            break;
+	            	            	            
+	            case "GetCartItem":
+	              $page_id = getCurrentPage();
+	        	  $("#"+$page_id +" .button_cart ons-input").val( 0 );
+	            break;
+	        		            
+     			default:
+     			 showToast( data.msg );
+     			break;
+     		}
+     	}
+     	     	
+    }); /*end done*/
+    
+    /*ALWAYS*/
+    ajax_request.always(function() {
+        dump("ajax always");
+        showLoader(false, loader_type);
+        ajax_request=null;  
+        clearTimeout(timer);
+    });
+          
+    /*FAIL*/
+    ajax_request.fail(function( jqXHR, textStatus ) {
+    	clearTimeout(timer);          	
+    	$text = !empty(jqXHR.responseText)?jqXHR.responseText:'';
+    	if(textStatus!="abort"){    	   
+    	   showToast( t("Failed") + ": " + textStatus + "\n" + $text );
+    	}
     	
-}
+    });     
+    
+   } catch(err) {
+      alert(err.message);
+   } 
+    
+};
+/*END PROCESS AJAX*/
 
 
-function paypalSuccessfullPayment(response)
-{	
-	var params="response="+response;
-	params+="&order_id="+ getStorage("order_id");
-	params+="&client_token="+ getStorage("client_token");	
-	callAjax("paypalSuccessfullPayment",params);	
-}
+getAppSettings = function(){
+	 app_settings = getStorage("app_settings");
+	 if(!empty(app_settings)){
+	    app_settings = JSON.parse( app_settings );	 
+	    return app_settings;
+	 }
+	 return false;
+};
 
-function showNotification(title,message)
-{	
+getMerchantSettings = function(){
+	 merchant_settings = getStorage("merchant_settings");
+	 if(!empty(merchant_settings)){
+	    merchant_settings = JSON.parse( merchant_settings );	 
+	    return merchant_settings;
+	 }
+	 return false;
+};
+
+getDefaultCountry = function(){
+	if(app_settings = getAppSettings()){
+		geocomplete_default_country = app_settings.geocomplete_default_country;
+		if(geocomplete_default_country=="yes"){		  
+		  return app_settings.map_country;
+		}
+	} 
+	return '';
+};
+
+showPage = function(page_id, animation, data){
+	
+   if(empty(page_id)){
+   	  return;
+   }
+   	
+   if(empty(animation)){
+   	  animation='slide';
+   }
+   if(empty(data)){
+   	  data={};
+   }
+   onsenNavigator.pushPage(page_id,{
+  	   animation : animation , 
+  	   data : data 	
+   });  
+};
+
+resetToPage = function(page_id, animation , data ){
+   if(empty(animation)){
+   	  animation='slide';
+   }
+   if(empty(data)){
+   	  data={};
+   }
+   onsenNavigator.resetToPage(page_id,{
+  	   animation : animation ,  	
+  	   data : data
+   });  
+};
+
+replacePage = function(page_id, animation, data){
+   if(empty(animation)){
+   	  animation='slide';
+   }
+   if(empty(data)){
+   	  data={};
+   }
+   onsenNavigator.replacePage(page_id,{
+  	   animation : animation ,  
+  	   data : data	
+   });  
+};
+
+bringPageTop = function(page_id, animation, data){
+   if(empty(animation)){
+   	  animation='slide';
+   }
+   if(empty(data)){
+   	  data={};
+   }
+   onsenNavigator.bringPageTop(page_id,{
+  	   animation : animation ,  
+  	   data : data	
+   });  
+};
+
+insertPage = function(page_id, animation, data){
+   if(empty(animation)){
+   	  animation='slide';
+   }
+   if(empty(data)){
+   	  data={};
+   }
+   onsenNavigator.insertPage(page_id,{
+  	   animation : animation ,  
+  	   data : data	
+   });  
+};
+
+
+submitForm = function(form_name, action_name , method ){
 			
-	if ( $(".map_canvass").exists() ){
-		toastMsg(message);
-		return;
-	}
-	
-	if (typeof pushDialog === "undefined" || pushDialog==null || pushDialog=="" ) { 	    
-		ons.createDialog('pushNotification.html').then(function(dialog) {
-			$(".push-title").html(title);
-	        $(".push-message").html(message);
-	        dialog.show();
-	    });	
-	} else {
-		$(".push-title").html(title);
-	    $(".push-message").html(message);
-		pushDialog.show();
-	}	
-}
-
-function showOrders2()
-{	
-	pushDialog.hide();
-	if (isLogin()){
-		menu.setMainPage('orders.html', {closeMenu: true});		
-	} else {
-		menu.setMainPage('prelogin.html', {closeMenu: true});
-	}
-}
-
-function initMerchantMap(data)
-{		
-	dump(data);	
-	if ( !empty(data)){
-		var map = new GoogleMap();	
-	    map.initialize('merchant-map', data.lat, data.lng , 15);
-	} else {
-		$("#merchant-map").hide();
-	}
-}
-
-function getCurrentLocation()
-{	
 		
-	//cordova.plugins.locationAccuracy.REQUEST_PRIORITY_BALANCED_POWER_ACCURACY
-	//cordova.plugins.locationAccuracy.REQUEST_PRIORITY_HIGH_ACCURACY
-	
-	if (isDebug()){
-		onRequestSuccess();
-		return;
+	switch(action_name){
+		case "createAccount":
+		  if ($('#check_terms_condition').is(':visible')) {
+				check_terms_condition = $("input[name=check_terms_condition]:checked").val();		
+				if(empty(check_terms_condition)){
+					showAlert( t("You must agree to terms and condition") );
+					return false;
+				}			
+			}
+		break;
+		
+		case "AddTip":
+		  dialog_tip = document.getElementById('dialog_tip');  
+          dialog_tip.hide();
+		break;
+		
+		default:
+		break;
 	}
 	
-	if ( device.platform =="iOS"){		
+	$(form_name).validate({
+   	    submitHandler: function(form) {
+   	    	 var params = $( form_name ).serialize();   	    	 
+		     processAjax(action_name, params , method );
+		}
+   	});
+	$(form_name).submit();
+};
 
-		cordova.plugins.diagnostic.isLocationAuthorized(function(authorized){								
-			if(authorized){			
-				cordova.plugins.locationAccuracy.request(
-	            onRequestSuccess, onRequestFailure, cordova.plugins.locationAccuracy.REQUEST_PRIORITY_BALANCED_POWER_ACCURACY);
-			} else {
-			 	cordova.plugins.diagnostic.requestLocationAuthorization(function(status){
-				    switch(status){
-				        case cordova.plugins.diagnostic.permissionStatus.NOT_REQUESTED:
-				            toastMsg( getTrans("Permission not requested",'permission_not_requested') );
-				            return;
-				            break;
-				        case cordova.plugins.diagnostic.permissionStatus.DENIED:		            
-				            toastMsg( getTrans("Permission denied",'permission_denied') );
-				            return;
-				            break;
-				        case cordova.plugins.diagnostic.permissionStatus.GRANTED:
-				            //toastMsg("Permission granted always");		 		            
-				            cordova.plugins.locationAccuracy.request(
-			                onRequestSuccess, onRequestFailure, cordova.plugins.locationAccuracy.REQUEST_PRIORITY_BALANCED_POWER_ACCURACY);
-				                       
-				            break;
-				        case cordova.plugins.diagnostic.permissionStatus.GRANTED_WHEN_IN_USE:
-				            //toastMsg("Permission granted only when in use");
-				            cordova.plugins.locationAccuracy.request(
-			                onRequestSuccess, onRequestFailure, cordova.plugins.locationAccuracy.REQUEST_PRIORITY_BALANCED_POWER_ACCURACY);
-			                
-				            break;
-				    }
-				}, function(error){
-				    toastMsg(error);
-				    return;
-				}, cordova.plugins.diagnostic.locationAuthorizationMode.ALWAYS);				
+get_customField = function(){
+	html='';
+	if(app_settings = getAppSettings()){
+		if( app_settings.reg_custom==1){			
+			$.each(app_settings.reg_custom_fields, function(key, val){
+				dump( key +"=>" + val);
+				html+= formatFields ( key, val);
+			});
+			$(".reg_last_row").after(html);
+		}
+	}
+};
+
+
+var popPage = function(){
+	try {
+		onsenNavigator.popPage({
+		 animation :"none"	
+		});		
+	} catch(err) {
+      dump(err.message);
+   } 
+};
+
+
+var setMobileNuber = function(){
+	$(".frm_setphone").validate({
+   	   submitHandler: function(form) {
+   	      prefix = $(".moobile_prefix").val();
+   	      if(empty(prefix)){
+   	      	 prefix='';
+   	      }
+   	      phone = $(".mobile_no").val();
+   	      complete_phone = prefix+phone;   	      
+   	      popPage();
+   	      $(".contact_phone").val( complete_phone );
+	   }
+   	});
+	$(".frm_setphone").submit();
+};
+
+
+showMobileCode = function(){
+	var dialog = document.getElementById('dialog_mobilecode_list');   
+     if (dialog) {     	 
+     	 dialog.show();
+    } else {
+       ons.createElement('dialog_mobilecode_list.html', { append: true }).then(function(dialog) {       	
+        dialog.show();
+      });
+    }
+};
+
+setPrefix = function(data){
+	$(".moobile_prefix").val(data);
+	var dialog = document.getElementById('dialog_mobilecode_list');  
+	dialog.hide();
+};
+
+resendCode = function(){
+	var params = $( ".frm_verify" ).serialize();   	    	 
+    processAjax("resendCode", params  );
+};
+
+/*showMainPage = function(){
+	var params = $( ".frm_searchbylat" ).serializeArray(); 
+	var lat = $(".lat").val();
+	var lng = $(".lng").val();
+	
+	setStorage("location_lat", lat );
+	setStorage("location_lng", lng );
+		
+    onsenNavigator.resetToPage("tabbar.html",{
+  	   animation : "slide" ,  	
+  	   data : {
+  	   	  lat : lat,
+  	   	  lng : lng,
+  	   }
+    });  	
+};*/
+
+openMenu = function() {
+  var menu = document.getElementById('menu');
+  menu.open();
+};
+
+loadSplitterPage = function(page) {
+  var content = document.getElementById('content');
+  var menu = document.getElementById('menu');
+  content.load(page).then(menu.close.bind(menu));
+};
+
+getCurrentLocation = function(){	
+	lat = getStorage("location_lat");
+    lng = getStorage("location_lng");
+    location_address = getStorage("location_address");
+    if(!empty(lat) && !empty(lng)){
+    	return {"lat": lat , "lng": lng, "address" : location_address };
+    }
+    return false;
+}
+
+getOldCurrentLocation = function(){	
+	lat = getStorage("location_old_lat");
+    lng = getStorage("location_old_lng");    
+    if(!empty(lat) && !empty(lng)){
+    	return {"lat": lat , "lng": lng};
+    }
+    return false;
+}
+
+
+getTimeNow = function(){
+	var d = new Date();
+    var n = d.getTime(); 
+    return n;
+};
+
+showLoaderDiv = function(show, target){
+	
+	dump("target=>"+target);
+	
+	if(show){
+		$("."+target).html( icon_loader );
+	} else {
+		$("."+target).html( '' );
+	}	
+};
+
+/*mycall2*/
+var ajax_array = {};
+var timer_array = {};
+	
+processDynamicAjax = function(action, data , target,  method , single_call){
+			
+	dump("processDynamicAjax");
+	if(empty(method)){
+		method='GET';
+	}
+	
+	var timenow = getTimeNow();
+	if(!empty(single_call)){
+		var timenow = 1;
+	}
+	
+	endpoint = ajax_url+"/"+action;
+	
+	data+=requestParams(action);
+	current_page = document.querySelector('ons-navigator').topPage.id;
+	data+="&current_page="+current_page;
+	
+	dump(endpoint);
+	
+	dump("AJAX VARIABLE")
+	dump(timenow);
+	dump("END AJAX VARIABLE")
+		
+	ajax_array[timenow] = $.ajax({
+	  url: endpoint ,
+	  method: method ,
+	  data: data ,
+	  dataType: "json",
+	  timeout: ajax_timeout ,
+	  crossDomain: true,
+	  beforeSend: function( xhr ) {
+         dump("before send ajax");   
+         
+         showLoaderDiv( true, target );
+         
+         clearTimeout( timer_array[timenow] );
+                                         
+         if(ajax_array[timenow] != null) {	
+         	ajax_array[timenow].abort();            
+            clearTimeout( timer_array[timenow] );            
+         } else {         	         	           	         	
+         	timer_array[timenow] = setTimeout(function() {		
+         		if(ajax_array[timenow] != null) {		
+				   ajax_array[timenow].abort();
+         		}         		
+         		showLoaderDiv( false, target );
+				//showToast( t('Request taking lot of time. Please try again') );
+				
+				$("."+ target).html( '<p class="small">'+ t('Request taking lot of time. Please try again') +'</p>' );
+	        }, ajax_timeout ); 
+         }
+      }
+    });
+       
+    ajax_array[timenow].done(function( data ) {
+    	
+    	showLoaderDiv( false, target );
+    	
+    	if(data.code==1){    		    		
+    		switch (action){
+    			case "searchMerchant":    			
+    			    			  
+    			  search_type = data.details.search_type;     	
+    			  
+    			  home_all_as_list = false;
+			  	  if(app_settings = getAppSettings()){
+			  	     home_all_as_list = app_settings.home_all_as_list;
+			  	  }		  
+    			      			  
+    			  if( search_type=="byLatLong"){    			  	  
+    			  	 $(".search_total_number_found").html( data.msg ); 
+    			  	 $(".total_number_found").html( data.msg ); 
+    			  } 
+
+    			  if ( data.details.page_action=="pull_refresh"){        			  	  
+    			  	  $("#list_restaurant").html('');			  	
+    			  	  setPaginate("#restaurant_list", data.details.paginate_total);  
+    			  	  fillRestaurantList(data.details.list);    		
+    			  	      			  	  
+    			  	  if(data.details.refresh_home==1){    			  	  	 
+    			  	  	 resp = MerchantCarousel( data.details.list );
+    			  	  	 $(".search_results_wrapper").html( resp );    
+    			  	  }
+    			  	  
+    			  } else if ( data.details.page_action=="infinite_scroll") {
+    			  	  if(home_all_as_list==1 && search_type=="allMerchant"){
+    			  	  	 restaurantListWithBanner(data.details.list, 'list_all_restaurant');
+    			  	  } else {
+    			  	  	 fillRestaurantList(data.details.list);
+    			  	  }    			  	      			  	  
+    			  } else {    			  	      			  	  
+    			  	  
+    			  	  if(home_all_as_list==1 && search_type=="allMerchant"){    	
+    			  	  	 resp = restaurantListWithBannerAll( data.details.list );
+    			  	  	 $("."+ target).html( resp ); 
+    			  	  } else {
+    			  	     resp = MerchantCarousel( data.details.list );    			      
+    			  	     $("."+ target).html( resp ); 
+    			  	  }    			  	  
+    			  }    			
+    			  
+    			  initRatyStatic();    			  
+    			  imageLoaded();	
+    			     			  
+    			break;
+    			
+    			case "cuisineList":      			      			  
+    			  if ( data.details.page_action=="pull_refresh"){    			  	
+    			  	 dump('pull_refresh');
+    			  	 $(".total_number_found").html( data.msg );
+	        	     $(".sortby_selected").html( data.details.sortby_selected );
+	        	     $("#list_cuisine").html('');
+	        	     $(".frm_cuisine .paginate_total").val( data.details.paginate_total );	        	     
+	        	     $(".frm_cuisine .paginate_page").val( 1 );
+	        	     ListCuisine( data.details.list , 'list_cuisine');
+    			  } else if (data.details.page_action=="infinite_scroll") {    			  	
+    			  	 dump('infinite_scroll');   			  	
+    			  	 $(".total_number_found").html( data.msg );
+	        	     $(".sortby_selected").html( data.details.sortby_selected );	        	     
+	        	     $(".frm_cuisine .paginate_total").val( data.details.paginate_total );		        	     
+	        	     ListCuisine( data.details.list , 'list_cuisine');    			  	
+    			  } else {
+    			  	 $("#cuisine_list_wrapper").show();
+    			  	 resp = CuisineCarousel( data.details.list );
+    			     $("."+ target).html( resp ); 
+    			  }
+    			  
+    			  imageLoaded(); 
+    			break;
+    			
+    			case "searchByMerchantName":
+    			  restaurantListSmall( data.details.list , 'search_field_by_name_result' );
+    			  imageLoaded(); 
+    			break;
+    			
+    			case "searchByCuisine":
+    			  cuisineListSmall( data.details.list , 'search_field_by_cuisine_result' );
+    			  imageLoaded(); 
+    			break;
+    			
+    			case "getMerchantMenu":
+    			    			      			  
+    			  if ( data.details.page_action=="pull_refresh"){ 
+    			  	  $("#resto_list_category").html('');			  	
+    			  	  setPaginate("#restaurant_page", data.details.paginate_total);  
+    			  	  //restaurantCategory(data.details.list,'resto_list_category');
+    			  	  setCategoryList( data.details.list,'resto_list_category' );
+    			  } else if (data.details.page_action=="infinite_scroll") { 
+    			  	 //restaurantCategory(data.details.list,'resto_list_category');
+    			  	 setCategoryList( data.details.list,'resto_list_category' );
+    			  } else {
+    			  	 setPaginate("#restaurant_page", data.details.paginate_total);  
+    			  	 //restaurantCategory(data.details.list,'resto_list_category');
+    			  	 setCategoryList( data.details.list,'resto_list_category' );
+    			  }     			  
+    			  
+    			  
+    			  if(!empty(data.details.item_id)){    
+    			  	setTimeout(function() {				     
+				 		itemDetails(data.details.item_id, data.details.cat_id);
+				    }, 500); 
+    			  }
+    			  
+    			break;
+    			
+    		  case "getItemByCategory":	
+    		      		     
+    		     $("#item_page .center span.print_category_name").html( data.details.category.category_name );
+    		     
+    		     setCategoryCarousel( data.details.category_list , data.details.category.cat_id );
+    		     
+    		     if ( data.details.page_action=="pull_refresh"){ 
+    		     	$("#resto_list_item").html('');			  	
+    			  	 setPaginate("#item_page", data.details.paginate_total);  
+    			  	 //setItemList( data.details.data ,'resto_list_item' );
+    			  	 setterMenu(data.details.data);
+    			 } else if (data.details.page_action=="infinite_scroll") {  	    			 	
+    			 	//setItemList( data.details.data,'resto_list_item' ); 
+    			 	setterMenu(data.details.data);
+    		     } else {
+    		     	setPaginate("#item_page", data.details.paginate_total);  
+    		        //setItemList( data.details.data ,'resto_list_item' );
+    		        setterMenu(data.details.data);
+    		     }
+    		     break;
+    		      		  
+	          case "searchFoodItem":	        	
+	        	  itemListSmall( data.details.data , 'search_item_name_result' );
+	        	  imageLoaded(); 
+	        	break;
+	        	
+	           case "getFirstCart":	  
+	               setStorage("cart_merchant_id", data.details.merchant_id);
+	               $(".tabbar__badge").html( data.details.count );
+	               setStorage("cart_item_count", data.details.count);
+	           break;
+	           
+	           case "removeCartItem":
+	        	  loadCart();
+	        	  clearBasket();
+	        	break;
+	        	
+	        	case "OrderList":
+	        	   if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#order_list_item").html('');			  	
+    			  	  setPaginate("#order_list", data.details.paginate_total);  
+    			  	  setOrderList( data.details.data ,'order_list_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setOrderList( data.details.data ,'order_list_item' );
+	        	   } else {
+		        	   setPaginate("#order_list", data.details.paginate_total);  
+	    		       setOrderList( data.details.data ,'order_list_item' );
+	        	   }
+	        	   initRatyStatic();
+	        	   imageLoaded(); 
+	        	break;
+	        	
+	          case "BookingList":	
+	              if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#booking_history_item").html('');			  	
+    			  	  setPaginate("#booking_history", data.details.paginate_total);  
+    			  	  setBookingList( data.details.data ,'booking_history_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setBookingList( data.details.data ,'booking_history_item' );
+	        	   } else {
+		        	   setPaginate("#booking_history", data.details.paginate_total);  
+	    		       setBookingList( data.details.data ,'booking_history_item' );
+	        	   }
+	        	   initRatyStatic();
+	        	   imageLoaded();
+	          break;
+	          
+	          case "FavoriteList":
+	               if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#favorite_list_item").html('');			  	
+    			  	  setPaginate("#favorite_list", data.details.paginate_total);  
+    			  	  setFavoriteList( data.details.data ,'favorite_list_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setFavoriteList( data.details.data ,'favorite_list_item' );
+	        	   } else {
+		        	   setPaginate("#favorite_list", data.details.paginate_total);  
+	    		       setFavoriteList( data.details.data ,'favorite_list_item' );
+	        	   }
+	        	   initRatyStatic();
+	        	   imageLoaded();
+	          break;
+	          
+	          case "CrediCartList":
+	             if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#creditcard_list_item").html('');			  	
+    			  	  setPaginate("#creditcard_list", data.details.paginate_total);  
+    			  	  setCreditCardList( data.details.data ,'creditcard_list_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setCreditCardList( data.details.data ,'creditcard_list_item' );
+	        	   } else {
+		        	   setPaginate("#creditcard_list", data.details.paginate_total);  
+	    		       setCreditCardList( data.details.data ,'creditcard_list_item' );
+	        	   }	        	   
+	          break;
+	          
+	           case "AddressBookList":
+	             if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#addressbook_list_item").html('');			  	
+    			  	  setPaginate("#addressbook_list", data.details.paginate_total);  
+    			  	  setAddressBookList( data.details.data ,'addressbook_list_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setAddressBookList( data.details.data ,'addressbook_list_item' );
+	        	   } else {
+		        	   setPaginate("#addressbook_list", data.details.paginate_total);  
+	    		       setAddressBookList( data.details.data ,'addressbook_list_item' );
+	        	   }	        	   
+	          break;
+	          
+	          case "getlanguageList":
+	            if ( data.details.page_action=="pull_refresh"){ 
+	            	$("#language_list_item").html('');			  	
+    			  	setlanguageList( data.details.data ,'language_list_item' , data.details.lang );
+	            } else {
+	               setlanguageList( data.details.data ,'language_list_item' , data.details.lang );
+	            }
+	          break;
+	          
+	          case "getOrderHistory":	              
+	        	  if(data.details.show_track){
+	        	  	$("#track_driver_button").attr("disabled",false);
+	        	  } else {
+	        	  	$("#track_driver_button").attr("disabled",true);
+	        	  }	        	  
+	        	  if ( data.details.page_action=="pull_refresh"){ 
+	        	  	  $(".order_details_header").html('');		
+	        	  	  $("#track_history_item").html('');		
+	        	  }
+	        	  setOrderDetails(data.details.order_info,'.order_details_header');
+	        	  setOrderHistory(data.details.data, 'track_history_item');
+	        	  initRatyStatic();
+	        	  imageLoaded(); 
+	        	break;
+	        	
+	        case "getOrderHistory2":	  	              
+	              stopTrackHistory();
+	        	  if(data.details.show_track){
+	        	  	$("#track_driver_button").attr("disabled",false);
+	        	  } else {
+	        	  	$("#track_driver_button").attr("disabled",true);
+	        	  }	        	  
+	        	  if ( data.details.page_action=="pull_refresh"){ 
+	        	  	  $(".order_details_header").html('');		
+	        	  	  $("#track_history_item").html('');		
+	        	  }
+	        	  setOrderDetails(data.details.order_info,'.order_details_header');
+	        	  setOrderHistory(data.details.data, 'track_history_item');
+	        	  initRatyStatic();
+	        	  imageLoaded(); 
+	        	  runTrackHistory();
+	        	break;	
+	        	
+	          case "searchOrder":	            
+	              orderListSmall( data.details.list , 'search_order_result' );
+	            break;
+	            
+	           case "searchFavorites": 
+	              FavoriteListSmall( data.details.data , 'favorite_search_result' );
+	           break;
+	           
+	           case "ReviewList":
+	              if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#reviews_list_item").html('');			  	
+    			  	  setPaginate("#reviews", data.details.paginate_total);  
+    			  	  setReviewList( data.details.data ,'reviews_list_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setReviewList( data.details.data ,'reviews_list_item' );
+	        	   } else {
+		        	   setPaginate("#reviews", data.details.paginate_total);  
+	    		       setReviewList( data.details.data ,'reviews_list_item' );
+	        	   }	
+	        	   initRatyStatic();
+	        	   imageLoaded(); 
+	           break;
+	           
+	           case "GetMerchantTimeList":
+	             setTimeList(data.details.data,'.time_select_wrap');
+	           break;
+	           
+	           case "GetGallery":
+	        	 if ( data.details.page_action=="pull_refresh"){    
+    			  	  $("#list_photo_gallery").html('');			  	    			  	  
+	        	 } 
+	        	 setGallery( data.details.data.gallery,'list_photo_gallery');
+	        	 imageLoaded(); 
+	        	break;
+	        	
+	           case "GetMerchantInformation":
+	             setMerchantInformation(data.details.data.information, '.information_loader');
+	             imageLoaded();
+	           break;
+	           
+	           case "GetMerchantPromo":
+		          if ( data.details.page_action=="pull_refresh"){    
+	    			  	$("#promo_list_item").html('');
+		          }			  	
+	              setPromo( data.details.data,'promo_list_item');
+	           break;
+	           
+	           case "GetPointSummary":
+	              if ( data.details.page_action=="pull_refresh"){
+	              	$("#points_list_item").html('');
+	              }
+	              setPointSummary( data.details.data ,'points_list_item' );
+	           break;
+	           
+	           case "GetPointDetails":
+	             $("#points_details .print_page_title").html( data.details.page_title );
+	             
+	             if ( data.details.page_action=="pull_refresh"){
+	              	$("#points_details_item").html('');
+	              	setPaginate("#points_details", data.details.paginate_total);  
+	             } 
+	             setPointDetails( data.details.data ,'points_details_item' );
+	           break;
+	           
+	           case "searchFoodCategory":
+	             CategoryListSmall( data.details.data , 'search_category_name_result' );
+	             imageLoaded();
+	           break;
+	           
+	           case "GetRecentLocation":
+	               $(".delete_recent_loc_wrap").show();
+		          if ( data.details.page_action=="pull_refresh"){	          	 
+		             $("#recent_location_item").find(".recent_loc_child").remove();
+		             setPaginate("#map_enter_address", data.details.paginate_total);  
+		          } 
+		          setPaginateTotal("#map_enter_address", data.details.paginate_total);  
+	              setGetRecentLocation( data.details.data , 'recent_location_item'  );
+	           break;
+	           
+	           case "searchMerchantFood":
+	             setMerchantFoodList( data.details.data , 'search_form_result'  );
+	           break;
+	           
+	           case "GetRecentSearch":	
+	              $(".delete_recent_searches_wrap").show();
+	              if ( data.details.page_action=="pull_refresh"){
+	              	  $("#recent_search_item").find(".recent_search_child").remove();
+	              	  setPaginate("#search", data.details.paginate_total);  
+	              }
+	             setPaginateTotal("#search", data.details.paginate_total);  
+	             setRecentSearchList( data.details.data , 'recent_search_item'  );
+	           break;
+	           
+	           case "PayOnDeliveryCardList":
+	              if ( data.details.page_action=="pull_refresh"){	
+  	              	  $("#payondelivery_list_item").html('');
+	              }
+	              setPayOnDeliveryCardList(data.details.list, 'payondelivery_list_item' );
+	              imageLoaded();
+	           break;
+	           
+	           case "getPushSettings":
+	              if(data.details.push_enabled==1){
+	                $(".enabled_push").prop('checked', true);
+	              } else {
+	              	$(".enabled_push").prop('checked', false);
+	              }
+	              
+	              if ((typeof data.details.subscribe_topic !== "undefined") && (data.details.subscribe_topic !== null)) {
+		              if(data.details.subscribe_topic==1){
+		                $(".subscribe_topic").prop('checked', true);
+		              } else {
+		              	$(".subscribe_topic").prop('checked', false);
+		              }
+	              }
+	              
+	           break;
+	           
+	           case "reRegisterDevice":
+	           break;
+	           
+	           case "mapboxgeocode":
+	              identifyLocationLoader(false);
+	              
+	              if (!app_settings.map_auto_identity_location){			   	  	  
+			   	  	  $(".identify_location_wrap").hide();
+			   	  }
+			   	  			   	  			   	 
+			   	  
+			   	  $(".print_location_address").html( data.details.formatted_address );
+			   	  $(".recent_search_address").val( data.details.formatted_address );
+			   	  
+			   	  $resp = data.details;			   	  
+			   	  
+			   	  current_page_id = onsenNavigator.topPage.id;				   	  
+			   	  $("#"+current_page_id +" .street").val( $resp.address );
+	   	  	  	  $("#"+current_page_id +" .city").val( $resp.city );
+	   	  	  	  $("#"+current_page_id +" .state").val( $resp.state );
+	   	  	  	  $("#"+current_page_id +" .zipcode").val( $resp.zip );
+	   	  	  	  $("#"+current_page_id +" .country").val( $resp.country );
+	              
+	           break;
+	           
+	           case "DriverInformation":
+	        	  if ( data.details.page_action=="pull_refresh"){ 
+	        	  	  $("#driver_list_details").html('');			  	
+	        	  	  $(".driver_details").html('');			  	
+	        	  }
+	        	  setDriverInformation(data.details.data, '.driver_details','driver_list_details');
+	        	  initRatyStatic();
+	        	break;
+	        	
+	           case "TrackDriver":	
+	             stopTrack();	             
+	             map_moveMarker( 1,  data.details.data.location_lat , data.details.data.location_lng );
+	             map_setCenter( data.details.data.location_lat , data.details.data.location_lng );
+	             
+	             document.querySelector('ons-progress-bar').setAttribute('value',  data.details.data.completed );
+
+	             //alert(data.details.data.task_status);
+	             if(data.details.data.task_status=="successful"){	             	
+	             	replacePage("task_add_rating.html",'none',{
+	        	  	  'task_id' : data.details.data.task_id
+	        	  	});             		        	  
+	             } else if ( data.details.data.task_status=="inprogress" ) {
+	             	 modal_content = NotificationContent(data.details.data.task_status, data.details.data);
+	             	 showModalNotification(true);
+	             	 
+	             } else if ( data.details.data.task_status=="declined" ) {
+	             	 modal_content = NotificationContent(data.details.data.task_status, data.details.data);
+	             	 showModalNotification(true);
+	             } else if ( data.details.data.task_status=="cancelled" ) {	
+	             	 modal_content = NotificationContent(data.details.data.task_status, data.details.data);
+	             	 showModalNotification(true);
+	             } else if ( data.details.data.task_status=="failed" ) {		             	
+	             	 modal_content = NotificationContent(data.details.data.task_status, data.details.data);
+	             	 showModalNotification(true);
+	             } else {
+	             	runTrack();
+	             }	             	                          	            
+	           break;
+    			
+	           
+	          case "loadCart":
+	        	
+	        	  initRatyStatic();
+	        	  setStorage("merchant_settings", JSON.stringify(data.details.merchant_settings) );  
+	        	  
+	        	  document.querySelector('ons-tabbar').setActiveTab(0);
+	        	   	        	   	        	  
+	        	  setStorage("next_step", 'payment_option' );
+	        	   
+	        	  if ( data.details.required_delivery_time=="yes"){
+        		  	 $(".required_delivery_time").val(1);
+        		  } else {
+        		  	 $(".required_delivery_time").val('');
+        		  }
+        		  
+        		  $(".has_addressbook").val( data.details.has_addressbook );
+        		  $(".sms_order_session").val( data.details.sms_order_session);
+        		  
+	        	  $(".no_order_wrap").hide();
+	        	  $(".bottom_toolbar_checkout").show();
+	        	  tpl = displayCartDetails(data.details);
+	        	  $(".cart_details").html( tpl ) ;
+	        	  
+	        	  if(data.details.cart_error.length>0){
+	        	  	 $('.bottom_toolbar_checkout ons-button').attr("disabled",true);
+	        	  	 cart_error='';     	  	
+	        	  	 $.each( data.details.cart_error  , function( cart_error_key, cart_error_val ) {
+	        	  		 cart_error+=cart_error_val + "\n";
+	        	  	 });	        	        	  	
+	        	  	 showAlert(cart_error);
+	        	  } else {
+	        	  	$('.bottom_toolbar_checkout ons-button').attr("disabled",false);
+	        	  }
+	        	  
+	        	  SetoneTimePayment(data);
+	        	  
+	        	  imageLoaded();
+	        	  initRatyStatic();
+	        	  
+	        	break; 
+	        	
+	        	case "GetPage":
+	        	  $(".custom_page_title").html( data.details.data.title );
+	        	  $(".custom_page_content").html( data.details.data.content );
+	        	break;
+	        	
+	        	case "GetNotifications":
+	        	  notiRemoveButton(true);
+	              if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#notifications_list_item").html('');			  	
+    			  	  setPaginate("#notifications", data.details.paginate_total);  
+    			  	  setNotificationList( data.details.data ,'notifications_list_item' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setNotificationList( data.details.data ,'notifications_list_item' );
+	        	   } else {
+		        	   setPaginate("#notifications", data.details.paginate_total);  
+	    		       setNotificationList( data.details.data ,'notifications_list_item' );
+	        	   }	    
+	            break;
+	            
+	            case "searchBooking":
+	               bookingListSmall( data.details.list , 'booking_search_result' );
+	            break;
+	            
+	            case "GetBookingDetails":
+	               if ( data.details.page_action=="pull_refresh"){ 
+	               	   $("#booking_details_list").html('');	
+	               } 	               
+	               setBookingDetails(data.details.data,'booking_details_list');
+	            break;
+	            
+	            case "getlanguageList2":
+	              if ( data.details.page_action=="pull_refresh"){ 
+	            	  $("#language2_list_item").html('');			  	
+    			  	  setlanguageList2( data.details.data ,'language2_list_item' , data.details.lang );
+	              } else {
+	                  setlanguageList2( data.details.data ,'language2_list_item' , data.details.lang );
+	              }
+	            break;
+	            
+	            case "checkRunTrackHistory":
+	               if(data.details.run_track==1){
+	               	  runTrackHistory();
+	               }    		
+	            break;
+	            
+	            case "CityList":
+	              if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#location_city_result").html('');			  	
+    			  	  setPaginate("#location_city", data.details.paginate_total);  
+    			  	  setCityList( data.details.data ,'location_city_result' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setCityList( data.details.data ,'location_city_result' );
+	        	   } else {
+		        	   setPaginate("#location_city", data.details.paginate_total);  
+	    		       setCityList( data.details.data ,'location_city_result' );
+	        	   }
+	            break;
+	            
+	            case "AreaList":
+	               if ( data.details.page_action=="pull_refresh"){ 
+	        	   	   $("#location_area_result").html('');			  	
+    			  	   setPaginate("#location_area", data.details.paginate_total);  
+    			  	   setAreaList( data.details.data ,'location_area_result' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setAreaList( data.details.data ,'location_area_result' );
+	        	   } else {
+		        	   setPaginate("#location_area", data.details.paginate_total);  
+	    		       setAreaList( data.details.data ,'location_area_result' );
+	        	   }
+	            break;
+	            
+	             case "StateList":
+	              if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#location_state_result").html('');			  	
+    			  	  setPaginate("#location_state", data.details.paginate_total);  
+    			  	  setStateList( data.details.data ,'location_state_result' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setStateList( data.details.data ,'location_state_result' );
+	        	   } else {
+		        	   setPaginate("#location_state", data.details.paginate_total);  
+	    		       setStateList( data.details.data ,'location_state_result' );
+	        	   }
+	            break;
+	            
+	            case "PostalCodeList":
+	              if ( data.details.page_action=="pull_refresh"){ 
+	        	   	  $("#location_postal_code_result").html('');			  	
+    			  	  setPaginate("#location_postal_code", data.details.paginate_total);  
+    			  	  setPotalList( data.details.data ,'location_postal_code_result' );
+	        	   } else if (data.details.page_action=="infinite_scroll") {  
+	        	   	   setPotalList( data.details.data ,'location_postal_code_result' );
+	        	   } else {
+		        	   setPaginate("#location_postal_code", data.details.paginate_total);  
+	    		       setPotalList( data.details.data ,'location_postal_code_result' );
+	        	   }
+	            break;
+	            
+	            case "getActiveMerchantCategory":
+	              setStorage("active_merchant_category", JSON.stringify(data.details.data) );  
+	            break;
+	            
+	            case "foodPromo":
+	               if ( data.details.page_action=="pull_refresh"){ 
+	               	   infinite_page=0;	
+	               	   $("#promo_food_list .infinite_done").val(0);
+	               	   destroyList('list_promo_food');		               	                  	  	               	 
+	               	   
+		        	   $("#promo_food_list .total_number_found").html( data.details.total );	        	   
+		        	   $("#promo_food_list .sortby_selected").html( data.details.sortby_default );
+		        	   
+		        	   setPromoList( data.details.list , 'list_promo_food'  );
+		        	   imageLoaded(); 
+	               } else if (data.details.page_action=="infinite_scroll") {  	               	  
+	               	  setPromoList( data.details.list , 'list_promo_food'  );
+	               } else {
+	               	  setFoodPromoCarousel('.food_list_wrapper', data.details.list);
+	               }
+	               	               	              
+	               setTimeout(function() {				     				 		
+				 		imageLoaded();
+				   }, 500); 
+	            break;
+	            	            
+	            case "searchFoodPromo":
+	              foodPromoListSmall( data.details.list , 'search_field_by_foodpromo_result' );
+    			  imageLoaded(); 
+	            break;
+	            
+	            case "getHomebanner":	              
+	              fillHomeBanner( data.details.data , '.home_banner_wrapper');
+	            break;
+	            
+	            
+	            case "getHomeCategories":	              
+	              fillCategories( data.details.data , '#category_list_wrapper');
+	            break;
+	            
+	            case "TrackOrderGraphical":	   
+	              $page_id = 'graphical_tracking';           
+	              $("#"+ $page_id + " ons-progress-circular").attr("value",data.details.percent);
+	              $("#"+ $page_id + " .estimation_time").html( data.details.estimation_time );
+	              $("#"+ $page_id + " .estimation_minutes").html( data.details.estimation_minutes );
+	              $("#"+ $page_id + " .estimation_ready").html( data.details.estimation_ready );
+	              $("#"+ $page_id + " .estimation_order_status").html( data.details.estimation_order_status );
+	              $("#"+ $page_id + " .estimation_merchant").html( data.details.estimation_merchant );
+	              $("#"+ $page_id + " .estimation_notes1").html( data.details.estimation_notes1 );
+	              $("#"+ $page_id + " .estimation_notes2").html( data.details.estimation_notes2 );
+	              
+	              if(data.details.percent==100){
+	              	
+	              	 stopTrackGraphical();	              	 
+	              	 
+	              	 if (data.details.failed_order){
+	              	 	$("#"+ $page_id + " .gpahical_content").addClass("failed");
+	              	 	$("#"+ $page_id + " .estimation_order_status").html('');	  	              	 	            	 
+	              	 	$("#"+ $page_id + " .estimation_time").html( data.details.estimation_order_status );
+	              	 	$("#"+ $page_id + " .estimation_ready").html( data.details.estimation_notes2 );
+	              	 } else {
+	              	 	$("#"+ $page_id + " .estimation_order_status").html('');
+	              	 	$(".success-checkmark").show();	                 
+	              	 }	              
+	              		                 
+	                 if ( data.details.add_review){
+	                 	setTimeout(function(){						   
+						   showPage(data.details.page_review,'fade',{
+						   	'order_id': data.details.order_id,
+						   	'task_id': data.details.task_id
+						   });
+						},4*1000);
+	                 } else {
+	                 	//
+	                 }
+	              }
+	            break;
+	            
+    		}    		
+    	} else if ( data.code== 6 ) {  // empty list
+    	          
+          $(data.details.element).html( templateError(data.msg, data.details.message) );
+          $(data.details.element_list).html('');
+                    
+          if ( action=="getOrderHistory"){              	  
+          	  $(".order_details_header").html('');
+          	  $("#track_driver_button").attr("disabled",true);
+          } else if ( action=="GetGallery"){
+          	   $("#photo_gallery .white_list_wrapper").css("background-color", "transparent");
+          } else if ( action=="DriverInformation"){
+          	  $(".driver_details").html('');	
+          } else if ( action=="GetNotifications"){
+          	 notiRemoveButton(false);
+          }
+    	   
+    	} else {
+    		// FAILED CONDITION
+    		dump('failed condition');
+    		switch (action){
+    			
+    			
+                case "GetPage":
+     			  $(".custom_page_title").html( '' );	        	  
+     			  $('.custom_page_content').html( templateError(data.msg, t("Sorry but we cannot find what you are looking for") ) );
+     			break;
+     			
+    			case "loadCart": 	        	
+	        	  clearCartDiv();	        	  
+	        	break;   
+    			
+    			case "TrackDriver":	
+	             stopTrack();
+	            break;
+	           
+    			case "mapboxgeocode":
+    			   showToast( data.msg );
+    			   
+    			  current_page_id = onsenNavigator.topPage.id;				   	  
+			   	  $("#"+current_page_id +" .street").val( '' );
+	   	  	  	  $("#"+current_page_id +" .city").val( '' );
+	   	  	  	  $("#"+current_page_id +" .state").val( '' );
+	   	  	  	  $("#"+current_page_id +" .zipcode").val( '' );
+	   	  	  	  $("#"+current_page_id +" .country").val( '' );
+	   	  	  	  
+    			break;
+    			
+    			case "searchMerchant":    
+    						      			  
+    			  search_type = data.details.search_type;    			  
+    			      			 
+    			  if( search_type=="byLatLong"){    			  	  
+    			  	 $(".search_total_number_found").html( data.msg ); 
+    			  	 $(".search_results_wrapper").addClass("remove-min-height");       			  
+    			  } else {    
+    			  	 $page_id = getCurrentPage();    			  	 
+    			  	 $("."+ target).addClass("remove-min-height small");
+    			  	 $("."+ target).html( data.msg );
+    			  	 
+    			  	 if($page_id=="tabbar"){    			  	 	
+    			  	 	if(search_type=="allMerchant"){
+	    			  	 	$("#home .home_infinite_done").val(1);
+	    			  	 	$("."+ target).html( t("end of results") );
+    			  	 	}
+    			  	 }
+    			  }
+    			  
+    			  if ( data.details.page_action=="pull_refresh"){
+    			  	  $("#list_restaurant").html('');
+    			  	  $(".total_number_found").html( data.msg );    			  	  
+    			  }
+    			      			
+    			   			  
+    			break;
+
+    			case "cuisineList":
+    			  if ( data.details.page_action=="pull_refresh"){     			  	  
+	        	      $(".total_number_found").html( data.msg );
+	        	   } else if (data.details.page_action=="infinite_scroll") {    	        	   	  
+	        	      $(".total_number_found").html( data.msg );
+    			  } else {
+    			  	  $("#cuisine_list_wrapper").hide();    			  	 
+    			  }
+	        	  break;   		
+	        	  
+	        	case "getMerchantMenu":	      
+	        	case "searchFoodItem":  	
+	        	case "searchFoodCategory":
+	        	  if(action=="getMerchantMenu"){
+	        	  	 $("#resto_list_category").html('');
+	        	  }
+	        	  $("."+ target).html( "<p class=\"small padding\">"+data.msg+"</p>" );
+	        	 break;   		
+	        	 
+	        	case "getItemByCategory":		        	 
+    		     $("#item_page .center span.print_category_name").html( data.details.category.category_name );
+    		     setCategoryCarousel( data.details.category_list , data.details.category.cat_id );	  
+    		     $("."+ target).html( "<p class=\"small padding\">"+data.msg+"</p>" );
+    		    break; 
+    		        		        		    
+    		    case "GetRecentLocation":    		      
+    		       $(".delete_recent_loc_wrap").hide();
+    		      $("#recent_location_item").find(".recent_loc_child").remove();
+    		    break; 
+    		    
+    		     case "GetRecentSearch":    		      
+    		      $(".delete_recent_searches_wrap").hide();
+    		      $("#recent_search_item").find(".recent_search_child").remove();    		      
+    		    break; 
+    		    
+    		    case "reRegisterDevice":
+    		    break; 
+    		    
+    		    case "getOrderHistory2":
+    		      stopTrackHistory();
+    		    break; 
+    		        		    
+    		    case "getActiveMerchantCategory":
+    		      setStorage("active_merchant_category",'');  
+    		    break; 
+    		    
+    		    case "foodPromo":
+    		      if(data.details.page_action=="infinite_scroll"){
+    		      	  $("#promo_food_list .infinite_done").val(1);
+    		      } else if ( data.details.page_action=="pull_refresh" ){
+    		      	 destroyList('list_promo_food');	
+	                 $("#promo_food_list .total_number_found").html( data.details.total );	        	   
+    		      } else {
+	    		      $("."+ target).html( '<p class="small">'+data.msg+'</p>' );
+	    		      $(".food_list_wrapper").addClass("remove-min-height"); 
+    		      }
+    		    break; 
+    		        	
+    		    case "searchFoodPromo":
+	              destroyList('search_field_by_foodpromo_result');	
+	              $("."+ target).html( data.msg );
+	            break;	    
+	            
+	            case "getFirstCart":
+	              removeStorage("cart_item_count");
+	            break;	    
+	            
+	            case "getOperational":	               
+	               resetToPage('operational_close_page.html','lift');
+	            break;	    
+    		        		    
+    			default:    			  
+    			  $("."+ target).html( data.msg );
+    			break;
+    		}
+    	}
+    });
+        
+    /*ALWAYS*/
+    ajax_array[timenow].always(function() {        
+        ajax_array[timenow] = null;  
+        clearTimeout( timer_array[timenow] );
+    });
+          
+    /*FAIL*/
+    ajax_array[timenow].fail(function( jqXHR, textStatus ) {
+    	showLoaderDiv( false, target );
+    	clearTimeout( timer_array[timenow] );    	
+    	//showToast( t("Failed") + ": " + textStatus );       	
+    });     
+	
+};
+
+showRestaurantList = function(search_type){
+   onsenNavigator.pushPage("restaurant_list.html",{
+  	   animation : "slide" ,  	
+  	   data : {
+  	   	  "search_type" : search_type
+  	   }
+   });  
+};
+
+showRestaurantListCuisine = function(search_type, cuisine_id){
+   onsenNavigator.pushPage("restaurant_list.html",{
+  	   animation : "slide" ,  	
+  	   data : {
+  	   	  "search_type" : search_type,
+  	   	  "cuisine_id" : cuisine_id
+  	   }
+   });  
+};
+
+replaceRestaurantListCuisine = function(search_type, cuisine_id){
+   onsenNavigator.replacePage("restaurant_list.html",{
+  	   animation : "slide" ,  	
+  	   data : {
+  	   	  "search_type" : search_type,
+  	   	  "cuisine_id" : cuisine_id
+  	   }
+   });  
+};
+
+loadMerchant = function(merchant_id){	
+
+	$different_merchant = false;
+	$cart_merchant_id = getStorage("cart_merchant_id");
+	$cart_item_count = getStorage("cart_item_count");
+	dump($cart_merchant_id+"=>"+merchant_id + "=>"+ $cart_item_count);
+	if(!empty($cart_merchant_id) && $cart_item_count>0){
+		if($cart_merchant_id!=merchant_id){
+			$different_merchant = true;
+		}
+	}
+	
+	$continue_resto_page = true;
+	if($different_merchant){
+		ons.platform.select('ios');  
+		ons.notification.confirm( t("Cancel current order?") ,{
+			title: t("You are about to order from different merchant"),
+			id : "dialog_remove_item",
+			buttonLabels : [ t("Yes"), t("No") ]
+		}).then(function(input) {
+			if(input==0){
+				setStorage("cart_merchant_id", merchant_id );
+				onsenNavigator.pushPage("restaurant_page.html",{
+			  	   animation : "slide" ,  	
+			  	   data : {
+			  	   	  "merchant_id" : merchant_id
+			  	   }
+			   });  
 			}
-		}, function(error){
-		    toastMsg("The following error occurred: "+error);
+		});
+	} else {
+		setStorage("cart_merchant_id", merchant_id );
+		onsenNavigator.pushPage("restaurant_page.html",{
+	  	   animation : "slide" ,  	
+	  	   data : {
+	  	   	  "merchant_id" : merchant_id
+	  	   }
+	   });  
+	}	
+};
+
+ReplaceMerchant = function(merchant_id){	
+	onsenNavigator.replacePage("restaurant_page.html",{
+  	   animation : "slide" ,  	
+  	   data : {
+  	   	  "merchant_id" : merchant_id
+  	   }
+   });  
+};
+
+
+getListType = function(){
+	
+	list_type = 1;
+	if(app_settings = getAppSettings()){
+   	   list_type = app_settings.list_type;
+   	}
+   	return list_type;    
+};
+
+showSheet = function(template_id, id){		
+	var dialog = document.getElementById(id);   
+    if (dialog) {     	 
+     	 dialog.show();
+    } else {
+       ons.createElement(template_id, { append: true }).then(function(dialog) {       	
+        dialog.show();
+      });
+    }
+    
+};
+
+hideSheet = function(){
+	var dialog1 = document.getElementById('sortbyresto');  
+	var dialog2 = document.getElementById('filter');  
+	var dialog3 = document.getElementById('sort_cuisine');
+	var dialog4 = document.getElementById('filter_item');
+	var dialog5 = document.getElementById('sort_food_promo');
+	if(!empty(dialog1)){
+	   dialog1.hide(); 
+	}
+	if(!empty(dialog2)){
+	   dialog2.hide(); 
+	}
+	if(!empty(dialog3)){
+	   dialog3.hide(); 
+	}
+	if(!empty(dialog4)){
+	   dialog4.hide(); 
+	}
+	if(!empty(dialog5)){
+	   dialog5.hide(); 
+	}
+};
+
+setSortBy = function(){
+	var sort_by = $('#sortbyresto input[name=sortby]:checked').val();		
+	$("#restaurant_list .sort_by").val( sort_by );
+	reloadSearchResult();
+};
+
+reloadSearchResult = function(){
+	$("#list_restaurant").html('');
+	
+	search_type = $(".search_type").val();	
+    params = "search_type="+search_type;
+    params+="&with_distance=1";
+    params+="&sort_by=" + $("#restaurant_list .sort_by").val();
+    params+="&sort_asc_desc=" + $("#sortbyresto .sort_asc_desc").val();
+    params+="&cuisine_id=" + $("#restaurant_list .cuisine_id").val();
+    params+="&banner_id=" + $("#restaurant_list .banner_id").val();
+    params+="&apply_sort=1";
+    
+    params+= "&"+$( ".frm_filter" ).serialize();   	    	  
+    
+    hideSheet();
+    processAjax('searchMerchant',params);
+};
+
+clearForm = function(form_id){
+	 $("#"+form_id).find(':input').each(function() {						    	
+        switch(this.type) {
+            case 'password':
+            case 'select-multiple':
+            case 'select-one':
+            case 'text':
+            case 'textarea':
+                $(this).val('');
+                break;
+            case 'checkbox':
+            case 'radio':
+                this.checked = false;    
+                break;        
+        }
+   });
+}
+
+destroyList = function(element){
+	dump("destroyList");
+	dump(element);
+	$("#"+ element +" ons-list-item").remove();
+};
+
+setFocus = function(element){
+	try {	    	    
+	    setTimeout(function(){
+		   document.getElementById( element )._input.focus();
+		},200);
+	 } catch(err) {
+        dump(err);
+     } 
+}
+
+var pullHook = {};
+
+/*mypull*/
+initPullHook = function(id, element, data){
+	
+	dump("initPullHook=> "+ element);
+	var timenow = getTimeNow();
+	
+	/*if (id=="home"){
+		pullHook[timenow] = document.getElementById('home_pull_hook');		 		  
+	} else if ( id = "restaurant_list"){
+		pullHook[timenow] = document.getElementById('restaurant_list_pull_hook');
+	}*/
+	
+	pullHook[timenow] = document.getElementById(element);		 		  
+	
+	if(pullHook[timenow]){
+		pullHook[timenow].addEventListener('changestate', function(event) {
+	    var message = '';		
+	    switch (event.state) {
+	      case 'initial':
+	        message = t('Pull to refresh');
+	        break;
+	      case 'preaction':
+	        message = t('Release');
+	        break;
+	      case 'action':
+	        message = t('Loading...');
+	        break;
+	     }		
+	     pullHook[timenow].innerHTML = message;
+	    }); 
+	}
+
+	
+	switch(id)
+	{
+		case "home":
+
+		  pullHook[timenow].onAction = function(done) {
+		  			  	
+	   	    setStorage("change_language", 1);
+   	    	params = "search_type=byLatLong";
+   	    	processDynamicAjax('searchMerchant', params , 'search_results_wrapper');
+	   	    			 
+			 loadHomePage();
+   	            
+		     setTimeout(function() {				     
+		 		done();
+		    }, 1000); 
+		  };
+		  		
+		break;
+		
+		case "restaurant_list":
+		    pullHook[timenow].onAction = function(done) {
+		       	search_type = $(".search_type").val();		       	
+   	            params = "search_type="+search_type;
+   	            params+="&with_distance=1";
+   	            params+="&sort_by=" + $(".sort_by").val();
+   	            params+="&page_action=pull_refresh";
+   	            params+="&cuisine_id="+ $(".cuisine_id").val();
+   	            params+="&banner_id="+ $(".banner_id").val();
+   	               	                        		    	   	            
+   	            processDynamicAjax('searchMerchant',params,'restaurant_list_loader','GET','1');
+   	            
+		        setTimeout(function() {				     
+		 		done();
+		       }, 1000); 
+		    };
+		break;
+		
+		case "load_cart":
+		    pullHook[timenow].onAction = function(done) {		    	
+		       //loadCart();
+		       loadCartPull();
+		       setTimeout(function() {				     
+		 		done();
+		       }, 1000); 
+		       
+		    };
+		break;
+		
+		case "cuisine_list":		
+		    pullHook[timenow].onAction = function(done) {		       	
+		    	
+		    	var params = $(".frm_cuisine").serialize();
+		    	params+="&page_action=pull_refresh";		    	
+		    	processDynamicAjax('cuisineList',params,'cuisine_loader','GET','1');
+		    	
+		        setTimeout(function() {				     
+		 		done();
+		       }, 1000); 
+		    };
+		    
+		break;
+		
+		case "restaurant_page":
+		  pullHook[timenow].onAction = function(done) {		       	
+		    			  	     
+		  	    merchant_id = getActiveMerchantID();
+		  	
+		    	params = "merchant_id="+ merchant_id;
+		    	params+="&page_action=pull_refresh";
+	        	processDynamicAjax('getMerchantMenu',params,'menu_loader','GET',1 )     		
+	        	  
+		        setTimeout(function() {				     
+		 		done();
+		       }, 1000); 
+		    };
+		break;
+		
+		case "item_page":
+		 pullHook[timenow].onAction = function(done) {		 
+		 	      	
+			  cat_id = $("#item_page .cat_id").val( );
+			  merchant_id = getActiveMerchantID();
+			  
+			  params = "merchant_id="+ merchant_id;
+	   	      params+="&cat_id=" + cat_id ;
+	   	      params+="&page_action=pull_refresh";
+	   	      params+= "&"+$( ".frm_filter_item" ).serialize(); 
+		      processDynamicAjax('getItemByCategory',params,'item_loader','GET',1 );
+		      
+		      setTimeout(function() {				     
+		 		done();
+		      }, 1000); 
+		       
+	      };
+		break;
+		
+		case "order_list":
+			pullHook[timenow].onAction = function(done) {		 
+			    params="&page_action=pull_refresh&tab="+ $(".order_tab_active").val() ;
+			    processDynamicAjax('OrderList',params,'order_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "booking_history":
+			pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&tab="+ $(".booking_tab_active").val();
+			    processDynamicAjax('BookingList',params,'booking_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "favorite_list":
+			pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh";
+			    processDynamicAjax('FavoriteList',params,'favorite_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "creditcard_list":
+			pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh";
+			    processDynamicAjax('CrediCartList',params,'creditcard_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "select_creditcards":
+		  pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh";
+			    processDynamicAjax('CrediCartList',params,'select_creditcards_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "addressbook_list":
+			pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh";
+			    processDynamicAjax('AddressBookList',params,'addressbook_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "language_list":
+			pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh";
+			    processDynamicAjax('getlanguageList',params,'language_list_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "track_history":
+		   pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('getOrderHistory',params,'track_history_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "reviews":
+		   pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('ReviewList',params,'reviews_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "photo_gallery":
+		  pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('GetGallery',params,'gallery_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "promos":
+		  pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('GetMerchantPromo',params,'promos_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "points_list":
+		   pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('GetPointSummary',params,'points_list_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "points_details":
+		   pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('GetPointDetails',params,'points_details_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "information":
+		 pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('GetMerchantInformation',params,'information_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "map_enter_address":
+		   pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('GetRecentLocation',params,'recent_location_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "search":
+		   pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('GetRecentSearch',params,'recent_search_item_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "payondelivery_list":		
+		
+		   pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('PayOnDeliveryCardList',params,'payondelivery_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		
+		break;
+		
+		case "driver_details":
+		    pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('DriverInformation',params,'driver_details_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "GetPage":
+		   pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('GetPage',params,'custom_page_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "notifications":
+		   pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('GetNotifications',params,'notifications_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "booking_details":
+		   pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh&" + data;
+			    processDynamicAjax('GetBookingDetails',params,'booking_details_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "language_list2":
+			pullHook[timenow].onAction = function(done) {					
+			    params="&page_action=pull_refresh";
+			    processDynamicAjax('getlanguageList2',params,'language2_list_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "location_city_result":		    
+		    pullHook[timenow].onAction = function(done) {					
+		    	destroyList('location_city_result');
+			    params="&page_action=pull_refresh";
+			    if(!empty(data)){
+			    	params+="&"+ data;
+			    }
+			    processDynamicAjax('CityList',params,'location_city_result_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "location_area_result":
+		   pullHook[timenow].onAction = function(done) {	
+		   	    destroyList('location_area_result');				
+			    params="&page_action=pull_refresh";
+			    params+="&"+data;
+			    processDynamicAjax('AreaList',params,'location_area_result_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "StateList":
+		   pullHook[timenow].onAction = function(done) {	
+		   	    destroyList('location_state_result');				
+			    params="&page_action=pull_refresh";
+			    if(!empty(data)){
+			       params+="&"+data;
+			    }
+			    processDynamicAjax('StateList',params,'location_state_result_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "PostalCodeList":
+		   pullHook[timenow].onAction = function(done) {	
+		   	    destroyList('location_state_result');				
+			    params="&page_action=pull_refresh";
+			    if(!empty(data)){
+			       params+="&"+data;
+			    }
+			    processDynamicAjax('PostalCodeList',params,'location_postal_code_result_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		case "promo_food_list":
+		    pullHook[timenow].onAction = function(done) {	
+		   	    destroyList('list_promo_food');				
+			    params="&page_action=pull_refresh";
+			    if(!empty(data)){
+			       params+="&"+data;
+			    }
+			    processDynamicAjax('foodPromo',params,'promo_food_list_loader','GET',1 ); 
+			    setTimeout(function() {				     
+			 		done();
+			    }, 1000); 
+			};    
+		break;
+		
+		default:
+		 dump("id =>"+ id);
+		break;
+		
+	}
+};
+/*end initPullHook*/
+
+fillRestaurantList = function(data){	
+	list_type = getListType(); 	
+	if(list_type==1){		
+	    restaurantList(data,'list_restaurant');
+	} else if ( list_type == 3) {
+		restaurantListColumn(data,'list_restaurant');
+	} else {	    
+	    restaurantListWithBanner(data, 'list_restaurant');
+	}
+};
+
+setterMenu = function(data){	
+    menu_type = 2;
+	if(app_settings = getAppSettings()){		  	 	  	
+	   menu_type = app_settings.menu_type;
+    }    
+    dump("menu_type=>"+menu_type);
+    
+    $cart_with_qty = false;
+    if ((typeof  app_settings.cart_with_qty !== "undefined") && ( app_settings.cart_with_qty !== null)) {
+  	  $cart_with_qty = app_settings.cart_with_qty;
+    }
+        	      
+    switch (menu_type){
+    	case "3":
+    	  if($cart_with_qty){
+    	  	 setItemListColumnWithQty(  data ,'resto_list_item' );
+    	  } else {
+    	     setItemListColumn(  data ,'resto_list_item' );
+    	  }
+    	break;
+    	
+    	default:    	  
+    	  if($cart_with_qty){
+    	  	 setItemListWithQty(  data ,'resto_list_item' );
+    	  } else {
+    	  	 setItemList(  data ,'resto_list_item' );
+    	  }    	      	  
+    	break;
+    }
+    
+    imageLoaded();
+};
+
+getCuisine = function(){
+	var params = $(".frm_cuisine").serialize();		
+   	processAjax('cuisineList',params,'GET','skeleton6');
+};
+
+
+setSortCuisine = function(){
+	var sort_fields = $('#sort_cuisine input[name=sortby]:checked').val();		
+	var sort_by = $( "#sort_cuisine .sort_asc_desc" ).val();
+		
+	$(".sort_fields").val( sort_fields );	
+	$(".sort_by").val( sort_by );	
+	
+	hideSheet();
+	getCuisine();
+};
+
+/*myscroll*/
+initInfiniteScroll = function(object, action , element_id, datas){	 
+	
+	 dump('initInfiniteScroll');
+	 object.onInfiniteScroll = function(done) {
+	 	
+	 	infinite_page++;
+	 	
+	 	switch (action){
+	 		case "cuisine_list":
+	 		   data = $(".frm_cuisine").serialize();
+	 		   data+="&page_action=infinite_scroll";
+	 		   
+	 		   paginate_page = parseInt($(".frm_cuisine .paginate_page").val());
+	 		   data+="&page="+ paginate_page;
+	 		   	 		   
+	 		   	 		  
+	 		   paginate_page = paginate_page+1;	 		   
+	 		   $(".frm_cuisine .paginate_page").val(paginate_page);
+	 		   
+	 		   paginate_total = $(".frm_cuisine .paginate_total").val( );
+	 		   if(paginate_page>paginate_total){
+	 		   	  dump('finish');	 		   	  
+	 		   	  done();
+	 		   } else {	 		   	  
+	 		   	  processDynamicAjax("cuisineList", data , "cuisine_loader",  "GET");
+	 		   	  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);
+	 		   }
+	 		break;
+	 		
+	 		
+	 		case "restaurant_list":
+	 		  
+	 		  //params = "search_type="+search_type+"&lat="+current_latlng.lat+"&lng="+ current_latlng.lng ;   	     
+	 		  params = "search_type="+search_type;
+	          params+="&with_distance=1";
+	          params+="&sort_by=" + $(".sort_by").val();
+	          params+="&page_action=infinite_scroll";
+   	            
+	 		  paginate_page = parseInt($("#restaurant_list .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  params+="&cuisine_id="+ $(".cuisine_id").val();
+	 		  params+="&banner_id="+ $(".banner_id").val();
+	 		  
+	 		  paginate_page = paginate_page+1;	 		   
+	 		  $("#restaurant_list .paginate_page").val(paginate_page);
+	 		  
+	 		  paginate_total = $("#restaurant_list .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');
+	 		  	 processDynamicAjax('searchMerchant',params,'restaurant_list_loader','GET');
+	 		  	 setTimeout(function(){	
+	 		  	    done();
+	 		  	 }, 1000);
+	 		  }
+	 		  
+	 		break;
+	 		
+	 		case "restaurant_page":
+	 		
+	 		  params = "search_type="+search_type;
+	          params+="&with_distance=1";	          
+	          params+="&page_action=infinite_scroll";
+   	            
+	 		  paginate_page = parseInt($("#restaurant_page .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		   
+	 		  $("#restaurant_page .paginate_page").val(paginate_page);
+	 		  
+	 		  paginate_total = $("#restaurant_page .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');
+	 		  	 params+= "&merchant_id="+ getActiveMerchantID();
+	        	 processDynamicAjax('getMerchantMenu',params,'menu_loader','GET' );	 		  	 
+	 		  	 setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);
+	 		  }
+	 		  
+	 		break;
+	 		
+	 		case "item_page":
+	 			 		 
+	 		  params='';
+		      paginate_page = parseInt($("#item_page .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		   
+	 		  $("#item_page .paginate_page").val(paginate_page);
+	 		  
+	 		  paginate_total = $("#item_page .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');
+	 		  	 
+	 		  	  cat_id = $("#item_page .cat_id").val( );
+			      merchant_id = getActiveMerchantID();
+			  
+			      params+="&merchant_id="+ merchant_id;
+	   	          params+="&cat_id=" + cat_id ;
+	   	          params+="&page_action=infinite_scroll";
+	   	          params+= "&"+$( ".frm_filter_item" ).serialize(); 
+	   	          
+		          processDynamicAjax('getItemByCategory',params,'item_loader','GET' );
+	 		  	  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);	 		  	 
+	 		  }
+	 		
+	 		break;
+	 		
+	 		case "order_list":	 			 		
+	 		  params='';
+		      paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		   
+	 		  $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  
+	 		  paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');	 		  	 	 		  	 
+	   	          params+="&page_action=infinite_scroll&tab="+ $(".order_tab_active").val() ;
+		          processDynamicAjax('OrderList',params,'order_loader','GET' );
+	 		  	  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);	 		  	 
+	 		  }	 		
+	 		break;
+	 		
+	 		
+	 		case "booking_history":	 			 		
+	 		  params='';
+		      paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		   
+	 		  $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  
+	 		  paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');	 		  	 	 		  	 
+	   	          params+="&page_action=infinite_scroll";
+	   	          params+="&tab="+ $(".booking_tab_active").val();	
+		          processDynamicAjax('BookingList',params,'booking_loader','GET');
+	 		  	 setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);	 		  	 
+	 		  }
+	 		break;
+	 		
+	 		case "favorite_list":	 			 		
+	 		  params='';
+		      paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		   
+	 		  $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  
+	 		  paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');	 		  	 	 		  	 
+	   	          params+="&page_action=infinite_scroll";
+		          processDynamicAjax('FavoriteList',params,'favorite_loader','GET' );
+	 		  	 setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);	 		  	 
+	 		  }
+	 		break;
+	 		
+	 		case "creditcard_list":	 			 		
+	 		  params='';
+		      paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		   
+	 		  $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  
+	 		  paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');	 		  	 	 		  	 
+	   	          params+="&page_action=infinite_scroll";
+		          processDynamicAjax('CrediCartList',params,'creditcard_loader','GET' );
+		          setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);	 		  		 		  	
+	 		  }
+	 		break;
+	 		
+	 		case "addressbook_list":	 			 		
+	 		  params='';
+		      paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		   
+	 		  $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  
+	 		  paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');	 		  	 	 		  	 
+	   	          params+="&page_action=infinite_scroll";
+		          processDynamicAjax('AddressBookList',params,'addressbook_loader','GET');
+	 		  	 setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);	 		  	 
+	 		  }
+	 		break;
+	 		
+	 		
+	 		case "reviews":	 			 		
+	 		  params='';
+		      paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		 		  
+	 		  $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  
+	 		  paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');	 		  	 	 		
+	 		  	  merchant_id = getActiveMerchantID();  	 
+	   	          params+="&page_action=infinite_scroll";
+	   	          params+="&merchant_id="+ merchant_id;	   	             	   
+		          processDynamicAjax('ReviewList',params,'reviews_loader','GET' );
+	 		  	  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);	 		  	 
+	 		  }
+	 		break;
+	 		
+	 		case "points_details":
+	 		
+	 		  params='';
+		      paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		   
+	 		  $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  
+	 		  paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');	 		  	 	 			 		  	  	
+	   	          params+="&page_action=infinite_scroll&"+ datas;	   	          
+		          processDynamicAjax('GetPointDetails',params,'reviews_loader','GET' );	 		  	 
+	 		  	 setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);
+	 		  }
+	 		
+	 		break;
+	 		
+	 		case "map_enter_address":
+	 		   params='';
+		       paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		   params+="&page="+ paginate_page;
+	 		  
+	 		   paginate_page = paginate_page+1;	 		   
+	 		   dump("paginate_page=>"+ paginate_page);
+	 		   
+	 		   $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  
+	 		   paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		   if(paginate_page>paginate_total){
+	 		  	  dump('finish');
+	 		   	  done();
+	 		   } else {
+	 		  	  dump('call ajax infinite');	 		  	 	 			 		  	  	
+	   	          params+="&page_action=infinite_scroll&"+ datas;	   	          
+ 		          processDynamicAjax('GetRecentLocation',params,'recent_location_loader','GET' );	 		  	 
+	 		  	  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);
+	 		   }
+	 		break;
+	 		
+	 		case "search":
+	 		
+	 		   params='';
+		       paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		   params+="&page="+ paginate_page;
+	 		  
+	 		   paginate_page = paginate_page+1;	 		   
+	 		   dump("paginate_page=>"+ paginate_page);
+	 		   
+	 		   $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  
+	 		   paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		   if(paginate_page>paginate_total){
+	 		  	  dump('finish');
+	 		   	  done();
+	 		   } else {
+	 		  	  dump('call ajax infinite');	 		  	 	 			 		  	  	
+	   	          params+="&page_action=infinite_scroll&"+ datas;	   	          
+ 		          processDynamicAjax('GetRecentSearch',params,'recent_search_item_loader','GET' );	 		  	 
+	 		  	  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);
+	 		   }
+	 		
+	 		break;
+	 		
+	 		case "notifications":
+	 		
+	 		   params='';
+		       paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		   params+="&page="+ paginate_page;
+	 		  
+	 		   paginate_page = paginate_page+1;	 		   
+	 		   dump("paginate_page=>"+ paginate_page);
+	 		   
+	 		   $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  
+	 		   paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		   if(paginate_page>paginate_total){
+	 		  	  dump('finish');
+	 		   	  done();
+	 		   } else {
+	 		  	  dump('call ajax infinite');	 		  	 	 			 		  	  	
+	   	          params+="&page_action=infinite_scroll&"+ datas;	   	          
+ 		          processDynamicAjax('GetNotifications',params,'notifications_loader','GET' );	 		  	 
+	 		  	  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);
+	 		   }
+	 		   
+	 		break;
+	 		
+	 		case "CityList":
+	 		
+	 		  params='';
+		      paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		 		  
+	 		  $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  
+	 		  paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');	 		  	 	 			 		  	  
+	   	          params+="&page_action=infinite_scroll";	
+	   	          if(!empty(datas)){
+	   	          	  params+="&"+datas;
+	   	          }
+		          processDynamicAjax('CityList',params,'location_city_result_loader','GET' );
+	 		  	  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);	 		  	 
+	 		  }
+	 		
+	 		break;
+	 		
+	 		case "AreaList":
+	 			 		
+	 		  params='';
+		      paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		 		  
+	 		  $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  	 		  
+	 		  paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');	 		  	 	 			 		  	  
+	   	          params+="&page_action=infinite_scroll";	  
+	   	          if(!empty(datas)){
+	   	          	  params+="&"+datas;
+	   	          }
+		          processDynamicAjax('AreaList',params,'location_area_result_loader','GET' );
+	 		  	  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);	 		  	 
+	 		  }
+	 		
+	 		break;
+	 		
+	 		case "StateList":
+	 		  params='';
+		      paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		 		  
+	 		  $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  	 		  
+	 		  paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');	 		  	 	 			 		  	  
+	   	          params+="&page_action=infinite_scroll";	  
+	   	          if(!empty(datas)){
+	   	          	  params+="&"+datas;
+	   	          }
+		          processDynamicAjax('StateList',params,'location_state_result_loader','GET' );
+	 		  	  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);	 		  	 
+	 		  }
+	 		break;
+	 		
+	 		case "PostalCodeList":
+	 		  params='';
+		      paginate_page = parseInt($("#"+element_id+" .paginate_page").val());
+	 		  params+="&page="+ paginate_page;
+	 		  
+	 		  paginate_page = paginate_page+1;	 		 		  
+	 		  $("#"+element_id+" .paginate_page").val(paginate_page);
+	 		  	 		  
+	 		  paginate_total = $("#"+element_id+" .paginate_total").val( );
+	 		  if(paginate_page>paginate_total){
+	 		  	 dump('finish');	 		   	  
+	 		   	 done();
+	 		  } else {
+	 		  	 dump('call ajax infinite');	 		  	 	 			 		  	  
+	   	          params+="&page_action=infinite_scroll";	  
+	   	          if(!empty(datas)){
+	   	          	  params+="&"+datas;
+	   	          }
+		          processDynamicAjax('PostalCodeList',params,'location_postal_code_result_loader','GET' );
+	 		  	  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);	 		  	 
+	 		  }
+	 		break;
+	 		
+	 		case "promo_food_list":
+	 		  infinite_done = parseInt($("#promo_food_list .infinite_done").val());
+			  dump("infinite_done=>"+infinite_done);
+			  if(infinite_done>0){
+			  	  dump('finish');	 		   	  
+	 		   	  done();
+			  } else {
+			  	  params = "page="+infinite_page;
+			  	  params+="&page_action=infinite_scroll";	  
+	   	          if(!empty(datas)){
+	   	          	  params+="&"+datas;
+	   	          }	   	          
+				  processDynamicAjax("foodPromo", params ,'promo_food_list_loader' ); 
+				  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);
+			  }
+	 		break;
+	 		
+	 		case "home_all_restaurant":
+	 		   infinite_done = parseInt($("#home .home_infinite_done").val());	 		  
+	 		   dump("infinite_done=>"+ infinite_done);
+	 		   if(infinite_done>0){
+	 		   	  dump('finish');	 		   	  
+	 		   	  done();
+	 		   } else {
+	 		   	  params = "page="+infinite_page;
+			  	  params+="&page_action=infinite_scroll";	  
+			  	  params+="&search_type=allMerchant";	  
+	   	          if(!empty(datas)){
+	   	          	  params+="&"+datas;
+	   	          }	   	          
+				  processDynamicAjax("searchMerchant", params ,'home_list_loader' ); 
+				  setTimeout(function(){	
+	 		  	    done();
+	 		  	  }, 1000);
+	 		   }	 		  	 		  
+	 		break;
+	 		
+	 	} /*end siwthc*/
+	 };
+};
+/*end initInfiniteScroll*/
+
+resetPaginate = function(element){
+	$( element + " .paginate_total").val( 0 );
+   	$( element + " .paginate_page").val( 1 );
+};
+
+setPaginate = function(element, total){
+	$( element + " .paginate_total").val( total );
+   	$( element + " .paginate_page").val( 1 );
+};
+
+setPaginateTotal = function(element, total){
+	$( element + " .paginate_total").val( total );   	
+};
+
+
+setCategoryList = function(data, element){
+	menu_type = 1;
+	if(app_settings = getAppSettings()){		  	 	  	
+	   menu_type = app_settings.menu_type;
+    }
+    dump("menu_typex=>"+ menu_type);
+
+    $cart_with_qty = false;
+    if ((typeof  app_settings.cart_with_qty !== "undefined") && ( app_settings.cart_with_qty !== null)) {
+  	   $cart_with_qty = app_settings.cart_with_qty;
+    }
+    
+    switch(menu_type){    	
+    	case "1":
+    	  if(!$cart_with_qty){
+    	     restaurantCategory( data , element );
+    	  } else {
+    	  	 restaurantCategoryWithQty( data , element , $cart_with_qty );
+    	  }
+    	break;
+    	    	
+    	case "2":
+    	  restaurantCategoryTwo(data, element);
+    	break;
+    	    	
+    	case "3":
+    	 restaurantCategoryColumn(data, element);
+    	break;
+    	
+    	default:
+    	  restaurantCategoryTwo(data, element);
+    	break;
+    	
+    }
+    
+    imageLoaded();
+};
+
+showItemPage = function(cat_id){
+	 onsenNavigator.pushPage("item_page.html",{
+  	   animation : "slide" ,  	
+  	   data :{
+  	   	  "cat_id" : cat_id,  	   	  
+  	   }
+   });  
+};
+
+reloadItemPage = function(cat_id){
+	$("#resto_list_item").html('');			  	
+	
+	$("#item_page .cat_id").val( cat_id );
+	merchant_id = getActiveMerchantID();
+	
+	params = "merchant_id="+ merchant_id;
+   	params+="&cat_id=" + cat_id ;
+   	params+= "&"+$( ".frm_filter_item" ).serialize(); 
+	processDynamicAjax('getItemByCategory',params,'item_loader','GET',1 );
+};
+
+itemDetails = function(item_id, cat_id , row){		
+	onsenNavigator.pushPage("item_details.html",{
+  	   animation : "slide" ,  	
+  	   data :{
+  	   	  "item_id" : item_id,
+  	   	  "cat_id" : cat_id,
+  	   	  'row' : row
+  	   }
+   });  
+};
+
+isHidePrice = function(){
+	website_hide_foodprice=false;
+	if(settings = getAppSettings()){
+		if(settings.website_hide_foodprice=="yes"){
+			website_hide_foodprice=true;
+		}
+	}
+	return website_hide_foodprice;
+};
+
+var addslashes = function(str)
+{
+	return (str + '')
+    .replace(/[\\"']/g, '\\$&')
+    .replace(/\u0000/g, '\\0')
+};
+
+var addQty = function(obj){	
+	var parent = obj.parent().parent();	
+	var ons_input = parent.find("ons-input");
+	var value = ons_input.val();
+	if (empty(value)){
+		value=0;
+	}
+	if (isNaN(value)){
+		value=0;
+	}
+	ons_input.val( parseInt(value) +1 );
+};
+
+var minusQty = function(obj){
+	var parent = obj.parent().parent();	
+	var ons_input = parent.find("ons-input");
+	var value = ons_input.val();
+	if (isNaN(ons_input.val())){
+		value=0;
+	}
+	if (empty(value)){
+		value=0;
+	}
+	value = parseInt(value) - 1;
+	if (value>=1){
+		ons_input.val( value );
+	} else {
+		ons_input.val( 1 );
+	}
+};
+
+
+var addToCart = function(){
+	dump('addToCart');
+	
+	merchant_two_flavor_option='';
+	if(settings = getAppSettings()){
+		var merchant_two_flavor_option = settings.merchant_two_flavor_option;		
+	}
+	
+	
+	/*CHECK IF HAS SELECTED PRICE*/
+	var found_price = false;
+	var params_price = $( ".frm_item").serializeArray();	
+	$.each( params_price  , function( params_pricekey, params_priceval ) {
+		dump(params_priceval.name);
+		if(params_priceval.name=="price"){
+			found_price  = true;
+		}
+	});
+	
+	is_two_flavors = $(".two_flavors").val();
+		
+	if(is_two_flavors==2 || is_two_flavors=="2"){
+		/*CHECK IF HAS SELECT LEFT AND RIGHT FLAVOR*/
+		left_flavor = $(".two_flavor_position_left  input:checked").length;		
+		right_flavor = $(".two_flavor_position_right  input:checked").length;		
+		
+		if(left_flavor<=0){
+			showToast( t("Please select left flavor") );
+			return;
+		}
+		if(right_flavor<=0){
+			showToast( t("Please select right flavor") );
+			return;
+		}
+		
+		temp_left_flavor_price = $(".two_flavor_position_left  input:checked").val();
+		temp_left_flavor_price = temp_left_flavor_price.split("|");
+		left_flavor_price=0;
+		if(!empty(temp_left_flavor_price[1])){
+		   left_flavor_price = temp_left_flavor_price[1];		
+		}
+		
+		dump("left_flavor_price : "+ left_flavor_price);
+		
+		temp_right_flavor_price = $(".two_flavor_position_right  input:checked").val();
+		temp_right_flavor_price = temp_right_flavor_price.split("|");
+		right_flavor_price=0;
+		if(!empty(temp_right_flavor_price[1])){
+		   right_flavor_price = temp_right_flavor_price[1];		
+		}
+		
+		dump("right_flavor_price : "+ right_flavor_price);
+		
+		final_flavor_price = 0;
+		
+		
+		if(merchant_two_flavor_option==2){			
+			sumup = parseFloat(left_flavor_price) + parseFloat(right_flavor_price);
+			dump("sum up : "+ sumup);
+			if(sumup>0.0001){
+			   final_flavor_price = sumup/2;
+			} 
+		} else {
+			if(left_flavor_price>right_flavor_price){
+				final_flavor_price = left_flavor_price;
+			} else {
+				final_flavor_price = right_flavor_price;
+			}
+		}
+		
+		dump("final_flavor_price : "+ final_flavor_price);
+		$(".two_flavors").after('<input type="hidden" name="price" value="'+ final_flavor_price +'" >');
+		
+		found_price = true;
+	}
+
+	
+	if(!found_price){
+		showToast( t("Please select price") );
+		return;
+	}
+	/*END CHECK IF HAS SELECTED PRICE*/
+	
+	/*CHECK ADDONS IF REQUIRED*/
+	if ( $(".require_addons").exists() ){
+		$(".required_addon").remove();
+	    var addon_required_msg = '';
+		$.each( $(".require_addons")  , function( addonkey, addonval ) {
+			dump(addonval);
+			r_subcat_id = $(this).data("subcat_id");
+			r_subcat_name = $(this).data("subcat_name");
+			r_multi_option = $(this).data("multi_option");			
+			r_multi_option_val = $(this).data("multi_option_val");
+			
+			dump( "r_subcat_id :"  + r_subcat_id);
+			dump( "r_subcat_name :"  + r_subcat_name);
+			dump( "r_multi_option :"  + r_multi_option);			
+			dump( "r_multi_option_val :"  + r_multi_option_val);	
+			
+			if ( r_multi_option == "one" || r_multi_option == "multiple"  || r_multi_option == "custom" ){				
+				addon_total_selected = $(".item_addon_" + r_subcat_id +" input:checked" ).length;
+				dump( "addon_total_selected :"  + addon_total_selected);		
+				if ( addon_total_selected<=0 ){
+					 addon_err = t("You must select at least one addon for") + " " + r_subcat_name;
+					 $(this).before( '<p class="required_addon">' + addon_err + '</p>' );
+					 addon_required_msg += addon_err+"\n";
+				}
+			} else {				
+				//
+			}
+			
 		});
 		
-	} else {
-			
-		cordova.plugins.diagnostic.requestLocationAuthorization(function(status){
-		    switch(status){
-		        case cordova.plugins.diagnostic.permissionStatus.NOT_REQUESTED:
-		            toastMsg( getTrans("Permission not requested",'permission_not_requested') );
-		            return;
-		            break;
-		        case cordova.plugins.diagnostic.permissionStatus.GRANTED:
-		            //toastMsg("Permission granted");
-		            
-		            cordova.plugins.locationAccuracy.request(
-	                onRequestSuccess, onRequestFailure, cordova.plugins.locationAccuracy.REQUEST_PRIORITY_BALANCED_POWER_ACCURACY);
-		            
-		            break;
-		        case cordova.plugins.diagnostic.permissionStatus.DENIED:
-		            toastMsg( getTrans("Permission denied",'permission_denied') );
-		            return;
-		            break;
-		        case cordova.plugins.diagnostic.permissionStatus.DENIED_ALWAYS:
-		            toastMsg( getTrans("Permission permanently denied",'permission_permanently_denied') );
-		            return;
-		            break;
-		    }
-		}, function(error){
-		    toastMsg(error);
-		    return;
-		});	
-	}
-			
-}
-
-function onRequestSuccess()
-{	
-	loader.show();	
-	navigator.geolocation.getCurrentPosition(geolocationSuccess,geolocationError, 
-	 { timeout: 10000 , enableHighAccuracy: getLocationAccuracy() , maximumAge:Infinity } );		 
-}
-
-function onRequestFailure(error){    
-	//alert("Accuracy request failed: error code="+error.code+"; error message="+error.message);    
-    /*if(error.code == 4){
-    	toastMsg( getTrans("You have choosen not to turn on location accuracy",'turn_off_location') );
-    	getCurrentLocation();
-    } else {
-    	toastMsg( error.message );
-    }*/       
-    toastMsg( error.message );
-}
-
-function getCurrentLocationOld()
-{		
-	CheckGPS.check(function win(){
-    //GPS is enabled! 
-     loader.show();
-	 navigator.geolocation.getCurrentPosition(geolocationSuccess,geolocationError, 
-	 { timeout:10000 , enableHighAccuracy: getLocationAccuracy() } );	
-   },
-   function fail(){
-      //GPS is disabled!
-      var m_1= getTrans('Your GPS is disabled, this app needs to be enabled to work.','your_gps');
-      var m_2= getTrans('Use GPS for location.','use_gps_for_location');
-      var m_3= getTrans('Improve location accuracy','improve_location_accuracy');
-      var b_1= getTrans('Cancel','cancel');
-      var b_2= getTrans('Later','later');
-      var b_3= getTrans('Go','go');
-      
-      cordova.dialogGPS( m_1 ,//message
-	    m_2,//description
-	    function(buttonIndex){//callback
-	      switch(buttonIndex) {
-	        case 0: break;//cancel
-	        case 1: break;//neutro option
-	        case 2: break;//user go to configuration
-	      }
-	    },
-	      m_3+"?",//title
-	      [b_1, b_2, b_3]
-	    );//buttons
-   });	    
-}
-
-
-function geolocationSuccess(position)
-{
-	dump(position);
-	var params="lat="+position.coords.latitude;
-	params+="&lng="+position.coords.longitude;
-	
-	setStorage("device_location_lat", position.coords.latitude);
-	setStorage("device_location_lng", position.coords.longitude);
-	
-	setStorage("gps_turn", 1);
-	
-	callAjax("reverseGeoCoding",params);
-}
-
-function geolocationError(error)
-{
-	hideAllModal();
-	/*onsenAlert('code: '    + error.code    + '\n' +
-          'message: ' + error.message + '\n');*/
-	toastMsg( error.message );
-}
-
-function saveSettings()
-{	
-	setStorage("country_code_set", $(".country_code_set").val() );
-	
-	var params = $( "#frm-settings").serialize();	 
-	params+="&client_token="+getStorage("client_token");	
-	params+="&device_id="+getStorage("device_id");	
-	callAjax("saveSettings",params);	    
-}
-
-function showLocationPopUp()
-{
-	if (typeof locationDialog === "undefined" || locationDialog==null || locationDialog=="" ) { 	    
-		ons.createDialog('locationOptions.html').then(function(dialog) {
-	        dialog.show();
-	        translatePage();
-	    });	
-	} else {
-		locationDialog.show();
-		//translatePage();
-	}	
-}
-
-function displayLocations(data)
-{
-	var htm='';
-	htm+='<ons-list>';
-	htm+='<ons-list-header class="list-header trn" data-trn-key="country">Country</ons-list-header>';
-	$.each( data.list, function( key, val ) {        		  		  
-		ischecked='';
-		if ( key==data.selected){
-			ischecked='checked="checked"';
+		if(!empty(addon_required_msg)){
+			showToast(addon_required_msg);
+			return;
 		}
-		htm+='<ons-list-item modifier="tappable" onclick="setCountry('+"'"+key+"'"+');">';
-		 htm+='<label class="radio-button checkbox--list-item">';
-			htm+='<input type="radio" name="country_code" class="country_code" value="'+key+'" '+ischecked+' >';
-			htm+='<div class="radio-button__checkmark checkbox--list-item__checkmark"></div>';
-			htm+=' '+val;
-		  htm+='</label>'; 
-		htm+='</ons-list-item>';
-	});		
-	htm+='</ons-list>';	
-	createElement('location-options-list',htm);	
-	translatePage();
-}
-
-function setCountry(country_code)
-{		
-	$(".country_code_set").val(country_code);	
-	setStorage("country_code_set",country_code);
-}
-
-function addressPopup()
-{
-	removeStorage("geo_address_result_formatted_address");
-	
-	if (typeof addressDialog === "undefined" || addressDialog==null || addressDialog=="" ) { 	    
-		ons.createDialog('addressPopup.html').then(function(dialog) {
-	        dialog.show({"callback":geoCompleteChangeAddress});
-	        translatePage();
-	        translateValidationForm();	        
-	        $(".new_s").attr("placeholder",  getTrans('Enter your address','enter_your_address') );
-	    });	
-	} else {
-		addressDialog.show( {"callback":geoCompleteChangeAddress} );
-	}	
 		
-}
-
-function changeAddress()
-{	
-	$.validate({ 	
-	    form : '#frm-adddresspopup',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	        dump('change address');
-	        
-	        sNavigator.popPage({cancelIfRunning: true}); //back button
-	        
-	        setStorage("search_address", $(".new_s").val() );
-	        
-	         $(".google_formatted_address").html( $(".new_s").val() );
-	        
-			var cart_params=JSON.stringify(cart);       	  
-			if (saveCartToDb()){
-			    cart_params='';
+	}
+	/*END CHECK ADDONS IF REQUIRED*/
+	
+	
+	var params = $( ".frm_item").serialize();	
+	params+="&qty="+$(".item_qty").val();
+	params+=requestParams()+"&merchant_id="+getActiveMerchantID();
+						
+	var ajax_uri = ajax_url+"/addToCart";
+		
+	ajax_cart = $.ajax({
+	  type: "POST",
+	  url: ajax_uri,
+	  data: params,
+	  dataType: "json",
+	  timeout: ajax_timeout,
+	  crossDomain: true,
+	   beforeSend: function( xhr ) {
+	   	  clearTimeout(timer);
+	   	  
+	   	  if(ajax_cart != null) {	
+         	ajax_cart.abort();
+            clearTimeout(timer);
+         } else {         	
+         	showLoader(true);
+         	
+         	timer = setTimeout(function() {		
+         		if(ajax_cart != null) {		
+				   ajax_cart.abort();
+         		}
+         		showLoader(false);
+				showToast( t('Request taking lot of time. Please try again') );
+	        }, ajax_timeout); 
+         }
+         
+	   }
+	});	
+	
+	ajax_cart.done(function( data ) {				 
+		dump(data);
+		if (data.code==1){
+						
+			setStorage("cart_merchant_id", data.details.merchant_id );
+			
+			showToast(data.msg ,'success');
+			
+			onsenNavigator.popPage({
+			 animation :"none"	
+			});	
+			getCartCount();
+			/*REFRESH CARD*/
+			if (data.details.refresh==1){				
+				loadCart();
 			}
-		    callAjax("loadCart","merchant_id="+ getStorage('merchant_id')+"&search_address=" + 
-		    encodeURIComponent($(".new_s").val()) + "&cart="+cart_params +"&transaction_type=" +
-		    getStorage("transaction_type") + "&device_id="+ getStorage("device_id") );
-	        return false;
-	    }  
-	});		
-}
+		} else {
+			showAlert(data.msg);
+		}
+	});	
+	
+	ajax_cart.always(function( data ) {
+		showLoader(false);
+		dump("always")		
+	});
+	
+	ajax_cart.fail(function( jqXHR, textStatus ) {	
+		/*dump("failed ajax " + textStatus );
+		showToast( t("Failed") + ": " + textStatus );*/
+		$text = !empty(jqXHR.responseText)?jqXHR.responseText:'';
+    	if(textStatus!="abort"){
+    	   showToast( t("Failed") + ": " + textStatus + "\n" + jqXHR.responseText );
+    	}	
+	});
+	
+};
 
-function geoCompleteChangeAddress()
-{
-	dump( "country_code_set=>" + getStorage("country_code_set"));
-	if ( empty(getStorage("country_code_set")) ){		
-		$("#new_s").geocomplete();		
-	} else {		
-		$("#new_s").geocomplete({
-		   country: getStorage("country_code_set")
-	    });	
-	}
-	$(".pac-container").css( {"z-index":99999} );
-}
-
-function showNotificationCampaign(title,message)
-{	
+var loadCart = function(transaction_type){	
+	
+	merchant_id = getActiveMerchantID();	
 		
-    if ( $(".map_canvass").exists() ){
-		toastMsg(message);
-		return;
+	if(!empty(transaction_type)){		
+		processAjax('loadCart','transaction_type='+ transaction_type + "&merchant_id=" + merchant_id , 'GET' ,'skeleton3');
+	} else {
+		transaction_type_set = getStorage("transaction_type");		
+		if(!empty(transaction_type_set)){			
+			processAjax('loadCart','transaction_type='+ transaction_type_set + "&merchant_id="+merchant_id ,'GET','skeleton3'); 
+		} else {			
+			processAjax('loadCart','merchant_id=' + merchant_id ,'GET','skeleton3');
+		}	    
+	}
+};
+
+loadCartPull = function(){
+	
+	merchant_id = getActiveMerchantID();
+	transaction_type = $(".transaction_type").val();	
+	
+	if(!empty(transaction_type)){
+		processDynamicAjax('loadCart','transaction_type='+ transaction_type + "&merchant_id=" + merchant_id ,'dummy','GET', 1 );
+	} else {
+		transaction_type_set = getStorage("transaction_type");
+		if(!empty(transaction_type_set)){
+			processDynamicAjax('loadCart','transaction_type='+ transaction_type_set + "&merchant_id="+merchant_id ,'dummy','GET', 1  );
+		} else {
+			processDynamicAjax('loadCart','merchant_id=' + merchant_id ,'dummy','GET', 1  );
+		}	    
+	}
+};
+
+var getCartCount = function(){
+	
+	
+	var ajax_uri = ajax_url+"/getCartCount/";
+	params = "merchant_id=" + getActiveMerchantID();
+	params+=requestParams();
+	
+	transaction_type_set = getStorage("transaction_type");
+	if(!empty(transaction_type_set)){
+	   params+="&transaction_type="+transaction_type_set;
 	}
 	
-	if (typeof pushcampaignDialog === "undefined" || pushcampaignDialog==null || pushcampaignDialog=="" ) { 	    
-		ons.createDialog('pushNotificationCampaign.html').then(function(dialog) {
-			$("#page-notificationcampaign .push-title").html(title);
-	        $("#page-notificationcampaign .push-message").html(message);
-	        dialog.show();
-	    });	
-	} else {
-		$("#page-notificationcampaign .push-title").html(title);
-	    $("#page-notificationcampaign .push-message").html(message);
-		pushcampaignDialog.show();
-	}	
-}
+	cart_theme = getCartTheme();
+	
+	var ajax_cart_count = $.post(ajax_uri, params , function(data){
+		dump(data);		
+		if(cart_theme==2){		   
+		   setBasket(data.details);
+		}
+		if (data.code==1){
+			setStorage("cart_item_count", data.details.count);
+			$(".cart_count").html(data.details.count);
+			$(".tabbar__badge").html(data.details.count);
+		} else {			
+			removeStorage("cart_item_count");
+			$(".cart_count").html('');
+			$(".tabbar__badge").html('');			
+		}
+	}, "json")
+	
+	ajax_cart_count.done(function( data ) {		
+	});	
+	
+	ajax_cart_count.always(function( data ) {
+		dump("always")		
+	});
+	ajax_cart_count.fail(function( jqXHR, textStatus ) {	
+		dump("failed ajax " + textStatus );
+	});
+};
 
-function itemNotAvailable(options)
-{
-	switch (options)
-	{
-		case 1:
-		toastMsg( getTrans("item not available",'item_not_available') );
-		break;
-		
-		case 2:
-		toastMsg( getTrans("Ordering is disabled",'ordering_disabled') );
-		return;
-		
-		break;
-	}	
-}
+getActiveMerchantID = function(){
+	merchant_id = $("#restaurant_page .merchant_id").val();
+	if(empty(merchant_id)){
+		merchant_id = getStorage("cart_merchant_id");
+	}
+	return merchant_id;
+};
+
+
+var showCart = function(){
+  onsenNavigator.pushPage('cart.html',{
+  	animation : "lift"  
+  });     
+};
 
 function number_format(number, decimals, dec_point, thousands_sep) 
 {
@@ -6731,3450 +7003,1148 @@ function number_format(number, decimals, dec_point, thousands_sep)
   return s.join(dec);
 }
 
-var translator;
-var dictionary;
-
-function getLanguageSettings()
-{
-	if ( !hasConnection() ){
-		toastMsg( getTrans("Internet connection lost","net_connection_lost") );
-		return;
-	}	
-	var params="&client_token="+getStorage("client_token");
-	callAjax("getLanguageSettings",params);		
-}
-
-function translatePage()
-{
-	dump("TranslatePage");			
-	//if (getStorage("translation")!="undefined"){
-	if (typeof getStorage("translation") === "undefined" || getStorage("translation")==null || getStorage("translation")=="" ) { 	   
-		return;		
-	} else {
-		dictionary =  JSON.parse( getStorage("translation") );
-	}
-	if (!empty(dictionary)){
-		//dump(dictionary);		
-		var default_lang=getStorage("default_lang");
-		//dump(default_lang);
-		if (default_lang!="undefined" && default_lang!=""){
-			dump("INIT TRANSLATE");
-			translator = $('body').translate({lang: default_lang, t: dictionary});
-		} 
-	}		
-}
-
-function getTrans(words,words_key)
-{
-	var temp_dictionary='';
-	/*dump(words);
-	dump(words_key);	*/
-	if (getStorage("translation")!="undefined"){
-	   temp_dictionary =  JSON.parse( getStorage("translation") );
-	}
-	if (!empty(temp_dictionary)){
-		//dump(temp_dictionary);		
-		var default_lang=getStorage("default_lang");
-		//dump(default_lang);
-		if (default_lang!="undefined" && default_lang!=""){
-			//dump("OK");
-			if ( array_key_exists(words_key,temp_dictionary) ){
-				//dump('found=>' + words_key +"=>"+ temp_dictionary[words_key][default_lang]);				
-				return temp_dictionary[words_key][default_lang];
-			}
-		}
-	}	
-	return words;
-}
-
-function array_key_exists(key, search) {  
-  if (!search || (search.constructor !== Array && search.constructor !== Object)) {
-    return false;
-  }
-  return key in search;
-}
-
-function translateValidationForm()
-{
-	$.each( $(".has_validation") , function() { 
-		var validation_type = $(this).data("validation");
-		
-		switch (validation_type)
-		{
-			case "number":			
-			$(this).attr("data-validation-error-msg",getTrans("The input value was not a correct number",'validation_numeric') );
-			break;
-			
-			case "required":
-			$(this).attr("data-validation-error-msg",getTrans("this field is mandatory!",'validaton_mandatory') );
-			break;
-			
-			case "email":
-			$(this).attr("data-validation-error-msg",getTrans("You have not given a correct e-mail address!",'validation_email') );
-			break;
-		}
-		
-	});
-}
-
-function showLanguageList()
-{
-	if (typeof languageOptions === "undefined" || languageOptions==null || languageOptions=="" ) { 	    
-		ons.createDialog('languageOptions.html').then(function(dialog) {
-	        dialog.show();
-	        translatePage();
-	    });	
-	} else {
-		languageOptions.show();		
-	}	
-}
-
-function displayLanguageSelection(data)
-{
-	var selected = getStorage("default_lang");
-	dump("selected=>"+selected);	
-	var htm='';
-	htm+='<ons-list>';
-	htm+='<ons-list-header class="list-header trn" data-trn-key="language">Language</ons-list-header>';
-	$.each( data, function( key, val ) {        		  		  
-		dump(val.lang_id);
-		ischecked='';
-		if ( key==selected){
-			ischecked='checked="checked"';
-		}
-		htm+='<ons-list-item modifier="tappable" onclick="setLanguage('+"'"+key+"'"+');">';
-		 htm+='<label class="radio-button checkbox--list-item">';
-			htm+='<input type="radio" name="country_code" class="country_code" value="'+key+'" '+ischecked+' >';
-			htm+='<div class="radio-button__checkmark checkbox--list-item__checkmark"></div>';
-			htm+=' '+val;
-		  htm+='</label>'; 
-		htm+='</ons-list-item>';
-	});		
-	htm+='</ons-list>';	
-	createElement('language-options-list',htm);	
-	translatePage();
-}
-
-function setLanguage(lang_id)
-{	
-	//removeStorage("translation");
-	dump( getStorage("translation") );
-	if (typeof getStorage("translation") === "undefined" || getStorage("translation")==null || getStorage("translation")=="" ) { 	
-	   languageOptions.hide();   
-       ons.notification.confirm({
-		  message: 'Language file has not been loaded, would you like to reload?',		  
-		  title: dialog_title_default ,
-		  buttonLabels: ['Yes', 'No'],
-		  animation: 'none',
-		  primaryButtonIndex: 1,
-		  cancelable: true,
-		  callback: function(index) {
-		     if ( index==0 || index=="0"){
-		     	getLanguageSettings();		     	
-		     } 
-		  }
-		});
-		return;
-	}	
-		
-	if ( getStorage("translation").length<=5 ){	
-		onsenAlert("Translation file is not yet ready.");	
-		return;
-	}
-	
-	if ( !empty(lang_id) ){	   
-	   setStorage("default_lang",lang_id);
-	   if ( !empty(translator)){
-	       translator.lang(lang_id);
-	   } else {
-	   	   translator = $('body').translate({lang: lang_id, t: dictionary});
-	   }	   
-	}
-}
-
-function applyVoucher()
-{
-	
-	if ( checkIfhasOfferDiscount() ){
-		return false;
-	}
-	
-	voucher_code = $(".voucher_code").val();
-	if ( voucher_code!="" ){
-		var params="voucher_code="+ voucher_code;        
-		params+="&client_token="+getStorage("client_token");
-		params+="&merchant_id="+ getStorage("merchant_id");
-		
-		params+="&cart_sub_total="+ getStorage("cart_sub_total");
-		
-		transaction_type=getStorage("transaction_type");		
-		params+="&transaction_type=" + getStorage("transaction_type");
-		if ( transaction_type=="delivery"){
-		   params+="&cart_delivery_charges="+ getStorage("cart_delivery_charges");
-		}
-		
-		params+="&cart_packaging="+ getStorage("cart_packaging");
-		params+="&cart_tax="+ getStorage("cart_tax");
-		params+="&pts_redeem_amount="+ $(".pts_redeem_amount").val();
-		
-		if ( empty(getStorage("tips_percentage")) ){
-	       setStorage("tips_percentage",0);
-	    }
-	    params+="&tips_percentage=" + getStorage("tips_percentage");	    
-		
-        callAjax("applyVoucher",params);	 
-	} else {
-		onsenAlert(  getTrans('invalid voucher code','invalid_voucher_code') );
-	}
-}
-
-function removeVoucher()
-{
-	$(".voucher_amount").val( '' );
-    $(".voucher_type").val( '' );
-    $(".voucher_code").val('');
-   
-    $(".apply-voucher").show();
-    $(".remove-voucher").hide();
-    
-    $(".voucher-header").html( getTrans("Voucher",'voucher') );
-    
-    $(".total-amount").html( prettyPrice(getStorage("order_total_raw")) );
-}
-
-function deviceBackReceipt()
-{
-	return false;
-}
-
 function prettyPrice( price )
 {
-	dump(price);
-	
-	var decimal_place = getStorage("decimal_place");		
-	var currency_position= getStorage("currency_position");
-	var currency_symbol = getStorage("currency_set");
-	var thousand_separator = getStorage("thousand_separator");
-	var decimal_separator = getStorage("decimal_separator");	
-			
-	dump("decimal_place=>"+decimal_place);	
+				
+	if(settings = getAppSettings()){  	
+		var decimal_place = settings.currency_decimal_place;		
+		var currency_position= settings.currency_position;
+		var currency_symbol = settings.currency_symbol;
+		var thousand_separator = settings.currency_thousand_separator;
+		var decimal_separator = settings.currency_decimal_separator;
+		var currency_space = settings.currency_space;
+    } else {
+    	var decimal_place = 2;		
+		var currency_position= "left";
+		var currency_symbol = "$";
+		var thousand_separator = ",";
+		var decimal_separator = ".";
+		var currency_space = '';	
+    }   	  	
+        
+	/*dump("decimal_place=>"+decimal_place);	
 	dump("currency_symbol=>"+currency_symbol);
 	dump("thousand_separator=>"+thousand_separator);
 	dump("decimal_separator=>"+decimal_separator);
-	dump("currency_position=>"+currency_position);
-		
-	price = number_format(price,decimal_place, decimal_separator ,  thousand_separator ) ;
+	dump("currency_position=>"+currency_position);*/
+			
+	price = number_format(price, decimal_place, decimal_separator ,  thousand_separator ) ;
+	spacer ="";
+	if(currency_space==1){
+		spacer =" ";
+	}
 	
 	if ( currency_position =="left"){
-		return currency_symbol+""+price;
+		return currency_symbol+spacer+price;
 	} else {
-		return price+""+currency_symbol;
+		return price+spacer+currency_symbol;
 	}
 }
 
-function showExpirationMonth()
-{
-	if (typeof ExpirationMonthDialog === "undefined" || ExpirationMonthDialog==null || ExpirationMonthDialog=="" ) { 	    
-		ons.createDialog('ExpirationMonth.html').then(function(dialog) {
-	        dialog.show();
-	        translatePage();
-	    });	
-	} else {
-		ExpirationMonthDialog.show();
-		//translatePage();
-	}	
-}
-
-function fillExpirationMonth()
-{
-	var htm='';
-	htm+='<ons-list>';
-	htm+='<ons-list-header class="list-header trn" data-trn-key="expiration_month">Expiration Month</ons-list-header>';
-	for (i = 1; i < 13; i++) { 
-		if (i<=9){
-			i="0"+i;
+var removeCartItem = function(row){			
+    ons.platform.select('ios');  
+    ons.notification.confirm( t("Are you sure you want to remove this item in your cart?") ,{
+		title: t("Remove From Cart?"),
+		id : "dialog_remove_item",
+		buttonLabels : [ t("Remove"), t("Cancel") ]
+	}).then(function(input) {
+		if (input==0){			
+			processDynamicAjax('removeCartItem', 'row=' + row,'temp_loader');
 		}
-
-		htm+='<ons-list-item modifier="tappable" onclick="setExpirationMonth('+"'"+i+"'"+');">';
-		 htm+='<label class="radio-button checkbox--list-item">';
-			htm+='<input type="radio" name="expiration_m" class="expiration_m" value="'+i+'"  >';
-			htm+='<div class="radio-button__checkmark checkbox--list-item__checkmark"></div>';
-			htm+=' '+i;
-		  htm+='</label>'; 
-		htm+='</ons-list-item>';
-	}
-	htm+='</ons-list>';	
-	createElement('expiration-options-list',htm);	
-	translatePage();
-}
-
-function setExpirationMonth(month)
-{	
-	$(".expiration_month").val( month );
-	$(".expiration_month_label").html( month );
-	ExpirationMonthDialog.hide();
-}
-
-function showExpirationYear()
-{
-	if (typeof showExpirationYearDialog === "undefined" || showExpirationYearDialog==null || showExpirationYearDialog=="" ) { 	    
-		ons.createDialog('showExpirationYearDialog.html').then(function(dialog) {
-	        dialog.show();
-	        translatePage();
-	    });	
-	} else {
-		showExpirationYearDialog.show();
-	}	
-}
-
-function fillExpirationYear()
-{
-	var d = new Date();
-    var current_year = d.getFullYear(); 
-    
-	var htm='';
-	htm+='<ons-list>';
-	htm+='<ons-list-header class="list-header trn" data-trn-key="expiration_year">Expiration Year</ons-list-header>';
-	for (i = 0; i < 15; i++) { 
-		
-		years = parseInt(current_year)+i;
-		
-		htm+='<ons-list-item modifier="tappable" onclick="setExpirationYear('+"'"+years+"'"+');">';
-		 htm+='<label class="radio-button checkbox--list-item">';
-			htm+='<input type="radio" name="expiration_m" class="expiration_m" value="'+years+'"  >';
-			htm+='<div class="radio-button__checkmark checkbox--list-item__checkmark"></div>';
-			htm+=' '+years;
-		  htm+='</label>'; 
-		htm+='</ons-list-item>';
-	}
-	htm+='</ons-list>';	
-	createElement('expiration-year-options-list',htm);	
-	translatePage();
-}
-
-function setExpirationYear(year_value)
-{
-	dump(year_value);
-	$(".expiration_yr").val( year_value );	
-	$(".expiration_year").html( year_value );
-	showExpirationYearDialog.hide();
-}
-
-function showCountry()
-{
-	if (typeof showCountryDialog === "undefined" || showCountryDialog==null || showCountryDialog=="" ) { 	    
-		ons.createDialog('showCountryDialog.html').then(function(dialog) {
-	        dialog.show();
-	        translatePage();
-	    });	
-	} else {
-		showCountryDialog.show();
-	}	
-}
-
-function fillCountryList()
-{
-	var htm='';
-	htm+='<ons-list>';
-	htm+='<ons-list-header class="list-header trn" data-trn-key="expiration_year">Expiration Year</ons-list-header>';
-	$.each( country_json_list , function( key, val ) {   
-		htm+='<ons-list-item modifier="tappable" onclick="setCardCountry('+"'"+val.code+"'"+');">';
-		 htm+='<label class="radio-button checkbox--list-item">';
-			htm+='<input type="radio" name="expiration_m" class="expiration_m" value="'+val.code+'"  >';
-			htm+='<div class="radio-button__checkmark checkbox--list-item__checkmark"></div>';
-			htm+=' '+val.name;
-		  htm+='</label>'; 
-		htm+='</ons-list-item>';
 	});
-	htm+='</ons-list>';	
-	createElement('country-options-list',htm);	
-}
+};
 
-function setCardCountry(country_code)
-{
-	$(".x_country").val( country_code );
-	$(".country_label").html( country_code );
-	showCountryDialog.hide();
-}
 
-function atzPayNow()
-{
-    $.validate({ 	
-	    form : '#frm-atz',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	       var params = $( "#frm-atz").serialize();
-	       params+="&client_token="+getStorage("client_token");
-	       params+="&merchant_id="+ getStorage("merchant_id");
-	       /*pts*/
-	       params+="&earned_points="+ getStorage('earned_points');	       
-	       callAjax("PayAtz",params);	       
-	       return false;
-	    }  
+confirmClearCart = function(){
+  ons.platform.select('ios');  
+  ons.notification.confirm( t("Are you sure you want to remove all items in your cart?") ,{
+		title: t("Clear cart?"),
+		id : "dialog_cancel_order",
+		buttonLabels : [ t("Ok"), t("Cancel") ]
+	}).then(function(input) {
+		if (input==0){			
+			processAjax("clearCart",'');
+			removeStorage("delivery_asap_enabled");
+		}
 	});
-}
+};
 
-function stripePayNow()
-{
-	var stripe_publish_key = getStorage('stripe_publish_key');
-	dump(stripe_publish_key);
-	 $.validate({ 	
-	    form : '#frm-stp',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() { 
-	    	
-	       loader.show();
-	    	
-	       var cards = $(".cc_number").val();       
-	       var cvv = $(".cvv").val();  
-	       var expiration_month = $(".expiration_month").val();  
-	       var expiration_yr = $(".expiration_yr").val(); 
-	            
-	       Stripe.setPublishableKey(stripe_publish_key);
-	       Stripe.card.createToken({
-			  number: cards ,
-			  cvc: cvv,
-			  exp_month: expiration_month ,
-			  exp_year: expiration_yr
-		   }, stripeResponseHandler);	
-		   
-	       return false;
-	    }  
-	});
-}
-
-function stripeResponseHandler(status, response)
-{
-	dump('stripe response');
-	dump(status);
-	dump(response);
-	if (response.error) {
-		hideAllModal();
-	 	onsenAlert( response.error.message );
-	} else {
-		$(".stripe_token").val( response.id );
-		
-	    var params = $( "#frm-stp").serialize();
-        params+="&client_token="+getStorage("client_token");
-        params+="&merchant_id="+ getStorage("merchant_id");
-        callAjax("PayStp",params);	       
-	}
-}
-
-function autoAddToCart(item_id,price,discount,category_id)
-{
-		
-    if ( $("#close_store").val()==2 || $("#merchant_open").val()==1 ){
-		onsenAlert( getTrans("This Restaurant Is Closed Now.  Please Check The Opening Times",'restaurant_close') );
-		return;
-	}
-	
-	dump(item_id);
-	dump(price);
-    cart[cart.length]={		  
-	  "item_id":item_id,
-	  "qty":1,
-	  "price":price,
-	  "sub_item":[],
-	  "cooking_ref":[],
-	  "ingredients":[],
-	  'order_notes': '',
-	  'discount':discount,
-	  'category_id':category_id  //cart category
-	};
-	dump(cart);
-	
-	var cart_value={		  
-	  "item_id":item_id,
-	  "qty":1,
-	  "price":price,
-	  "sub_item":[],
-	  "cooking_ref":[],
-	  "ingredients":[],
-	  'order_notes': '',
-	  'discount':discount,
-	  'category_id':category_id  //cart category
-	};
-
-	
-	if(saveCartToDb()){
-		callAjax("addToCart", "cart="+ JSON.stringify(cart_value) + "&device_id=" + getStorage("device_id") );		
-	} else {		
-	    //sNavigator.popPage({cancelIfRunning: true}); //back button
-	    toastMsg(  getTrans("Item added to cart",'item_added_to_cart') );
-	}
-	showCartNosOrder();
-}
-
-function validateCLient()
-{
-	$.validate({ 	
-	    form : '#frm-signup-validation',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	       var params = $( "#frm-signup-validation").serialize();	       
-	       callAjax("validateCLient",params);	       
-	       return false;
-	    }  
-	});
-}
-
-function detailsPTS(pts_type)
-{
-	dump(pts_type);
-	var options = {
-      animation: 'slide',
-      onTransitionEnd: function() {
-      	   callAjax('detailsPTS',
-		    "client_token="+getStorage("client_token")+"&pts_type="+pts_type
-		   );
-      } 
-    };
-    sNavigator.pushPage("detailsPTS.html", options);		
-}
-
-function displayPTSdetails(data)
-{
-	if (data.length>0){
-		var htm='<ons-list class="list-dim-text">';
-		$.each( data, function( key, val ) {   
-		     htm+='<ons-list-item  class="list-item-container" >';
-	           htm+='<ons-row class="row">';
-	              htm+='<ons-col width="100px" >';
-	                htm+=val.date_created;
-	              htm+='</ons-col>';
-	              htm+='<ons-col >';
-	                 htm+=val.label;
-	              htm+='</ons-col>';
-	              htm+='<ons-col width="20px" >';
-	                 htm+=val.points;
-	              htm+='</ons-col>';
-	           htm+='</ons-row>';
-	         htm+='</ons-list-item>';
-		});
-		htm+='</ons-list>';
-		createElement('scroller-pts-details',htm);	
-	}
-}
-
-function applyRedeem()
-{
-	
-	/*if ( checkIfhasOfferDiscount() ){
-		return false;
-	}*/
-	
-	/*pts*/
-	redeem_points = $(".redeem_points").val();
-	if ( redeem_points!="" ){
-		var params="redeem_points="+ redeem_points;        
-		params+="&client_token="+getStorage("client_token");
-		params+="&merchant_id="+ getStorage("merchant_id");
-		params+="&voucher_amount="+ $(".voucher_amount").val();
-		params+="&subtotal_order="+ getStorage("cart_sub_total");
-		
-		params+="&cart_sub_total="+ getStorage("cart_sub_total");
-		params+="&cart_delivery_charges="+ getStorage("cart_delivery_charges");
-		params+="&cart_packaging="+ getStorage("cart_packaging");
-		//params+="&cart_tax_amount="+ getStorage("cart_tax_amount");
-		params+="&cart_tax="+ getStorage("cart_tax");
-		
-		if ( empty(getStorage("tips_percentage")) ){
-	       setStorage("tips_percentage",0);
-	    }
-	    params+="&tips_percentage=" + getStorage("tips_percentage");
-	
-        callAjax("applyRedeemPoints",params);	 
-	} else {
-		onsenAlert(  getTrans('invalid redeem points','invalid_redeem_points') );
-	}
-}
-
-function cancelRedeem()
-{
-	$(".pts_redeem_points").val( '' );
-    $(".pts_redeem_amount").val( '' );
-    $(".pts_pts").show();
-    $(".pts_pts_cancel").hide();
-    $(".total-amount").html( prettyPrice(getStorage("order_total_raw")) );
-}
-
-function backtoHome()
-{
-	var options = {     	  		  
-  	  closeMenu:true,
-      animation: 'slide'	    
-   };	   	   	   
-   menu.setMainPage('home.html',options);
-}
-
-function exitKApp()
-{
-	ons.notification.confirm({
-	  message: getTrans('Are you sure to close the app?','close_app') ,	  
-	  title: dialog_title_default ,
-	  buttonLabels: [ getTrans('Yes','yes') ,  getTrans('No','no') ],
-	  animation: 'default', // or 'none'
-	  primaryButtonIndex: 1,
-	  cancelable: true,
-	  callback: function(index) {
-	  	   //alert(index);
-	  	   // -1: Cancel
-           // 0-: Button index from the left           
-	  	   if (index==0){	  	   	      	   	  
-				if (navigator.app) {
-				   navigator.app.exitApp();
-				} else if (navigator.device) {
-				   navigator.device.exitApp();
-				} else {
-				   window.close();
-				}
-	  	   }
-	  }
-	});
-}
-
-function imageLoaded(div_id)
-{	
-	$(div_id).imagesLoaded()
-	  .always( function( instance ) {
-	    //console.log('all images loaded');
-	  })
-	  .done( function( instance ) {
-	    //console.log('all images successfully loaded');
-	  })
-	  .fail( function() {
-	    console.log('all images loaded, at least one is broken');
-	  })
-	  .progress( function( instance, image ) {
-	    var result = image.isLoaded ? 'loaded' : 'broken';	    	   
-	    image.img.parentNode.className = image.isLoaded ? '' : 'is-broken';
-	    //console.log( 'image is ' + result + ' for ' + image.img.src );	    
-	});
-}
-
-$( document ).on( "keyup", ".limit_char", function() {
-	  var limit=$(this).data("maxl");
-	  limit=parseInt(limit);	  
-	  limitText(this,limit);
-});
-
-function limitText(field, maxChar){
-    var ref = $(field),
-        val = ref.val();
-    if ( val.length >= maxChar ){
-        ref.val(function() {
-            //console.log(val.substr(0, maxChar))
-            return val.substr(0, maxChar);       
-        });
-    }
-}
-
-function toastMsg( message )
-{		
-	if (isDebug()){		
-		onsenAlert( message );
-		return ;
-	}
-	 
-   /* window.plugins.toast.showWithOptions(
-    {
-      message: message ,
-      duration: "long",
-      position: "bottom",
-      addPixelsY: -40 
-    },
-      toastOnSuccess, 
-      toastOnError  
-    );*/
-   
-    window.plugins.toast.showWithOptions(
-      {
-        message: message ,
-        duration: "long",
-        position: "bottom",
-        addPixelsY: -40 
-      },
-      function(args) {
-      	
-      },
-      function(error) {
-      	onsenAlert( message );
-      }
-    );
-}
-
-function isDebug()
-{	
-	var debug = krms_config.debug;
-	if(debug){
-		return true;
-	}
-	return false;
-}
-
-var rzr_successCallback = function(payment_id) {
-  //alert('payment_id: ' + payment_id)
-    var params="payment_id="+payment_id;
-	params+="&order_id="+ getStorage("order_id");
-	params+="&client_token="+ getStorage("client_token");	
-	callAjax("razorPaymentSuccessfull",params);	  
-}
-
-var rzr_cancelCallback = function(error) {
-  onsenAlert(error.description + ' (Error '+error.code+')')
-}
+hideDialog = function(id) {
+  document.getElementById(id).hide();
+};
 
 
-function showEasyCategory(element)
-{
-	
-	if (typeof myPopover === "undefined" || myPopover==null || myPopover=="" ) { 	    		
-		ons.createPopover('popover.html').then(function(popover) {	
-		   popover.show(element,{
-		   	 animation:"none"
-		   });	   
-		   createElement("category-pop-over-list", easy_category_list );
-	    });	    
-	} else {				
-		myPopover.show(element);		
-		myPopover.on("postshow", function(e) {	
-			createElement("category-pop-over-list", easy_category_list );
-		});
-	}
-	      
-}
+clearCart = function(){
+	hideDialog('clear_cart_dialog'); 
+	processAjax("clearCart",'');
+	removeStorage("delivery_asap_enabled");
+};
 
-
-function fillPopOverCategoryList(data)
-{		
-	var html='<ons-scroller class="category_popup_scroller">';
-	
-	html+='<ons-list>';
-	if( data.length>0){
-	   $.each( data, function( key, val ) {     
-	   	  html+='<ons-list-item modifier="tappable" onclick="loadmenu('+
-             val.category_id+','+val.merchant_id+');"  >'+val.category_name+'</ons-list-item>';
-	   });	
-	}	
-	html+='</ons-list>';
-	
-	html+='</ons-scroller>';
-	
-	dump(html);		
-	easy_category_list=html;
-}
-
-function loadmenu2(cat_id,mtid)
-{
-	callAjax("getItemByCategory","cat_id="+cat_id+"&merchant_id="+mtid);	
-	myPopover.hide();
-}
-
-function showMenu(element)
-{
-	if (typeof merhantPopOverMenu === "undefined" || merhantPopOverMenu==null || merhantPopOverMenu=="" ) { 	    		
-		ons.createPopover('merchantmenu.html').then(function(popover) {	
-		   popover.show(element,{
-		   	 animation:"none"
-		   });	   		   
-		   
-		   enabled_table_booking = getStorage('enabled_table_booking');	    
-		    if(enabled_table_booking==2){
-		    	$(".book_table_menu").show();
-		    } else $(".book_table_menu").hide();
-		    
-		    translatePage();
-		    
-	    });	    	    	    
-	} else {						
-		merhantPopOverMenu.show(element);				
-		
-		merhantPopOverMenu.on("preshow", function(e) {	
-			enabled_table_booking = getStorage('enabled_table_booking');	    
-		    if(enabled_table_booking==2){
-		    	$(".book_table_menu").show();
-		    } else $(".book_table_menu").hide();
-		});				
-		
-		translatePage();
-	}
-}
-
-function loadPageMerchantInfo()
-{
-	var options = {
-      animation: 'none',
-      onTransitionEnd: function() { 	 	      	  
-      	  displayMerchantLogo2( 
-	      	     getStorage("merchant_logo") ,
-	      	     '' ,
-	      	     'page-merchantinfo'
-	      );	  		      
-	      callAjax("getMerchantInfo","merchant_id="+ getStorage('merchant_id'));  		      
-      } 
-    };  
-    sNavigator.pushPage("merchantInfo.html", options);	   
-    
-    if (typeof merhantPopOverMenu === "undefined" || merhantPopOverMenu==null || merhantPopOverMenu=="" ) {	     
+var showTransactionList = function(){
+    var dialog = document.getElementById('dialog_transaction_type');   
+     if (dialog) {
+     	 dialog.show();
     } else {
-       merhantPopOverMenu.hide(); 
+       ons.createElement('dialog_transaction_type.html', { append: true }).then(function(dialog) {
+        dialog.show();
+      });
     }
-}
+};
 
-function loadBookingForm1()
-{
-	if (typeof merhantPopOverMenu === "undefined" || merhantPopOverMenu==null || merhantPopOverMenu=="" ) {	     
-	} else {
-	   merhantPopOverMenu.hide(); 
-	}
-	loadBookingForm();
-}
 
-function loadMoreReviews1()
-{
+var setFieldValue = function(class_name, value , label ){
 	
-	if (typeof merhantPopOverMenu === "undefined" || merhantPopOverMenu==null || merhantPopOverMenu=="" ) {	     
-	} else {
-		merhantPopOverMenu.hide(); 
-	}
-	loadMoreReviews();
-}
-
-function loadMap(map_type)
-{
+	$("."+ class_name).val( value );
 	
-	if (typeof merhantPopOverMenu === "undefined" || merhantPopOverMenu==null || merhantPopOverMenu=="" ) {	     
-	} else {
-	   merhantPopOverMenu.hide(); 
-	}
-		
-	var options = {
-      animation: 'none',
-      'map_type': map_type,      
-    };  
-    sNavigator.pushPage("map.html", options);	   
-}
-
-function checkGPS(map_type)
-{					 
-	 if (isDebug()){
-	 	//viewTaskMapInit();
-	 	initMap(map_type);
-		return ;
-	 }
-	 
- 	if ( device.platform =="iOS"){		
- 		 		
- 		cordova.plugins.diagnostic.isLocationAuthorized(function(authorized){		
- 			 
- 			if(authorized){
- 				cordova.plugins.locationAccuracy.request( onRequestSuccessMap, 
-                onRequestFailureMap, cordova.plugins.locationAccuracy.REQUEST_PRIORITY_BALANCED_POWER_ACCURACY);
- 			} else {
-			 	 cordova.plugins.diagnostic.requestLocationAuthorization(function(status){
-				    switch(status){
-				        case cordova.plugins.diagnostic.permissionStatus.NOT_REQUESTED:
-				            toastMsg( getTrans("Permission not requested",'permission_not_requested') );
-				            return;
-				            break;
-				        case cordova.plugins.diagnostic.permissionStatus.DENIED:
-				            toastMsg( getTrans("Permission denied",'permission_denied') );
-				            return;
-				            break;
-				        case cordova.plugins.diagnostic.permissionStatus.GRANTED:
-				            //toastMsg("Permission granted always");		 
-				            
-				            cordova.plugins.locationAccuracy.request( onRequestSuccessMap, 
-			                onRequestFailureMap, cordova.plugins.locationAccuracy.REQUEST_PRIORITY_BALANCED_POWER_ACCURACY);
-				                       
-				            break;
-				        case cordova.plugins.diagnostic.permissionStatus.GRANTED_WHEN_IN_USE:
-				            //toastMsg("Permission granted only when in use");		            		            
-				            
-				            cordova.plugins.locationAccuracy.request( onRequestSuccessMap, 
-			                onRequestFailureMap, cordova.plugins.locationAccuracy.REQUEST_PRIORITY_BALANCED_POWER_ACCURACY);
-			                
-				            break;
-				    }
-				}, function(error){
-				    toastMsg(error);
-				    return;
-				}, cordova.plugins.diagnostic.locationAuthorizationMode.ALWAYS);				
- 			}
-		
-		}, function(error){
-		   toastMsg("The following error occurred: "+error);
-		});
-		
-	} else {
-			
-		cordova.plugins.diagnostic.requestLocationAuthorization(function(status){
-		    switch(status){
-		        case cordova.plugins.diagnostic.permissionStatus.NOT_REQUESTED:
-		            toastMsg( getTrans("Permission not requested",'permission_not_requested') );
-		            return;
-		            break;
-		        case cordova.plugins.diagnostic.permissionStatus.GRANTED:
-		            //toastMsg("Permission granted");
-		            
-		            cordova.plugins.locationAccuracy.request( onRequestSuccessMap, 
-	                onRequestFailureMap, cordova.plugins.locationAccuracy.REQUEST_PRIORITY_BALANCED_POWER_ACCURACY);
-		            
-		            break;
-		        case cordova.plugins.diagnostic.permissionStatus.DENIED:
-		            toastMsg( getTrans("Permission denied",'permission_denied') );
-		            return;
-		            break;
-		        case cordova.plugins.diagnostic.permissionStatus.DENIED_ALWAYS:
-		            toastMsg( getTrans("Permission permanently denied",'permission_permanently_denied') );
-		            return;
-		            break;
-		    }
-		}, function(error){
-		    toastMsg(error);
-		    return;
-		});	
-	}
-}
-
-function onRequestSuccessMap(success){
-    //alert("Successfully requested accuracy: "+success.message);    
-    //viewTaskMapInit();
-    initMap( $(".map_type").val() );
-}
-
-function onRequestFailureMap(error){
-    //alert("Accuracy request failed: error code="+error.code+"; error message="+error.message);    
-    if(error.code == 4){
-    	toastMsg( getTrans("You have choosen not to turn on location accuracy",'turn_off_location') );
-    	checkGPS();
-    } else {
-    	toastMsg( error.message );
-    }
-}
-
-
-function viewTaskMapInit()
-{
-	
-	if(isDebug()){
-		return;
-	}
-	
-	loader.show();
-	
-	merchant_latitude = getStorage("merchant_latitude");
-	merchant_longtitude = getStorage("merchant_longtitude");
-	
-	/*alert('viewTaskMapInit');	
-	alert( merchant_latitude );
-	alert( merchant_longtitude );	*/
-	
-	google_lat = new plugin.google.maps.LatLng( merchant_latitude , merchant_longtitude );
-	
-	setTimeout(function(){ 	    
-        var div = document.getElementById("map_canvas_div");
-        $('#map_canvas_div').css('height', $(window).height() - $('#map_canvas_div').offset().top);
-        
-        map = plugin.google.maps.Map.getMap(div, {     
-	     'camera': {
-	      'latLng': google_lat,
-	      'zoom': 17
-	     }
-	    });
-        map.setBackgroundColor('white');        
-        
-        map.on(plugin.google.maps.event.MAP_READY, onMapInit); 
-        
-    }, 500); // and timeout for clear transitions    
-}
-
-function onMapInit()
-{
-			
-	merchant_latitude = getStorage("merchant_latitude");
-	merchant_longtitude = getStorage("merchant_longtitude");
-	delivery_address = getStorage("merchant_address");
-	
-	var GOOGLE = new plugin.google.maps.LatLng( merchant_latitude , merchant_longtitude);
-	
-	map.clear();	
-	map.off();
-	map.setCenter(GOOGLE);
-	map.setZoom(17);
-					
-    map.addMarker({
-	  'position': new plugin.google.maps.LatLng( merchant_latitude , merchant_longtitude ),	  
-	  'title': delivery_address ,
-	  'snippet': getTrans( "Destination" ,'destination'),
-	  'icon': {
-	    'url': getStorage("destination_icon")
-	   }			  				  
-     }, function(marker) {
-     	
-     	marker.showInfoWindow();
-     	     	
-     	navigator.geolocation.getCurrentPosition( function(position) {	    
-	    	     		
-	    	 var your_location = new plugin.google.maps.LatLng(position.coords.latitude , position.coords.longitude); 	
-	    	 	    	 
-	    	 var destination = new plugin.google.maps.LatLng( merchant_latitude , merchant_longtitude );
-	    	 	    	 
-	    	 if ( iOSeleven() ){	    	 	
-	    	 	 map.animateCamera({
-				  'target': your_location,
-				  'zoom': 17,
-				  'tilt': 30
-					}, function() {
-						
-					   var data = [      
-				          {
-				            'title': getTrans('You are here','you_are_here'), 
-				            'position': your_location ,
-				            'icon': {
-							    'url': getStorage("from_icon")
-							  }			  				  
-				          }  
-				       ];
-				       
-				       hideAllModal();
-				   
-					   addMarkers(data, function(markers) {
-					    markers[markers.length - 1].showInfoWindow();
-					   });
-						
-				   });  
-	    	 	
-	    	 } else {	    	      
-		    	  map.addPolyline({
-				    points: [
-				      destination,
-				      your_location
-				    ],
-				    'color' : '#AA00FF',
-				    'width': 10,
-				    'geodesic': true
-				   }, function(polyline) {
-				   	
-				   	  
-				   	  map.animateCamera({
-						  'target': your_location,
-						  'zoom': 17,
-						  'tilt': 30
-						}, function() {
-							
-						   var data = [      
-					          {
-					            'title': getTrans('You are here','you_are_here'), 
-					            'position': your_location ,
-					            'icon': {
-								    'url': getStorage("from_icon")
-								  }			  				  
-					          }  
-					       ];
-					       
-					       hideAllModal();
-					   
-						   addMarkers(data, function(markers) {
-						    markers[markers.length - 1].showInfoWindow();
-						   });
-							
-					   });  
-					   
-				   });   
-		    	 // end polyline
-	    	 }
-	    	 
-	      }, function(error){
-	      	 hideAllModal();
-	    	 toastMsg( error.message );
-	    	 // end position error
-	      }, 
-          { timeout: 10000, enableHighAccuracy : getLocationAccuracy() } 
-        );	    	  
-     	
-     });     
-}
-
-function addMarkers(data, callback) {
-  var markers = [];
-  function onMarkerAdded(marker) {
-    markers.push(marker);
-    if (markers.length === data.length) {
-      callback(markers);
-    }
-  }
-  data.forEach(function(markerOptions) {
-    map.addMarker(markerOptions, onMarkerAdded);
-  });
-}
-
-
-function getLocationAccuracy()
-{
-	/*var networkState = navigator.connection.type;		
-	switch (networkState)
+	switch (class_name)
 	{
-		case "Connection.WIFI":
-		case "wifi":
-		return false;
+		case "transaction_type":
+		  setStorage("transaction_type", value);
+		  $(".transaction_type_label").html( label );
+		  var dialog = document.getElementById('dialog_transaction_type');
+		  dialog.hide();
+		  loadCart(value);
 		break;
 		
-		default:
-		return true;
-		break;
-	}*/
-	
-	location_accuracy = getStorage("location_accuracy");
-	if (location_accuracy=="true"){
-		return true;
-	}
-	return false;
-}
-
-function viewTaskDirection()
-{
-	merchant_latitude = getStorage("merchant_latitude");
-	merchant_longtitude = getStorage("merchant_longtitude");
-	
-	navigator.geolocation.getCurrentPosition( function(position) {	    
-   	         
-         var your_location = new plugin.google.maps.LatLng(position.coords.latitude , position.coords.longitude); 	        
-         //demo
-         //var yourLocation = new plugin.google.maps.LatLng(34.039413 , -118.25480649999997); 	        
-         
-         var destination_location = new plugin.google.maps.LatLng(merchant_latitude , merchant_longtitude); 	        
-         
-         plugin.google.maps.external.launchNavigation({
-	         "from": your_location,
-	         "to": destination_location
-	      });	
-
-    	 // end position success    	 
-      }, function(error){
-    	 toastMsg( error.message );
-    	 // end position error
-      }, 
-      { timeout: 10000, enableHighAccuracy : getLocationAccuracy() } 
-    );	    	  		
-	
-}
-
-function initIntelInputs()
-{
-	 var mobile_country_code=getStorage("mobile_country_code");
-	 dump(mobile_country_code);
-	 if(!empty(mobile_country_code)){
-	 	 $(".mobile_inputs").intlTelInput({      
-		    autoPlaceholder: false,		      
-		    defaultCountry: mobile_country_code,  
-		    autoHideDialCode:true,    
-		    nationalMode:false,
-		    autoFormat:false,
-		    utilsScript: "lib/intel/lib/libphonenumber/build/utils.js"
-		 });
-	 } else {
-		 $(".mobile_inputs").intlTelInput({      
-		    autoPlaceholder: false,		        
-		    autoHideDialCode:true,    
-		    nationalMode:false,
-		    autoFormat:false,
-		    utilsScript: "lib/intel/lib/libphonenumber/build/utils.js"
-		 });
-	 }
-}
-
-function showVerifyAccountPage()
-{
-	 var options = {
-	      animation: 'slide',
-	      onTransitionEnd: function() {	      	  
-	      } 
-	  }; 
-	  sNavigator.pushPage("verify-account.html", options);
-}
-
-function verifyAccount()
-{
-	$.validate({ 	
-	    form : '#frm-verify-account',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	      var params = $( "#frm-verify-account").serialize();	      	      
-	      callAjax("verifyAccount",params);	       
-	      return false;
-	    }  
-	});
-}
-
-function checkIfhasOfferDiscount()
-{
-	var has_discount = getStorage("has_discount");	
-	if(!empty(has_discount)){
-		if(has_discount==1){
-		   onsenAlert(  getTrans('you request cannot be applied you have offer discount already','discount_offer') );
-		   return true;
-		}
-	}
-	return false;
-}
-
-function showPageAdressSelection()
-{
-	var options = {
-      animation: 'none',
-      onTransitionEnd: function() {         	   	 
-      } 
-   };   
-   sNavigator.pushPage("address-selection.html", options);
-}
-
-function showManualAddressInput()
-{
-	$(".manual-address-input").toggle();
-}
-
-function setManualAddress()
-{
-	$.validate({ 	
-	    form : '#frm-manual-address',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	       $(".street").val( $(".stree_1").val()  );	
-	       $(".city").val( $(".city_1").val()  );	
-	       $(".state").val( $(".state_1").val()  );	
-	       $(".zipcode").val( $(".zipcode_1").val()  );		
-	       
-	       var complete_address = $(".stree_1").val();
-	       complete_address+=" "+ $(".city_1").val();
-	       complete_address+=" "+ $(".state_1").val();
-	       complete_address+=" "+ $(".zipcode_1").val();	       
-	       
-           $(".google_lat").val( '' );	
-		   $(".google_lng").val( '' );	
-		   $(".formatted_address").val( '' );			
-	       
-	       $(".delivery-address-text").html( complete_address );       
-	       sNavigator.popPage({cancelIfRunning: true});    
-	       return false;
-	    }  
-	});
-}
-
-function showMapAddress(map_address_action)
-{
-	setStorage("map_address_action",map_address_action)
-	
-	var options = {
-      animation: 'none',
-      map_address_action: map_address_action
-      /*onTransitionEnd: function() {       	 
-      	 checkGPS_AddressMap();
-      } */
-    };   
-    sNavigator.pushPage("address-bymap.html", options);		
-}
-
-
-function checkGPS_AddressMap()
-{
-	//puta
-	
-	$('#map_canvas_address').css('height', $(window).height() - $('#map_canvas_address').offset().top);
-	
-	if ( $(".search_address_geo").exists() ){
-		
-		dump('checkGPS_AddressMap');
-		$('.map_search_field_wrap').css('height',"auto");
-		
-		$( document ).on( "click", "#search_address_geo", function() {    	     	    
-		   $('.map_search_field_wrap').css('height', $(window).height() - $('.map_search_field_wrap').offset().top);
-		   $(".search_address_geo").val('');
-		});
-		
-		var country_code_set=getStorage("country_code_set");
-		if ( empty(getStorage("country_code_set")) ){
-			country_code_set='';
-		}		
-		$(".search_address_geo").geocomplete({
-		   country: country_code_set
-	    }).bind("geocode:result", function(event, result){	    	    		    	    		        
-	    	
-	    	 dump(result);    
-	    	 
-	    	 $('.map_search_field_wrap').css('height',"auto");
-	    	 
-	    	 var address = "", city="", state="" ;			 			 
-			 var zip = "", formatted_address="", s_lat='', s_lng=''; 
-
-			 formatted_address=result.formatted_address;
-			 
-	    	 $.each(result.address_components, function(){
-	            switch(this.types[0]){
-	                case "postal_code":
-	                    zip = this.short_name;
-	                    break;
-	                case "street_address":
-	                    address = this.short_name;
-	                    break;
-	                case "administrative_area_level_1":
-	                    state = this.short_name;
-	                    break;
-	                case "locality":
-	                    city = this.short_name;
-	                    break;                  
-	            }
-	        });
-	        
-	        dump("formatted_address=>"+formatted_address);
-	        dump("address=>"+address);
-	        dump("city=>"+city);
-	        dump("state=>"+state);
-	        dump("zip=>"+zip);
-	    	 
-	         s_lat = result.geometry.location.lat();
-	         s_lng = result.geometry.location.lng();
-	         
-	         if(!isDebug()){
-		         var geo_loc = new plugin.google.maps.LatLng( s_lat , s_lng );	
-		         	         
-		         map_search.getCameraPosition(function(camera) {
-		         	
-		         	 map_search.setCenter(geo_loc);
-		             map_search.setZoom(camera.zoom);
-			         drag_marker.setPosition(geo_loc);
-			         drag_marker.setTitle( formatted_address );
-		             drag_marker.showInfoWindow();	             
-			         	
-		         });		         
-	         }
-             
-	         var map_address_action=getStorage("map_address_action");
-	         dump(map_address_action);
-	         	         
-	         setStorage("map_address_result_address", address );
-			 setStorage("map_address_result_city", city );
-			 setStorage("map_address_result_state",state);
-			 setStorage("map_address_result_zip",zip);				
-			 setStorage("map_address_result_formatted_address",formatted_address);
-			 
-			 setStorage("google_lat", result.geometry.location.lat() );
-			 setStorage("google_lng", result.geometry.location.lng() );
-			 
-	    });
-	} /*end search geo*/
-	
-	if(isDebug()){
-		return;
-	}
-			
-	/*var can_request=true;
-	cordova.plugins.locationAccuracy.canRequest(function(canRequest){
-	 	 if(!canRequest){	
-	 	 	can_request=false;
-	 	 	var _message=getTrans('Your device has no access to location Would you like to switch to the Location Settings page and do this manually?','location_off')
-		   	   ons.notification.confirm({
-				  message: _message,		  
-				  title: dialog_title_default ,
-				  buttonLabels: ['Yes', 'No'],
-				  animation: 'none',
-				  primaryButtonIndex: 1,
-				  cancelable: true,
-				  callback: function(index) {
-				     if ( index==0 || index=="0"){
-				     	cordova.plugins.diagnostic.switchToLocationSettings();
-				     } 
-				  }
-			 });			   			 
-	 	 }
-	});
-	
-	if(!can_request){
-		return;
-	}*/
-
-	if ( device.platform =="iOS"){		
-		 cordova.plugins.diagnostic.isLocationAuthorized(function(authorized){
-		 	 if(authorized){		 
-		 	 			 	 	
-		 	 	cordova.plugins.locationAccuracy.request( function(success){		
-					MapInit_addressMap();			
-				} ,  function(error){			
-					if(error.code == 4){	    	
-				    	checkGPS_AddressMap();
-				    } else {
-				    	toastMsg( error.message );
-				    }			
-				}, cordova.plugins.locationAccuracy.REQUEST_PRIORITY_BALANCED_POWER_ACCURACY);
-		 	 	
-		 	 } else {	
-			 	 cordova.plugins.diagnostic.requestLocationAuthorization(function(status){
-				    switch(status){
-				        case cordova.plugins.diagnostic.permissionStatus.NOT_REQUESTED:
-				            toastMsg( getTrans("Permission not requested",'permission_not_requested') );
-				            return;
-				            break;
-				        case cordova.plugins.diagnostic.permissionStatus.DENIED:
-				            toastMsg( getTrans("Permission denied",'permission_denied') );
-				            return;
-				            break;
-				            
-				        case cordova.plugins.diagnostic.permissionStatus.GRANTED:		            
-				        case cordova.plugins.diagnostic.permissionStatus.GRANTED_WHEN_IN_USE:
-				            toastMsg("Permission granted only when in use");	
-		
-				            cordova.plugins.locationAccuracy.request( function(success){		
-								MapInit_addressMap();			
-							} ,  function(error){			
-								if(error.code == 4){	    	
-							    	checkGPS_AddressMap();
-							    } else {
-							    	toastMsg( error.message );
-							    }			
-							}, cordova.plugins.locationAccuracy.REQUEST_PRIORITY_BALANCED_POWER_ACCURACY);
-				            	            
-				            break;
-				    }
-				}, function(error){
-				    toastMsg(error);
-				    return;
-				}, cordova.plugins.diagnostic.locationAuthorizationMode.ALWAYS);			
-		 	}
-		}, function(error){
-		   toastMsg("The following error occurred: "+error);
-		});
-
-	} else {
-			
-		cordova.plugins.diagnostic.requestLocationAuthorization(function(status){
-		    switch(status){
-		        case cordova.plugins.diagnostic.permissionStatus.NOT_REQUESTED:
-		            toastMsg( getTrans("Permission not requested",'permission_not_requested') );
-		            return;
-		            break;
-		        case cordova.plugins.diagnostic.permissionStatus.GRANTED:
-		            //toastMsg("Permission granted");		            		            
-		            
-		            cordova.plugins.locationAccuracy.request( function(success){		
-						MapInit_addressMap();			
-					} ,  function(error){			
-						if(error.code == 4){	    	
-					    	checkGPS_AddressMap();
-					    } else {
-					    	toastMsg( error.message );
-					    }			
-					}, cordova.plugins.locationAccuracy.REQUEST_PRIORITY_BALANCED_POWER_ACCURACY);
-		            
-		            
-		            break;
-		        case cordova.plugins.diagnostic.permissionStatus.DENIED:
-		            toastMsg( getTrans("Permission denied",'permission_denied') );            		            
-		            return;
-		            break;
-		            
-		        case cordova.plugins.diagnostic.permissionStatus.DENIED_ALWAYS:
-		            toastMsg( getTrans("Permission permanently denied",'permission_permanently_denied') );
-		            return;
-		            break;
-		    }
-		}, function(error){
-		    toastMsg(error);
-		    return;
-		});
-	
-	}
-	
-}
-
-function MapInit_addressMap()
-{
-		 
-	 loader.show();
-	
-	 drag_marker_bounce=1;
-	
-     navigator.geolocation.getCurrentPosition( function(position) {
-		
-	 var your_location = new plugin.google.maps.LatLng( position.coords.latitude , position.coords.longitude ); 	
-	
-		setTimeout(function(){ 	    
-			
-	        var div = document.getElementById("map_canvas_address");
-	        $('#map_canvas_address').css('height', $(window).height() - $('#map_canvas_address').offset().top);
-	        	        
-	        map_search = plugin.google.maps.Map.getMap(div, {     
-			         'camera': {
-			         'latLng': your_location,
-			         'zoom': 17
-			        }
-			      });
-			    
-		        map_search.setBackgroundColor('white');
-
-		        map_search.addEventListener(plugin.google.maps.event.MAP_READY, function onMapInit(map) {		     
-		        			        	
-		        	
-		        	map_search.clear();	
-		        	map_search.off();
-		        	map_search.setCenter(your_location);
-		        	map_search.setZoom(17);
-		        			        	
-		        	
-		        	callAjax("coordinatesToAddress","lat=" + position.coords.latitude + "&lng="+ position.coords.longitude );	 
-		        	
-		        	
-		        	map_search.addEventListener(plugin.google.maps.event.MAP_CLICK, function onMapClick(latLng) {		        	
-	                     //alert("Map was long clicked.\n" + latLng.toUrlValue());
-	                     var lat_lng= latLng.toUrlValue();
-	                     lat_lng=explode(",",lat_lng);
-	                     /*alert(lat_lng[0]);
-	                     alert(lat_lng[1]);*/
-		            });/* even listner*/
-		            
-		            map_search.addEventListener(plugin.google.maps.event.CAMERA_CHANGE, function onMapCamera(position) {
-	                    //alert(JSON.stringify(position));
-	                    /*alert( position.target.lat );
-	                    alert( position.target.lng );*/
-	                    
-	                    //drag_marker.remove();	                    
-	                    
-	                    var new_location = new plugin.google.maps.LatLng( position.target.lat , position.target.lng );
-	                    /*map_search.addMarker({
-						  'position': new_location
-						}, function(marker) {							
-							drag_marker=marker;
-	                    });*/
-	                    
-	                    if(drag_marker_bounce==2){
-		                    //toastMsg('CAMERA CHANGE =>' + position.target.lat );
-		                    drag_marker.setPosition(new_location);
-		                    drag_marker.hideInfoWindow();
-		                    		                    
-		                    $(".change_cemara_action").val("getAddress");
-		                    $(".change_cemara_lat").val(  position.target.lat );
-		                    $(".change_cemara_lng").val( position.target.lng );
-		                    
-		                    $(".use-location").html( getTrans("Get Address",'get_address') );
-	                    }
-	                    
-	                    /*if(drag_marker_bounce==2){
-	                       callAjax("coordinatesToAddress","lat=" + position.target.lat + "&lng="+ position.target.lng );	 
-	                    }*/
-	                    
-		            });/* even listner*/
-		        	
-		       });/* even listner*/
-		       		       
-		       	
-	    }, 500); // and timeout for clear transitions    
-		
-	
-	  }, function(error){
-	  	 hideAllModal();
-    	 toastMsg( error.message );    	 
-      }, 
-      { timeout: 10000, enableHighAccuracy : getLocationAccuracy() } 
-    );	   
-}
-
-function useThisLocationOld()
-{	
-	
-	var data_action=$(".change_cemara_action").val();
-	//toastMsg(data_action);
-	if ( data_action=="getAddress"){
-		var lat = $(".change_cemara_lat").val();
-		var lng = $(".change_cemara_lng").val();
-		//toastMsg( lat + "=>"+ lng );
-		$(".change_cemara_action").val('');
-		$(".use-location").html( getTrans("Use this address",'use_this_address') );
-		callAjax("dragMarker","lat=" + lat + "&lng="+ lng );	 
-		return;
-	}
-	
-	var map_address_action=getStorage("map_address_action");
-	//alert(map_address_action);
-	dump(map_address_action);
-	
-	switch (map_address_action){
-		case "mapaddress":
-		
-		    //remove this when going live
-		    if(isDebug()){
-		    	$(".street").val( "Ciudad de Calamba Road" );
-				$(".city").val( "Calamba" );
-				$(".state").val( "Calabarzon" );
-				$(".zipcode").val( "" );	
-				
-				$(".google_lat").val( "14.187671199999999" );	
-				$(".google_lng").val( "121.1250825" );	
-				$(".formatted_address").val( "Ciudad de Calamba Rd, Calamba, Laguna, Philippines" );	
-				
-				$(".delivery-address-text").html( "Ciudad de Calamba Rd, Calamba, Laguna, Philippines" );  
-				
-				sNavigator.popPage({cancelIfRunning: true}); //back button
-		        sNavigator.popPage({cancelIfRunning: true}); //back button    
-		    	return;
-		    }
-		
-		    $(".street").val( getStorage("map_address_result_address") );
-			$(".city").val( getStorage("map_address_result_city") );
-			$(".state").val( getStorage("map_address_result_state") );
-			$(".zipcode").val( getStorage("map_address_result_zip") );	
-			
-			$(".google_lat").val( getStorage("google_lat") );	
-			$(".google_lng").val( getStorage("google_lng") );	
-			$(".formatted_address").val( getStorage("map_address_result_formatted_address") );	
-			
-			$(".delivery-address-text").html( getStorage("map_address_result_formatted_address") );  
-			
-		    sNavigator.popPage({cancelIfRunning: true}); //back button
-		    sNavigator.popPage({cancelIfRunning: true}); //back button    
+		case "delivery_date":  
+		  setStorage("delivery_date_set", value );
+		  setStorage("delivery_date_set_pretty", label );
+		  $(".delivery_date_label").html( label );
+		  var dialog = document.getElementById('dialog_delivery_date');
+		  dialog.hide();
+		  $(".delivery_time_label").html('');
+		  $(".delivery_time").val('');
+		  removeStorage("delivery_time_set");
 		break;
 		
-		case "changeaddress":
-		
-		   sNavigator.popPage({cancelIfRunning: true}); //back button
-		   setStorage("search_address", getStorage("map_address_result_formatted_address") );		   
-		   
-		   var cart_params=JSON.stringify(cart);       			     
-		   if (saveCartToDb()){
-		      var cart_params='';
-		   }
-			
-		   callAjax("loadCart","merchant_id="+ getStorage('merchant_id')+"&search_address=" + 
-		   encodeURIComponent( getStorage("search_address") ) + "&cart="+cart_params +"&transaction_type=" +
-		   getStorage("transaction_type") + "&device_id="+ getStorage("device_id") );
-		   
-		   sNavigator.popPage({cancelIfRunning: true}); //back button
-		   sNavigator.popPage({cancelIfRunning: true}); //back button
-		   
-		break;
-		
-		default: 
-		  sNavigator.popPage({cancelIfRunning: true}); //back button
-		break;
-	}			
-}
-
-function showChangeAddressPage(object)
-{
-   search_mode = getSearchMode();	
-   if ( search_mode=="postcode"){
-   	  showLocationSelect(1);
-   } else {
-	   var options = {
-	      animation: 'slide',
-	      onTransitionEnd: function() {       	  
-	      } 
-	   };   
-	   sNavigator.pushPage("change-address.html", options);
-   }
-}
-
-function showOrderOptions(order_id, show_cancel_order , show_review)
-{	
-	var options = {
-      animation: 'none',
-      order_id : order_id,
-      show_cancel_order : show_cancel_order,
-      show_review : show_review
-   };   
-   sNavigator.pushPage("order-options.html", options);
-}
-
-function showOrderDetails2()
-{
-	showOrderDetails( $(".order_option_order_id").val() ); 
-}
-
-function reOrder2()
-{
-	reOrder( $(".order_option_order_id").val() );
-}
-
-function showTrackPage()
-{	
-	var options = {
-      animation: 'slide',
-      /*onTransitionEnd: function() {           	        	      	  
-      	  var params='order_id=' + $(".order_option_order_id").val();
-      	  params+="&client_token="+getStorage("client_token");
-		  callAjax("trackOrderHistory",params);	       	 		  
-		  stopTrackInterval();		  		  		  
-      } */
-   };   
-   sNavigator.pushPage("track-order.html", options);
-}
-
-function showTrackingPage()
-{
-	var options = {
-      animation: 'none',
-      /*onTransitionEnd: function() {              	
-      	  $(".driver_avatar").attr("src", $(".driver_avatar").val() );
-      	  $("._driver_name").html( $(".driver_name").val() );
-      	  $(".call_driver").attr("href","tel:"+ $(".driver_phone").val() );      	  	  
-      	  MapInit_Track();      	        	  
-      } */
-   };   
-   sNavigator.pushPage("tracking-page.html", options);
-}
-
-function MapInit_Track()
-{
-	if(isDebug()){
-	   return ;
-    }
-    
-    var driver_lat=$(".driver_lat").val();
-	var driver_lng=$(".driver_lng").val();
-	
-	var task_lat=$(".task_lat").val();
-	var task_lng=$(".task_lng").val();
-	
-	var dropoff_lat=$(".dropoff_lat").val();
-	var dropoff_lng=$(".dropoff_lng").val();
-		
-	var driver_location = new plugin.google.maps.LatLng( driver_lat , driver_lng );
-    var destination = new plugin.google.maps.LatLng( task_lat , task_lng );
-    var dropoff_location = new plugin.google.maps.LatLng( dropoff_lat , dropoff_lng );
-	
-    setTimeout(function(){ 
-    	
-    	var div = document.getElementById("map_canvas_track");
-    	$('#map_canvas_track').css('height', $(window).height() - $('#map_canvas_track').offset().top);
-    	
-    	 map = plugin.google.maps.Map.getMap(div, {     
-			 'camera': {
-			 'latLng': driver_location,
-			 'zoom': 17
-			}
-		 });
-		 
-		 map.setBackgroundColor('white');
-		 
-		 map.addEventListener(plugin.google.maps.event.MAP_READY, function onMapInit2(map) {
-		 	
-		 	map.clear();	
-			map.off();
-			map.setCenter(driver_location);
-			map.setZoom(17);
-										
-	         var data = [      
-			 { 
-		        'title': $(".driver_name").val(),
-		        'position': driver_location ,
-		        'snippet': getTrans( "Driver name" ,'driver_name'),
-		        'icon': {
-			       'url': $(".driver_icon").val()
-			    }
-		      },
-		      { 
-		        'title': "Merchant name" , 
-		        'position': dropoff_location ,
-		        'snippet': $(".drop_address").val() ,
-		        'icon': {
-			       'url': $(".merchant_icon").val()
-			    }
-		      },
-		      {
-		      	'title': $(".delivery_address").val() , 
-		        'position': destination ,
-		        'snippet': getTrans( "Delivery Address" ,'delivery_address') ,
-		        'icon': {
-			       'url': $(".address_icon").val()
-			    }
-		      } 
-		    ];
-		    		    		    
-		    addMarkers(data, function(markers) {    
-		    	
-		    	if ( iOSeleven() ){		    		
-		    		map.animateCamera({
-						  'target': dropoff_location,
-						  'zoom': 17,
-						  'tilt': 30
-					}, function() {			
-									
-						map.animateCamera({
-						  'target': destination,
-						  'zoom': 17,
-						  'tilt': 30
-						}, function() {			
-							
-							stopTrackMapInterval();
-  	                        track_order_map_interval = setInterval(function(){runTrackMap()}, 10000);
-												
-						}); /*end animate*/		
-									
-					}); /*end animate*/
-		    		
-		    	} else {		    	
-			    	map.addPolyline({
-					points: [
-					  driver_location,
-					  dropoff_location
-					],
-					'color' : '#AA00FF',
-					'width': 10,
-					'geodesic': true
-					}, function(polyline) {
-					   
-						map.animateCamera({
-						  'target': dropoff_location,
-						  'zoom': 17,
-						  'tilt': 30
-						}, function() {
-							
-			                map.addPolyline({
-							points: [
-							  dropoff_location,
-							  destination
-							],
-							'color' : '#AA00FF',
-							'width': 10,
-							'geodesic': true
-							}, function(polyline) {
-							   						
-								map.animateCamera({
-								  'target': destination,
-								  'zoom': 17,
-								  'tilt': 30
-								}, function() {			
-									
-									stopTrackMapInterval();
-	      	                        track_order_map_interval = setInterval(function(){runTrackMap()}, 10000);
-														
-								}); /*end animate*/
-									
-							});  /*end polyline*/
-							
-						}); /*end animate*/
-						
-					});  /*end polyline*/
-					
-		    	}
-		    	  								    		
-	        });/* end marker*/
-		 	
-		 });/* even listner*/
-    	
-    }, 500); 
-}
-
-function MapInit_Track_OLD()
-{
-	if(isDebug()){
-		return ;
-	}
-	
-	var driver_lat=$(".driver_lat").val();
-	var driver_lng=$(".driver_lng").val();
-	
-	var task_lat=$(".task_lat").val();
-	var task_lng=$(".task_lng").val();
-	
-	
-	var driver_location = new plugin.google.maps.LatLng( driver_lat , driver_lng );
-	var destination = new plugin.google.maps.LatLng( task_lat , task_lng );
-	
-	setTimeout(function(){ 	    
-		
-        var div = document.getElementById("map_canvas_track");
-        $('#map_canvas_track').css('height', $(window).height() - $('#map_canvas_track').offset().top);
-        	        
-	         map = plugin.google.maps.Map.getMap(div, {     
-		         'camera': {
-		         'latLng': driver_location,
-		         'zoom': 17
-		        }
-		      });
-		    
-	        map.setBackgroundColor('white');
-
-	        map.addEventListener(plugin.google.maps.event.MAP_READY, function onMapInit2(map) {		        	
-	        		        	
-	        	map.clear();	
-	        	map.off();
-	        	map.setCenter(driver_location);
-	        	map.setZoom(17);
-	        		        	 	        	
-	        	 map.addMarker({
-				  'position': driver_location ,
-				  'title': $(".driver_name").val(),
-				  'snippet': getTrans( "Driver name" ,'driver_name'),
-				  'icon': {
-				    'url': $(".driver_icon").val()
-				  }			  				  
-			     }, function(marker) {
-			     	
-	        	       marker.showInfoWindow();	        	       
-	        	       
-	        	        map.addPolyline({
-						    points: [
-						      driver_location,
-						      destination
-						    ],
-						    'color' : '#AA00FF',
-						    'width': 10,
-						    'geodesic': true
-						   }, function(polyline) {
-						   	
-						   	  map.animateCamera({
-								  'target': destination,
-								  'zoom': 17,
-								  'tilt': 30
-								}, function() {
-									
-								   var data = [      
-							          { 
-							            'title': $(".delivery_address").val() , 							            
-							            'position': destination ,
-							            'snippet': getTrans( "Delivery Address" ,'delivery_address'),
-							            'icon': {
-									       'url': $(".address_icon").val()
-									    }
-							          }  
-							       ];												      
-							       
-								   addMarkers(data, function(markers) {
-								      markers[markers.length - 1].showInfoWindow();
-								      //markers[markers.length - 1].setAnimation(plugin.google.maps.Animation.BOUNCE);
-								   });
-									
-							   });  
-							   
-						 });   
-				    	 // end addPolyline
-				    	 
-				    	 stopTrackMapInterval();
-      	                 track_order_map_interval = setInterval(function(){runTrackMap()}, 10000);
-	        	       
-			     });  /*end marker*/ 
-			     	
-	       });/* even listner*/
-        
-	    }, 500); // and timeout for clear transitions      
-}
-
-
-function submitContactForm()
-{
-	$.validate({ 	
-	    form : '#frm-enter-contact',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	      var params = $( "#frm-enter-contact").serialize();	      
-	      params+="&client_token="+ getStorage('client_token');
-	      callAjax("saveContactNumber",params);	       
-	      return false;
-	    }  
-	});
-}
-
-function playNotification()
-{	 
-	 //var sound_url= "file:///android_asset/www/audio/fb-alert.mp3";
-	 var sound_url= "file:///android_asset/www/beep.wav";
-	 dump(sound_url);
-	 if(!empty(sound_url)){
-        playAudio(sound_url);
-	 }
-}
-
-var my_media;
-
-function playAudio(url) {
-    // Play the audio file at url    
-    my_media = new Media(url,
-        // success callback
-        function () {
-            dump("playAudio():Audio Success");
-            my_media.stop();
-            my_media.release();
-        },
-        // error callback
-        function (err) {
-            dump("playAudio():Audio Error: " + err);
-        }
-    );
-    // Play audio    
-    my_media.play({ playAudioWhenScreenIsLocked : true });
-    my_media.setVolume('1.0');
-}
-
-function stopNotification()
-{
-	my_media.stop();
-    my_media.release();
-}
-
-function saveCartToDb()
-{
-	var mobile_save_cart_db= getStorage("mobile_save_cart_db");
-	if(mobile_save_cart_db==1){
-		return true;
-	}
-	return false;
-}
-
-function runTrackOrder()
-{
-	if ($('#page-track-order').is(':visible')) {	
-	   dump("runTrackOrder");
-	   var params='order_id=' + $(".order_option_order_id").val();
-       params+="&client_token="+getStorage("client_token");
-       callAjax("trackOrderHistory",params);	       	 
-	} else {
-		dump("stop runTrackOrder");
-		stopTrackInterval();
-	}
-}
-
-function reRunTrackOrder(){
-   stopTrackInterval();
-   track_order_interval = setInterval(function(){runTrackOrder()}, 60000);	
-}
-
-function reRunTrackOrder2()
-{	
-	sNavigator.popPage({cancelIfRunning: true}); //back button
-	stopTrackInterval();
-    track_order_interval = setInterval(function(){runTrackOrder()}, 60000);	
-}
-
-function stopTrackInterval() {
-    clearInterval(track_order_interval);
-}
-
-function stopTrackMapInterval() {
-    clearInterval(track_order_map_interval);
-}
-
-function runTrackMap()
-{	
-	if ($('#tracking-page').is(':visible')) {	
-	   dump("runTrackMap");
-	   stopTrackMapInterval();
-	   var params='order_id=' + $(".order_option_order_id").val();
-       params+="&client_token="+getStorage("client_token");
-       callAjax("trackOrderMap",params);	       	 
-	} else {
-		dump("stop runTrackMap");
-		stopTrackMapInterval();
-	}
-}
-
-function reInitTrackMap(data)
-{
-	dump('reInitTrackMap');
-	dump(data);
-    var driver_lat = data.driver_lat;
-	var driver_lng = data.driver_lng;
-	
-	var task_lat = data.task_lat;
-	var task_lng = data.task_lng;
-	
-	var dropoff_lat = $(".dropoff_lat").val();
-	var dropoff_lng = $(".dropoff_lng").val();
-	
-	if(isDebug()){
-		dump("driver location=>" + driver_lat + ":"+ driver_lng);
-		dump("task location=>" + task_lat + ":"+ task_lng);
-		return;
-	}
-	
-	var driver_location = new plugin.google.maps.LatLng( driver_lat , driver_lng );
-	var destination = new plugin.google.maps.LatLng( task_lat , task_lng );
-	var dropoff_location = new plugin.google.maps.LatLng( dropoff_lat , dropoff_lng );
-		
-	map.getCameraPosition(function(camera) {
-	  var data = ["Current camera position:\n",
-	      "latitude:" + camera.target.lat,
-	      "longitude:" + camera.target.lng,
-	      "zoom:" + camera.zoom,
-	      "tilt:" + camera.tilt,
-	      "bearing:" + camera.bearing].join("\n");
-	      
-	      //toastMsg(data);
-			
-	    var camera_location = new plugin.google.maps.LatLng( camera.target.lat , camera.target.lng );  
-		
-		map.clear();	
-		map.off();
-		map.setCenter(camera_location);
-		map.setZoom(camera.zoom);
-			     
-	   /* var data = [      
-		 { 
-	        'title': $(".driver_name").val(),
-	        'position': driver_location ,
-	        'snippet': getTrans( "Driver name" ,'driver_name'),
-	        'icon': {
-		       'url': $(".driver_icon").val()
-		    }
-	      },{ 
-	        'title': $(".delivery_address").val() , 							            
-	        'position': destination ,
-	        'snippet': getTrans( "Delivery Address" ,'delivery_address'),
-	        'icon': {
-		       'url': $(".address_icon").val()
-		    }
-	      }  
-	    ];*/
-	    
-	     var data = [      
-		 { 
-	        'title': $(".driver_name").val(),
-	        'position': driver_location ,
-	        'snippet': getTrans( "Driver name" ,'driver_name'),
-	        'icon': {
-		       'url': $(".driver_icon").val()
-		    }
-	      },
-	      { 
-	        'title': "Merchant name" , 
-	        'position': dropoff_location ,
-	        'snippet': $(".drop_address").val() ,
-	        'icon': {
-		       'url': $(".merchant_icon").val()
-		    }
-	      },
-	      {
-	      	'title': $(".delivery_address").val() , 
-	        'position': destination ,
-	        'snippet': getTrans( "Delivery Address" ,'delivery_address') ,
-	        'icon': {
-		       'url': $(".address_icon").val()
-		    }
-	      } 
-	    ];
-	    
-	    addMarkers(data, function(markers) {       
-	    	
-	    	if ( iOSeleven() ){
-	    		// do nothing
-	    	} else {
-		    	map.addPolyline({
-				points: [
-				  driver_location,
-				  dropoff_location
-				],
-				'color' : '#AA00FF',
-				'width': 10,
-				'geodesic': true
-				}, function(polyline) {
-				   
-					map.addPolyline({
-					points: [
-					  dropoff_location,
-					  destination
-					],
-					'color' : '#AA00FF',
-					'width': 10,
-					'geodesic': true
-					}, function(polyline) {
-					   
-					}); /*end polyline*/
-					
-				}); /*end polyline*/			
-	    	}
-	    	
-	    });
-	   
-	    stopTrackMapInterval();
-		track_order_map_interval = setInterval(function(){runTrackMap()}, 9000);   
-
-	});
-}
-
-function showTip()
-{		
-	if (typeof tipsDialog === "undefined" || tipsDialog==null || tipsDialog=="" ) { 	    
-		ons.createDialog('tipsDialog.html').then(function(dialog) {
-			$(".cash_tip").val('');
-			dialog.show();
-	        translatePage();   
-	        $(".cash_tip").attr("placeholder",  getTrans("Cash Tip",'cash_tip') );
-	    });	
-	} else {
-		$(".cash_tip").val('');
-		tipsDialog.show();
-	}	
-}
-
-function setTips(tips)
-{	
-	removeStorage("remove_tips");
-	setStorage("tips_percentage",tips);
-	$(".tip_amount").html( getTrans("Tips",'tips') + " "+ tips+"%" );
-	tipsDialog.hide();
-	reloadCart();
-}
-
-function removeTips()
-{
-	removeStorage("tips_percentage");
-	setStorage("remove_tips",1);
-	tipsDialog.hide();
-	reloadCart();
-}
-
-function reloadCart()
-{
-	var cart_params=JSON.stringify(cart);       	        	  
-	if (saveCartToDb()){
-	  	  var cart_params='';
-	}      	  
-	        	 
-    if ( empty(getStorage("tips_percentage")) ){
-	   setStorage("tips_percentage",0);
-	}
-	
-	var params='';
-	params="merchant_id="+ getStorage('merchant_id');
-	params+="&search_address=" + encodeURIComponent(getStorage("search_address"))
-	params+="&cart="+cart_params;
-	params+="&transaction_type=" + getStorage("transaction_type");
-	params+="&device_id="+ getStorage("device_id");
-	params+="&tips_percentage=" + getStorage("tips_percentage");
-		
-	if (!empty( getStorage("remove_tips") )){
-		params+="&remove_tips="+getStorage("remove_tips");
-	}
-	  
-	callAjax("loadCart",params); 	
-}
-
-function fillCCList(data)
-{
-	var html='';
-	if (data.length>0){
-	  $.each( data, function( key, val ) { 
-	  	  html+='<ons-list-item modifier="tappable" onclick="setCC('+val.cc_id+');" >';
-	  	  html+=val.credit_card_number;
-	  	  html+='</ons-list-item>';
-	  });
-	  createElement("cc-list", html );
-	}
-}
-
-function setCC(cc_id)
-{
-	/*dump(cc_id);
-	setStorage("cc_id",cc_id);
-	sNavigator.popPage({cancelIfRunning: true});*/
-	
-	ons.notification.confirm({
-	  message: getTrans('Choose action','choose_action'),  
-	  title: '',
-	  buttonLabels: [ getTrans('Use this card','use_this_card') , getTrans('Edit this card','edit_this_card')  ],
-	  animation: 'default', // or 'none'
-	  primaryButtonIndex: 1,
-	  cancelable: true,
-	  callback: function(index) {
-	  	  dump(index);
-	      switch (index)
-	      {
-	      	 case 0:
-	      	 setStorage("cc_id",cc_id);
-	         sNavigator.popPage({cancelIfRunning: true});
-	      	 break;
-	      	 
-	      	 case 1:
-	      	  var options = {
-			      animation: 'slide',
-			      onTransitionEnd: function() {         	   	 
-			      	  translatePage();
-				      translateValidationForm();				      
-				      var params="&client_token="+ getStorage("client_token");
-				      params+="&cc_id="+cc_id;
-				      callAjax("loadCC",params);	       
-			      } 
-			   };   
-			   sNavigator.pushPage("ccform.html", options);
-	      	 break;
-	      }
-	  }
-   });
-	
-}
-
-function showCCForm()
-{
-    var options = {
-      animation: 'slide',
-      onTransitionEnd: function() {         	   	 
-      	  translatePage();
-	      translateValidationForm();
-	      $(".delete-cc").hide();
-	      
-	      $(".cc_number").attr("placeholder",  getTrans("Credit Card Number",'cc_number') );
-	      $(".cvv").attr("placeholder",  getTrans("CVV",'cvv') );
-	      $(".card_name").attr("placeholder",  getTrans("Card name",'card_name') );	      
-	      $(".billing_address").attr("placeholder",  getTrans("Billing Address",'billing_address') );
-	      
-      } 
-   };   
-   sNavigator.pushPage("ccform.html", options);
-}
-
-function saveCC()
-{
-	$.validate({ 	
-	    form : '#frm-cc',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	      var params = $( "#frm-cc").serialize();	      	      
-	      params+="&client_token="+ getStorage("client_token");
-	      callAjax("saveCreditCard",params);	       
-	      return false;
-	    }  
-	});
-}
-
-function deleteCC()
-{	
-	ons.notification.confirm({
-	  message: getTrans('Delete this records?','delete_this_records') ,	  
-	  title: dialog_title_default,
-	  buttonLabels: ['Yes', 'No'],
-	  animation: 'default', // or 'none'
-	  primaryButtonIndex: 1,
-	  cancelable: true,
-	  callback: function(index) {	  	
-	    if ( index==0){
-	    	var params='';
-	        params+="&client_token="+ getStorage("client_token");
-	        params+="&cc_id="+ $(".cc_id").val() ;	
-	        callAjax("deleteCreditCard",params);	       
-	    }
-	  }
-	});		
-}
-
-function fillShippingAddress()
-{	
-	
-	dump('fillShippingAddress');
-	if ( !empty( getStorage("map_address_result_formatted_address") )){
-		 dump('p1');
-  	     $(".delivery-address-text").html( getStorage("map_address_result_formatted_address") );
-  	     $(".street").val( getStorage("map_address_result_address") );
-		 $(".city").val( getStorage("map_address_result_city") );
-		 $(".state").val( getStorage("map_address_result_state") );
-		 $(".zipcode").val( getStorage("map_address_result_zip") );	
-		 $(".formatted_address").val( getStorage("map_address_result_formatted_address") );	
-		 
-		 $(".google_lat").val( getStorage("google_lat") );	
-		 $(".google_lng").val( getStorage("google_lng") );	
-  	 } else {  	 	
-  	 	dump("p2");
-  	 	if(!empty(getStorage("geo_address_result_formatted_address"))){
-  	 	   $(".delivery-address-text").html( getStorage("geo_address_result_formatted_address") );
-  	       $(".street").val( getStorage("geo_address_result_address") );
-		   $(".city").val( getStorage("geo_address_result_city") );
-		   $(".state").val( getStorage("geo_address_result_state") );
-		   $(".zipcode").val( getStorage("geo_address_result_zip") );	
-		   $(".formatted_address").val( getStorage("geo_address_result_formatted_address") );	
-  	 	}
-  	 } 
-}
-
-function monerisPay()
-{	
-	 $.validate({ 	
-	    form : '#frm-mri',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() { 
-	    		      
-	       var cards = $(".cc_number").val();       	       
-	       var expiration_month = $(".expiration_month").val();  
-	       var expiration_yr = $(".expiration_yr").val(); 
-	            	      
-	       params="cards="+cards;
-	       params+="&expiration_month="+expiration_month;
-	       params+="&expiration_yr="+expiration_yr;
-	       
-	       params+="&order_id="+$("#order_id").val();
-	       params+="&currency_code="+$("#currency_code").val();
-	       params+="&paymet_desc="+$("#paymet_desc").val();
-	       params+="&total_w_tax="+$("#total_w_tax").val();
-	       params+="&merchant_id="+ getStorage("merchant_id");
-	       params+="&client_token="+getStorage("client_token");
-	       
-	       params+="&cvv="+ $(".cvv").val(); 
-	       
-	       callAjax("monerisPay",params);
-	       return false;
-	    }  
-	});
-}
-
-function applyCashTip()
-{
-	if ( $(".cash_tip").val() ==""){
-		 onsenAlert(   getTrans('Cash Tip is required','cash_tip_required')  );
-		 return;
-	}
-	var tip_raw = $(".cash_tip").val();
-	var order_sub_total = getStorage("order_sub_total_raw");
-	
-	
-	if (!empty(order_sub_total)){				
-		//dump( tip_raw + "/"+ order_sub_total );
-	    var reverse_percentage = ( parseFloat(tip_raw)/parseFloat(order_sub_total))*100;
-	    dump(reverse_percentage); dump( reverse_percentage.toFixed() );
-	    var tips=reverse_percentage.toFixed();	    
-	    setStorage("tips_percentage",tips);
-		$(".tip_amount").html( getTrans("Tips",'tips') + " "+ tips+"%" );
-		tipsDialog.hide();
-		reloadCart();	    
-	}	
-}
-
-function initSlideMenu()
-{	
-   menu.on('preopen', function() {
-       console.log("Menu page is going to open");
-       
-       if (isLogin()){
-       	   dump('logon ok');
-       	   
-       	   var pts = getStorage("pts");
-	       dump("pts=>"+pts);
-	       if(pts!=2){
-	       	  $(".menu-pts").hide();
-	       } else {
-	       	  $(".menu-pts").css({"display":"block"});
-	       }
-	              	   
-       	   $(".logout-menu").css({"display":"block"});
-       	   
-       	   var avatar=getStorage("avatar");
-       	   dump("avatar=>"+avatar);       	   
-       	   if(!empty(avatar)){
-       	   	   dump('fillavatar');
-	       	   $(".profile-pic-wrap").show();
-	       	   $(".avatar").attr("src", getStorage("avatar") );
-	       	   $(".avatar-right").html(  getStorage("client_name_cookie") );
-	       	   $(".avatar-wrap-menu div").addClass("img_loaded");
-       	   }
-       } else {
-       	   dump('logon not');
-       	   $(".logout-menu").hide();
-       	   $(".profile-pic-wrap").hide();
-       	   $(".menu-pts").hide();
-       }
-       
-       initCustomPages();
-       
-       translatePage();    
-          
-  });  
-  menu.on('postopen', function() {
-      dump('menu is open');      
-      imageLoaded('.img_loaded');
-  });	
-}
-
-function InitPlaceOrder()
-{
-	$.validate({ 	
-	    form : '#frm-paymentoption',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	
-	    	placeOrder();
-	        return false;
-	    }  
-	});   
-}
-
-function hubtePaynow()
-{
-	$.validate({ 	
-	    form : '#frm-hubtel',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	
-	       var params='';
-	       params+="&order_id="+$("#order_id").val();
-	       params+="&currency_code="+$("#currency_code").val();
-	       params+="&paymet_desc="+$("#paymet_desc").val();
-	       params+="&total_w_tax="+$("#total_w_tax").val();
-	       
-	       params+="&merchant_id="+ getStorage("merchant_id");
-	       params+="&client_token="+getStorage("client_token");
-	       
-	       params+="&channel_code="+ $(".channel_code").val(); 
-	       params+="&customer_name="+ $(".customer_name").val(); 
-	       params+="&customer_mobileno="+ $(".customer_mobileno").val(); 
-	       params+="&customer_email="+ $(".customer_email").val(); 
-	       
-	       callAjax("hubtelPaymentInit",params);
-	       return false;
-	    }  
-	});   
-}
-
-function showHubtelChannel()
-{
-	if (typeof hubtelChannel === "undefined" || hubtelChannel==null || hubtelChannel=="" ) { 	    
-		ons.createDialog('hubtelChannel.html').then(function(dialog) {
-	        dialog.show();
-	        translatePage();
-	    });	
-	} else {
-		hubtelChannel.show();
-	}	
-}
-
-function setChannel(channel, channel_name)
-{
-	$(".channel_code").val(channel);
-	$(".channel_label").html( channel_name );
-	hubtelChannel.hide();
-}
-
-/*VERSION 2.1 STARTES HERE*/
-
-function showCity()
-{		
-	if (typeof locationCity === "undefined" || locationCity==null || locationCity=="" ) { 	    
-		ons.createDialog('locationCity.html').then(function(dialog) {
-	        dialog.show();
-	        $(".search_city").attr("placeholder", getTrans("Type City here",'search_city') );	        
-	        $(".search_title").html( getTrans("Search",'search') );
-	        loadAjaxLocationCity();	        	        
-	        //translatePage();
-	    });	
-	} else {
-		loadAjaxLocationCity();
-		locationCity.show();
-	}	
-}
-
-function searchCity()
-{
-	loadAjaxLocationCity( $(".search_city").val() );
-}
-
-function loadAjaxLocationCity(s)
-{
-	search_type = getSearchType();	
-	if(empty(global_state_id)){
-		global_state_id='';
-	}
-	
-	if ($('#page-home').is(':visible')) {			
-		global_state_id='';
-	}	
-	
-	params="state_id="+ global_state_id ;
-	if(!empty(s)){
-		params+="&s="+ s ;
-	}
-	
-	callAjax('getLocationCity', params );
-	/*switch (search_type){
-    	case "1":
-    	callAjax('getLocationCity', "" );
-    	break;
-    	
-    	case "2":
-    	if (empty(global_state_id)){
-    		global_state_id='';
-    	}
-    	callAjax('getLocationCity', "state_id="+ global_state_id );
-    	break;
-    	
-    	case "3":
-    	break;
-    }*/
-}
-
-function setLocationCity(city_id , city_name, state_id )
-{
-	global_city_name = city_name;
-	global_city_id = city_id;
-	
-	if(!empty(state_id)){
-	   global_state_id = state_id;
-	}
-	
-	$(".city_id").val( city_id );
-	$(".location_city").html( city_name );
-
-	$(".city").val( city_name );
-	
-	$(".area_id").val('');
-	$(".location_area").html( getTrans("District / Area","destrict_area") );
-	
-	locationCity.hide();
-}
-
-function searchArea()
-{
-	callAjax('getLocationArea', "city_id=" + $(".city_id").val() + "&s=" + $(".search_area").val() );
-}
-
-function showArea()
-{
-	if ( $(".city_id").val()!="" ){
-		if (typeof locationArea === "undefined" || locationArea==null || locationArea=="" ) { 	    
-		ons.createDialog('locationArea.html').then(function(dialog) {
-			
-			$(".search_area").attr("placeholder", getTrans("Type Area here",'search_area') );	        
-	        $(".search_title").html( getTrans("Search",'search') );
-	        
-	        dialog.show();
-	        //translatePage();
-	    });	
-		} else {
-			callAjax('getLocationArea', "city_id=" + $(".city_id").val() );
-			locationArea.show();
-		}	
-	} else {
-		onsenAlert( getTrans('Please select Cty first','please_select_city') );
-	}
-}
-
-function setLocationArea(area_id, area_name )
-{
-	global_area_name = area_name;
-	global_area_id = area_id;
-	
-	$(".area_id").val( area_id );
-	$(".location_area").html( area_name );
-		
-	$(".area_name").val( area_name );	
-	
-	locationArea.hide();
-}
-
-
-function clearAllStorage()
-{  
-  removeStorage('merchant_id');
-  removeStorage('shipping_address');  
-  removeStorage('merchant_id');
-  removeStorage('transaction_type');
-  removeStorage('merchant_logo');
-  removeStorage('order_total');
-  removeStorage('merchant_name');
-  removeStorage('total_w_tax');
-  removeStorage('currency_code');
-  removeStorage('paymet_desc');
-  removeStorage('order_id');   
-  removeStorage('order_total_raw');   
-  removeStorage('cart_currency_symbol');     
-  removeStorage('paypal_card_fee');   
-  
-  removeStorage('cart_sub_total');
-  removeStorage('cart_delivery_charges');
-  removeStorage('cart_packaging');
-  removeStorage('cart_tax');
-  removeStorage('map_address_result_formatted_address');
-  removeStorage("customer_contact_number");
-  
-  removeStorage("category_count");
-  removeStorage("item_count");    
-}
-
-function getSearchMode()
-{
-	var search_mode = getStorage("search_mode");	
-	return search_mode;
-}
-
-function getSearchType()
-{
-	var search_type = getStorage("search_type");	
-	return search_type;
-}
-
-function showLocationSelect(force_show)
-{
-	search_type = getSearchType();
-	dump(search_type);
-	dump("force_show=>"+force_show);
-	
-	var is_false=1;
-	
-	switch (search_type){
-		case "1":
-		case 1:
-		
-		if(force_show==1 || force_show=="1" ){
-			is_false=2;
-		} else {
-			if (empty(global_city_id)){		
-				is_false++;
-			}
-			if (empty(global_area_id)){					
-				is_false++;
-			}
-		}	
-		
-		dump("is_false=>"+ is_false);
-		
-		if (is_false>=2){
-			var options = {
-		      animation: 'slide',
-		      onTransitionEnd: function() { 		      	  		      	
-		      } 
-		    };   
-		    sNavigator.pushPage("locationTypeCityArea.html", options);		
-		    return false;
-		}
-		
-		break;
-		
-		case "2":
-		case 2:
-		
-		 if(force_show==1 || force_show=="1" ){
-				is_false=2;
-		 } else {
-			if (empty(global_city_id)){		
-				is_false++;
-			}
-			if (empty(global_state_id)){					
-				is_false++;
-			}
-		 }	
-		
-		 dump("is_false=>"+ is_false);
-		 
-		 if (is_false>=2){
-			var options = {
-		      animation: 'slide',
-		      onTransitionEnd: function() { 		  		      	  
-		      } 
-		    };   
-		    sNavigator.pushPage("locationTypeCityArea.html", options);		
-		    return false;
-		 }
-		    
-		break;
-		
-		case "3":
-		case 3:
+		case "delivery_time":
+		  setStorage("delivery_time_set", value );
+		  $(".delivery_time_label").html( label );
+		  var dialog = document.getElementById('dialog_delivery_time');
+		  dialog.hide();
+		  
+		  var delivery_asap = document.getElementById('delivery_asap');
+		  if(!empty(delivery_asap)){
+		     delivery_asap.checked = false;
+		     removeStorage("delivery_asap_enabled");
+		  }
+		  
 		break;
 	}
-	
-	return true;
-}
+};
 
-function showShippingLocation(data)
-{	
-	
-   var options = {
-      animation: 'slide',
-      onTransitionEnd: function() { 		
-      	  if(!empty(data.msg.profile)){
-      	  	$(".contact_phone").val( data.msg.profile.contact_phone ) ;
-      	  	$(".location_name").val( data.msg.profile.location_name ) ;
-      	  }
-      	  if(!empty(data.msg.address_book)){
-      	  	 $(".street").val( data.msg.address_book.street );
-      	  	 $(".location_name").val( data.msg.address_book.location_name );
-      	  }
-      	  if(!empty(data.msg.state_info)){
-      	  	 global_state_id  = data.msg.state_info.state_id;
-      	  	 global_state_name  = data.msg.state_info.state_name;
-      	  	 
-      	  	 $(".location_state").html( data.msg.state_info.state_name );
-      	  	 $(".state_id").html( data.msg.state_info.state_id );
-      	  	 
-      	  	 $(".state").val( data.msg.state_info.state_name );
-      	  }
-      	  if(!empty(data.details.contact_phone)){
-      	  	$(".contact_phone").val( data.details.contact_phone ) ;      	  	
-      	  }
-      	  if(!empty(global_area_name)){
-      	  	 $(".area_name").val( global_area_name );
-      	  }
-      } 
-    };   
-    sNavigator.pushPage("shippingLocationArea.html", options);
-		    
-	/*search_type = getSearchType();		
-	dump("search_type=>"+search_type);
-	dump(data);
-	switch (search_type){
-		case "1":
-		case "2":
-		case "3":
-		
-			var options = {
-		      animation: 'slide',
-		      onTransitionEnd: function() { 		
+clearCartDiv = function(){	
+	$(".no_order_wrap").show();
+    $(".cart_details").html( '' ) ;
+    $(".cart_count").html('');
+    $(".tabbar__badge").html('');
+    $(".bottom_toolbar_checkout").hide();
+    clearBasket();    
+    $(".one_time_payment").val( '' );
+    removeStorage("cart_item_count");
+};
 
-		      	  if(!empty(data.msg.profile)){
-		      	  	$(".contact_phone").val( data.msg.profile.contact_phone ) ;
-		      	  	$(".location_name").val( data.msg.profile.location_name ) ;
-		      	  }
-		      	  if(!empty(data.msg.address_book)){
-		      	  	 $(".street").val( data.msg.address_book.street );
-		      	  	 $(".location_name").val( data.msg.address_book.location_name );
-		      	  }
-		      } 
-		    };   
-		    sNavigator.pushPage("shippingLocationArea.html", options);
-		
-		break;
-		
-		default:
-	    break;
-	}	*/
-}
-
-function showState()
-{
-	if (typeof locationState === "undefined" || locationState==null || locationState=="" ) { 	    
-	ons.createDialog('locationState.html').then(function(dialog) {
-		callAjax('locationState', '' );
-        dialog.show();        
-    });	
-	} else {
-		callAjax('locationState', '' );
-		locationState.show();
-	}	
-}
-
-function setLocationState(state_id, state_name)
-{
-	search_type = getSearchType();
-	
-	global_state_id = state_id ;
-	global_state_name = state_name ;
-	
-	$(".location_state").html( state_name );
-	$(".state_id").val( state_id );
-	$(".state").val( state_name );
-	
-	$(".location_city").html( getTrans("City", "city") );
-	$(".city_id").val( '' );
-		
-	$(".area_id").val('');
-	$(".location_area").html( getTrans("District / Area","destrict_area") );
-	
-	locationState.hide();
-}
-
-function showPostal()
-{
-	if (typeof locationPostal === "undefined" || locationPostal==null || locationPostal=="" ) { 	    
-		ons.createDialog('locationPostal.html').then(function(dialog) {
-	        dialog.show();	        	        
-	    });	
-	} else {
-		callAjax('getLocationPostal', "" );
-		locationPostal.show();
-	}	
-}
-
-function setLocationPostal(postal_code)
-{
-	dump(postal_code);
-	global_postal_code = postal_code;
-	$(".location_postal").html( postal_code );
-	locationPostal.hide();
-}
-
-function resetLocation()
-{
-	search_mode = getSearchMode();
-    if ( search_mode=="postcode"){
-	   setTimeout(function(){ 	 
-	   	
-		 if ( !empty(global_state_id)){
-	        $(".location_state").html( global_state_name );		   	   		   	   		   	   
-	     }
-	     if ( !empty(global_city_id)){
-	     	 $(".location_city").html( global_city_name );
-	     }
-	     if ( !empty(global_area_id)){
-	     	 $(".location_area").html( global_area_name );
-	     }
-	  },200);
+var showDeliveryDateList = function(){
+	var dialog = document.getElementById('dialog_delivery_date');   
+     if (dialog) {
+     	 dialog.show();
+    } else {
+       ons.createElement('dialog_delivery_date.html', { append: true }).then(function(dialog) {
+        dialog.show();
+      });
     }
 }
 
-function showTestpage()
-{
-   var options = {
-      animation: 'slide',
-      onTransitionEnd: function() {         	   	 
-      } 
-   };   
-   kNavigator.pushPage("testpage.html", options);
+
+var showDeliveryTime = function(){
+	var dialog = document.getElementById('dialog_delivery_time');   
+     if (dialog) {
+     	 dialog.show();
+    } else {
+       ons.createElement('dialog_delivery_time.html', { append: true }).then(function(dialog) {
+        dialog.show();
+      });
+    }
 }
 
-var spinner='<div class="spinner"><div class="bounce1"></div><div class="bounce2"></div><div class="bounce3"></div></div>';
+setAsap = function(){
+	var delivery_asap = document.getElementById('delivery_asap');
+	is_selected = delivery_asap.checked;	
+    if (is_selected=="true" || is_selected == true){    	
+    	$(".delivery_time").val('');
+    	$(".delivery_time_label").html('');
+    	removeStorage("delivery_time_set");  
+    	setStorage("delivery_asap_enabled", 1);
+    } else {
+    	setStorage("delivery_asap_enabled", 0);
+    }
+};
 
-var lazyLoadSearch = {
-  createItemContent: function(index, oldContent) {      	
-  	
-  	search_total = getStorage("search_total_raw");
-  	if(!empty(search_total)){
-  		$(".result-msg").text(search_total+" "+getTrans("Restaurant found",'restaurant_found') );
-  	}  	  	
-    var $element = $('<div id="results-'+index+'">'+spinner+'</div>');     
-    getSearchMerchant(index);   
-    return $element[0];    
-  },
-  calculateItemHeight: function(index) {  	
-    return 1100;
-  },
-  countItems: function() {  	
-    return getStorage("search_total");
-  },
-  destroyItemContent: function(index, element) {
-    console.log("Destroyed item " + index);
-  }
-}
-
-function getSearchMerchant(index)
-{
-	var params='';
-	search_mode = getSearchMode();		
-	if ( search_mode=="postcode"){
-		params="search_mode="+ search_mode;
-		var search_type = getSearchType();			
-		switch (search_type)
-		{
-			case "1":				
-			params+="&city_id="+ global_city_id;
-			params+="&area_id="+ global_area_id;
-			break;
-			
-			case "2":
-			params+="&state_id="+ global_state_id;
-			params+="&city_id="+ global_city_id;
-			break;
-			
-			case "3":
-			params+="&postal_code="+ global_postal_code;
-			break;
-			
-			default:
-			break;
-		}		
+initAddress = function(){
+	has_addressbook = $(".has_addressbook").val();
+	if(has_addressbook==1){
+		if(isLocation()){
+		   showPage('address_form_select_location.html');
+		} else {
+		   showPage('address_form_select.html');
+		}
 	} else {
-		//params  = "address="+ getStorage("search_address") + "&search_mode=" + search_mode;	    
-		params  = "address="+ urlencode(getStorage("search_address")) + "&search_mode=" + search_mode;	    
+		if(isLocation()){
+			showPage('address_form_location.html');
+		} else {
+		   showPage('address_form.html');
+		}
 	}
-	
-	if (!empty(global_filter_params)){
-		params = global_filter_params;
+};
+
+var setDeliveryAddress = function(){
+	$(".frm_address").validate({
+   	    submitHandler: function(form) {
+   	    	setStorage("page_need_refresh",1);
+   	    	var params = $( ".frm_address").serialize();
+   	    	params+="&merchant_id=" + getActiveMerchantID();
+   	    	processAjax('setDeliveryAddress', params );
+		}
+   	});
+	$(".frm_address").submit();
+};
+
+var printDeliveryAddress = function(address){	
+	$(".delivery_address_label").html(address);
+};
+
+/*placeholder = function(field, value){
+	$(field).attr("placeholder", t(value) );
+};*/
+
+var isLogin = function(){
+	var token = getStorage("user_token");
+	if(!empty(token)){
+		return token;
 	}
+	return false;
+};
+
+
+var checkout = function(){
 		
-	action="search";
-	params+="&page="+index;	
-	
-	/*add language use parameters*/
-	params+="&lang_id="+getStorage("default_lang");
-	params+="&lang="+getStorage("default_lang");
-	if(!empty(krms_config.APIHasKey)){
-		params+="&api_key="+krms_config.APIHasKey;
-	}
-
-	params+="&app_version=" + app_version;
-	
-	dump(ajax_url+"/"+action+"?"+params);
-	
-	 ajax_lazy = $.ajax({
-		url: ajax_url+"/"+action, 
-		data: params,
-		type: 'post',                  
-		async: false,
-		dataType: 'jsonp',
-		timeout: 8000,
-		crossDomain: true,
-	 beforeSend: function() {			 	
-	},
-	complete: function(data) {							
-	},
-	success: function (data) {	  	   
-	   if (data.code=1){	   		   	      	  
-	   	   if ( $('#results-'+index).exists() ){
-	   	      displayRestaurantResults(data.details.data ,'results-'+index);	   	   
-	   	   } else {
-	   	   	  dump('element not exist');
-	   	   	  ajax_lazy.abort();
-              ajax_lazy = null;
-	   	   }
-	   } else {	   	  
-	   	  $("#results-"+index).html(data.msg);
-	   }
-	},
-	error: function (request,error) {	        
-		hideAllModal();				
-		$("#results-"+index).html( getTrans("Network error has occurred please try again!",'network_error') );		
-	}
-   });       	
-}
-
-function initBrowseMerchant()
-{
-	browse_params='';
-	removeStorage("browse_total");  
-	callAjax("initBrowseMerchant",'');
-}
-
-
-var lazyBrowseMerchant = {
-  createItemContent: function(index, oldContent) {      	
-  	
-  	search_total = getStorage("browse_total_raw");
-  	if(!empty(search_total)){
-  		$(".result-msg").text(search_total+" "+getTrans("Restaurant found",'restaurant_found') );
-  	}  	  	
-    var $element = $('<div id="browse-results-'+index+'">'+spinner+'</div>');     
-    getBrowseMerchant(index);   
-    return $element[0];    
-  },
-  calculateItemHeight: function(index) {  	
-    return 1200;
-  },
-  countItems: function() {  	
-    return getStorage("browse_total");
-  },
-  destroyItemContent: function(index, element) {
-    console.log("Destroyed item " + index);
-  }
-}
-
-function getBrowseMerchant(index)
-{
-	var params='';
-	action="BrowseRestaurant";
-	params+="&page="+index;	
-	if(!empty(browse_params)){
-		params+="&"+browse_params;
+	transaction_type = $(".transaction_type").val();
+	if(empty(transaction_type)){
+		showToast( t("Please select transaction type") );
+		return;
 	}
 	
-	/*add language use parameters*/
-	params+="&lang_id="+getStorage("default_lang");
-	params+="&lang="+getStorage("default_lang");
-	if(!empty(krms_config.APIHasKey)){
-		params+="&api_key="+krms_config.APIHasKey;
-	}
+	switch (transaction_type){
+		case "delivery":
+		  var street = $(".delivery_address").val();
+		  if(empty(street)){
+		  	 showAlert( t("Please enter delivery address") );
+		  	 return ;
+		  }
+		  
+		  var delivery_asap_val = false;
+		  var delivery_asap = document.getElementById('delivery_asap');		  		  
+		  if(!empty(delivery_asap)){
+		  	  delivery_asap_val = delivery_asap.checked;
+		  }
+		  
+		  //alert(delivery_asap_val);
+		  
+		  required_delivery_time = $(".required_delivery_time").val();
+		  if(required_delivery_time==1 && delivery_asap_val == false){
+		  	  delivery_time_set = getStorage("delivery_time_set");		  
+			  if(empty(delivery_time_set)){
+			  	 showAlert( t("Delivery time is required") );
+			  	 return;
+			  }
+		  }
+		  
+		  /*CHECK MINIMUM ORDER TABLE*/
+		  min_delivery_order = parseFloat($(".min_delivery_order").val());		  
+		  //alert(min_delivery_order);
+		  if(min_delivery_order>0.0001){
+		  	 cart_sub_total = parseFloat($(".cart_sub_total").val());		  	 
+		  	// alert(cart_sub_total);
+		  	 if(min_delivery_order>cart_sub_total){
+		  	 	showAlert( t("Sorry but Minimum order is") +" "+ prettyPrice(min_delivery_order) );
+			  	return;
+		  	 }
+		  }
+		  
+		break;
 		
-	params+="&app_version=" + app_version;
+		case "pickup":
+		  delivery_time_set = getStorage("delivery_time_set");		  
+		  if(empty(delivery_time_set)){
+		  	 showAlert( t("Pickup time is required") );
+		  	 return;
+		  }
+		break;
+		
+		case "dinein":
+		  delivery_time_set = getStorage("delivery_time_set");		  
+		  if(empty(delivery_time_set)){
+		  	 showAlert( t("Dine in time is required") );
+		  	 return;
+		  }
+		break;
+	}	
 	
-	dump(ajax_url+"/"+action+"?"+params);	
-	
-	 ajax_lazy = $.ajax({
-		url: ajax_url+"/"+action, 
-		data: params,
-		type: 'post',                  
-		async: false,
-		dataType: 'jsonp',
-		timeout: 8000,
-		crossDomain: true,
-	 beforeSend: function() {			 	
-	},
-	complete: function(data) {							
-	},
-	success: function (data) {	  	   
-	   if (data.code=1){	   		   
-	   	  if ( $('#browse-results-'+index).exists() ){
-	   	      displayRestaurantResults(data.details.data ,'browse-results-'+index);
-	   	   } else {
-	   	   	  dump('element not exist');
-	   	   	  ajax_lazy.abort();
-              ajax_lazy = null;
-	   	   } 	  	   	   
-	   } else {	   	  
-	   	  $("#browse-results-"+index).html(data.msg);
-	   }
-	},
-	error: function (request,error) {	        
-		hideAllModal();				
-		$("#browse-results-"+index).html( getTrans("Network error has occurred please try again!",'network_error') );		
-	}
-   });       	
-}
-
-function clearCart()
-{
-	ons.notification.confirm({
-	  message: getTrans('Are you sure','are_you_sure') +"?",
-	  title: dialog_title_default,
-	  buttonLabels: [ getTrans('Yes','yes') ,  getTrans('No','no') ],
-	  animation: 'default', // or 'none'
-	  primaryButtonIndex: 1,
-	  cancelable: true,
-	  callback: function(index) {	    
-	    if ( index==0){
-	     	
-	       if (saveCartToDb()){
-	       	  callAjax("clearMyCart", "&device_id="+ encodeURIComponent(getStorage("device_id")) );
-	       } else {
-	       	   //showCart();
-		       cart=[];		       
-		       sNavigator.popPage({cancelIfRunning: true}); //back button
-		       showCartNosOrder();
-	       }
-	    }
-	  }
-	});	
-}
-
-function googleLogin()
-{
-	if(isDebug()){
-		
-		var params = "email=test@google.com";
-		params+="&userid=123";
-		params+="&fullname=basti";
-		params+="&lastname=bach";
-		params+="&imageurl=";		
-		params+="&device_id="+ encodeURIComponent(getStorage("device_id"));
-		
-		if (isDebug()){
-      	  params+="&device_platform=Android";
-        } else {
-      	  params+="&device_platform="+ encodeURIComponent(device.platform);
-        }
-                
-		if ( $(".next_steps").exists()){
-            params+="&next_steps="+ encodeURIComponent($(".next_steps").val());        
-        }        		
-		callAjax("googleLogin", params );
-		
+	setStorage("next_step",'payment_option');
+			
+	if(!isLogin()){				
+		/*not login*/
+		if (transaction_type=="dinein"){
+			showPage("dinein_forms.html");	
+		} else if ( transaction_type=="pickup" ) {
+		    showPage("pickup_forms.html");	
+		} else {									
+			showPage('login.html');
+		}
 	} else {
-		// USE GOOGLE LOGIN PLUGIN
-		window.plugins.googleplus.login(
-	    {      
-	    },
-	    function (obj) {
-	    	// SUCCESS
-	    	var params = "email=" + encodeURIComponent(obj.email);
-			params+="&userid=" + encodeURIComponent(obj.userId);			
-			if(!empty(obj.givenName)){
-			    params+="&fullname="+ encodeURIComponent(obj.givenName);
+		/*already login*/			
+		if (transaction_type=="dinein"){
+			showPage("dinein_forms.html");
+		} else if ( transaction_type=="pickup" ) {
+			showPage("pickup_forms.html");
+		} else {							
+			if (isOrderVerificationEnabled()){
+			 	showPage('order_verification.html');
 			} else {
-				params+="&fullname="+ encodeURIComponent(obj.displayName);
+				if(!oneTimePayment()){
+			       showPage('payment_option.html');	     
+				}
 			}
-			params+="&lastname="+ encodeURIComponent(obj.familyName);
-			params+="&imageurl="+ encodeURIComponent(obj.imageUrl);			
-			params+="&device_id="+ encodeURIComponent(getStorage("device_id"));
-			
-			if (isDebug()){
-	      	  params+="&device_platform=Android";
-	        } else {
-	      	  params+="&device_platform="+ encodeURIComponent(device.platform);
-	        }
-	                
-			if ( $(".next_steps").exists()){
-	            params+="&next_steps="+ encodeURIComponent($(".next_steps").val());        
-	        }	        			        
-			callAjax("googleLogin", params );	    	
-	    },
-	    function (msg) {
-	    	// FAILED
-	    	switch(msg){
-	    	   case "10":	
-	    	   case 10:
-	    	   case "16":	
-	    	   case 16:
-	    	     err_msg = getTrans('error has occured. android keystore not valid','invalid_keystore');
-	    	     err_msg+=". "+ getTrans("error code:",'error_code') + msg;
-	    	     toastMsg( err_msg  );
-	    	   break;
-	    	   	
-	    	   default:
-	    	   toastMsg( getTrans('error has occured. error number','error_has_occured') + ' : ' + msg);
-	    	   break;	
-	    	}	    	
-	    });
+		}
 	}
-}
+};
 
-var lazyFoodCategory = {
-  createItemContent: function(index, oldContent) {      	
-  	  	
-    var $element = $('<div id="foodcategory-results-'+index+'">'+spinner+'</div>');     
-    getCategory(index);   
-    return $element[0];    
-  },
-  calculateItemHeight: function(index) {  	
-    return 50;
-  },
-  countItems: function() {  	
-    return getStorage("category_count");
-  },
-  destroyItemContent: function(index, element) {
-    console.log("Destroyed item " + index);
-  }
-}
-
-function getCategory(index)
-{
-	var params='';
-	action="getCategory";
-	params+="&page="+index;	
-	params+="&mtid="+  getStorage("merchant_id");
-		
-	/*add language use parameters*/
-	params+="&lang_id="+getStorage("default_lang");
-	params+="&lang="+getStorage("default_lang");
-	if(!empty(krms_config.APIHasKey)){
-		params+="&api_key="+krms_config.APIHasKey;
+isOrderVerificationEnabled = function(){	
+	if (settings = getMerchantSettings() ){
+		if (settings.order_verification==2){
+			return true;
+		}
 	}
-		
-	params+="&app_version=" + app_version;
+	return false;
+};
+
+continueCheckout = function(){	
 	
-	dump(ajax_url+"/"+action+"?"+params);		
-    ajax_lazy = $.ajax({
-		url: ajax_url+"/"+action, 
-		data: params,
-		type: 'post',                  
-		async: false,
-		dataType: 'jsonp',
-		timeout: 8000,
-		crossDomain: true,
-	 beforeSend: function() {			 	
-	},
-	complete: function(data) {							
-	},
-	success: function (data) {		   
-	   if (data.code=1){	   	
-	   	
-	   	   if ( $('#foodcategory-results-'+index).exists() ){
-	   	
-		   	   html='';
-		   	   html+='<ons-list>';	   	  
-		   	   
-		   	   if (app_version>="2.4"){
-		   	   	   if(data.details.show_cat_image==1){
-		   	   	   	  $.each( data.details.data, function( key, val ) {
-		   	   	   	  	 html+= '<ons-list-item onclick="loadmenu('+val.cat_id+','+val.merchant_id+');"  >';			   	   	   
-                             html+= '<ons-row align="center">';
-                               html+= '<ons-col class="col-image" width="90px">';
-                                 html+='<img class="rounded_image" src="'+ val.photo_url +'">';
-                               html+= '</ons-col>';
-                               
-                               html+= '<ons-col>';
-                               html+= val.category_name;
-                               html+= '<p class="small-font-dim small nomargin">'+val.category_description+'</p>';
-                               
-                               if($.isArray(val.dish_list)) {
-                               	  html+='<div class="dish_wrap">';
-                               	  $.each( val.dish_list, function( d_key, d_val ) {
-                               	  	  html+='<div class="dish_col">';
-                               	  	  html+='<img class="dish_icon" src="'+ d_val +'">';
-                               	  	  html+='</div>';
-                               	  });
-                               	  html+='</div>';
-                               }
-                               
-                               html+= '</ons-col>';
-                               
-                             html+= '</ons-row>';
-			   	   	     html+= '</ons-list-item>';
-		   	   	   	  });
-		   	   	   } else {
-		   	   	   	  $.each( data.details.data, function( key, val ) {
-			   	   	   html+= '<ons-list-item onclick="loadmenu('+val.cat_id+','+val.merchant_id+');"  >';			   	   	   
-				   	   	   html+= val.category_name;	   	   	   			   	   	   
-			   	   	   html+= '</ons-list-item>';
-			   	   });	   	   		   	   
-		   	   	   }
-		   	   } else {		   	       	  
-			   	   $.each( data.details, function( key, val ) {
-			   	   	   html+= '<ons-list-item onclick="loadmenu('+val.cat_id+','+val.merchant_id+');"  >';			   	   	   
-				   	   	   html+= val.category_name;	   	   	   			   	   	   
-			   	   	   html+= '</ons-list-item>';
-			   	   });	   	   		   	   
-		   	   }
-		   	   
-		   	   html+='</ons-list>';
-		   	   createElement( 'foodcategory-results-'+index, html);
-	   	   
-	   	   } else {
-			  dump('element not exist');
-			  ajax_lazy.abort();
-			  ajax_lazy = null;
-			} 	  	   	   
-	   } else {	   	  
-	   	  $("#foodcategory-results-"+index).html(data.msg);
-	   }
-	},
-	error: function (request,error) {	        
-		hideAllModal();				
-		$("#foodcategory-results-"+index).html( getTrans("Network error has occurred please try again!",'network_error') );		
+	order_verification = false;
+	if (isOrderVerificationEnabled()){	
+	    order_verification=true;	
 	}
-   });       	
-}
-
-
-var lazyItem = {
-  createItemContent: function(index, oldContent) {      	
-  	  	
-    var $element = $('<div id="item-results-'+index+'">'+spinner+'</div>');     
-    getItem(index);   
-    return $element[0];    
-  },
-  calculateItemHeight: function(index) {  	
-    return 50;
-  },
-  countItems: function() {  	
-    return getStorage("item_count");
-  },
-  destroyItemContent: function(index, element) {
-    console.log("Destroyed item " + index);
-  }
-}
-
-function getItem(index)
-{
-	var params='';
-	action="getItem";
-	params+="&page="+index;	
-	params+="&merchant_id="+  getStorage("merchant_id");
-	params+="&cat_id="+  getStorage("selected_cat_id");
-		
-	/*add language use parameters*/
-	params+="&lang_id="+getStorage("default_lang");
-	params+="&lang="+getStorage("default_lang");
-	if(!empty(krms_config.APIHasKey)){
-		params+="&api_key="+krms_config.APIHasKey;
-	}
-		
-	params+="&app_version=" + app_version;
 	
-	dump(ajax_url+"/"+action+"?"+params);
-	
-	ajax_lazy_item = $.ajax({
-		url: ajax_url+"/"+action, 
-		data: params,
-		type: 'post',                  
-		async: false,
-		dataType: 'jsonp',
-		timeout: 8000,
-		crossDomain: true,
-	beforeSend: function() {			 	
-	},
-	complete: function(data) {							
-	},
-	success: function (data) {	  	   
-	   if (data.code=1){	   		  
-	   	   if ( $('#item-results-'+index).exists() ){	      	  
-	   	   	  dump('element  exist' + index);
-	   	      displayItemByCategory(data.details, index);
-	   	   } else {
-
-			  dump('element not exist');
-			  ajax_lazy_item.abort();
-			  ajax_lazy_item = null;
-			} 	  	   	   
-	   } else {	   	  
-	   	  $("#item-results-"+index).html(data.msg);
-	   }
-	},
-	error: function (request,error) {	        
-		hideAllModal();				
-		$("#item-results-"+index).html( getTrans("Network error has occurred please try again!",'network_error') );		
-	}
-   });       	
-	
-}
-
-function initCustomPages()
-{
-	lang = getStorage("default_lang");
-	dump('initCustomPages');	
-	var html='';
-	custom_pages = getStorage("custom_pages");	
-	if(!empty(custom_pages)){		
-		custom_pages =  JSON.parse(custom_pages);
-		if($.isArray(custom_pages)) {
-			$.each( custom_pages , function( key, val ) {			
-				
-				title = val.title;
-				if(!empty(lang)){				
-				   var t = "lang_title_"+lang;
-				   if ( array_key_exists(t,val) ){			   
-					   title = val[t];
-					   if(empty(title)){
-					   	  title = val.title;
-					   }
+	current_page_id = onsenNavigator.topPage.id;	
+	$("#"+current_page_id + " .frm_dinein").validate({
+   	    submitHandler: function(form) {
+   	    	if(!isLogin()){
+				showPage('login.html');
+			} else {
+				if(order_verification){
+				   showPage('order_verification.html');	
+				} else {
+				   if(!oneTimePayment()){	 
+				      showPage('payment_option.html');
 				   }
 				}
-				
-				html+='<ons-list-item onclick="getPage('+val.page_id+');" class="bottom-menu-item">';
-			      html+='<ons-icon icon="'+val.icon+'"></ons-icon> ';
-			      html+='<span>'+title+'</span>';
-			    html+='</ons-list-item>';
-				
-			});			
-			createElement("custom_pages",html);
+			}
 		}
+   	});
+	$("#"+current_page_id + " .frm_dinein").submit();
+};
+
+var initPayment = function(){
+	transaction_type = $(".transaction_type").val();
+	var payment_provider = $("input[name=payment_provider]:checked").val();
+	
+	one_time_payment = $(".one_time_payment").val();	
+	if(!empty(one_time_payment)){
+		payment_provider = one_time_payment;
 	}
 	
+	dump("payment_provider=>" + payment_provider);
+	
+	if(empty(payment_provider)){
+		showToast( t("Please select payment") );
+		return;
+	}		  
+		
+	switch (payment_provider){
+		case "cod":		 
+		  if (transaction_type=="delivery"){
+		  	 app_settings = getAppSettings();		  	 
+		  	 if(app_settings.cod_change_required==2){
+		  	    showPage("cod_forms.html");
+		  	 } else {
+		  	 	payNow();
+		  	 }
+		  } else {
+		  	 payNow();
+		  }
+		break;
+		
+	
+		case "ocr":
+		  showPage("select_creditcards.html");		  
+		break;
+		
+		case "pyr":
+		  showPage("select_payondelivery.html");		  
+		break;
+		
+		default:
+		  //showToast("Please select payment");
+		  payNow();
+		break;
+	}
+};
+
+submitCOD = function(){
+	$(".frm_cod_forms").validate({
+   	    submitHandler: function(form) {
+   	    	payNow();   	    	
+		}
+   	});   	
+	$(".frm_cod_forms").submit();
+};
+
+var payNow = function(payment_params){
+	transaction_type = $(".transaction_type").val();
+	var payment_provider = $("input[name=payment_provider]:checked").val();
+	
+	one_time_payment = $(".one_time_payment").val();	
+	if(!empty(one_time_payment)){
+		payment_provider = one_time_payment;
+	}
+	
+	dump(transaction_type+"=>"+payment_provider);
+	
+	var params  = '';
+	params = "transaction_type="+transaction_type;
+	params += "&payment_provider="+payment_provider;	
+		
+	delivery_date_set = getStorage("delivery_date_set");
+	if(!empty(delivery_date_set)){
+	   params +='&delivery_date=' + delivery_date_set;
+	}
+	
+	delivery_time_set = getStorage("delivery_time_set");
+	if(!empty(delivery_time_set)){
+	   params +='&delivery_time=' + delivery_time_set;	
+	}
+	
+	save_address = getStorage("save_address");
+	if(!empty(save_address)){
+		params +='&save_address=1';
+	}
+	
+	if(!empty(payment_params)){
+		params+="&payment_params="+payment_params;
+	}
+	
+	params += "&sms_order_session="+ $(".sms_order_session").val();
+		
+	switch (payment_provider){
+		case "cod":
+		case "obd":
+		  if (transaction_type=="delivery"){
+		      params+='&order_change='+ $("#order_change").val();
+		  }
+		  /*if (transaction_type=="dinein"){
+		     params+= "&"+$( ".frm_dinein").serialize();
+		  }*/
+		break;
+				
+		case "ocr":
+		  var selected_cc = $('#select_creditcards input[name=cc_id]:checked').val();
+		  params+= "&cc_id=" + selected_cc;
+		break;
+				
+		/*default:
+		  showToast("Please select payment");
+		  return;
+		break;*/
+	}
+	
+	switch(transaction_type){
+		case "dinein":
+		   params+= "&"+$( "#dinein_forms .frm_dinein").serialize();
+		break;
+		
+		case "pickup":
+		   params+= "&"+$( "#pickup_forms .frm_dinein").serialize();
+		break;
+		
+		case "delivery":
+		  var delivery_asap = document.getElementById('delivery_asap');
+		  if(!empty(delivery_asap)){
+		     params+= "&delivery_asap=" + delivery_asap.checked;
+		  }
+		break;
+	}
+	
+	opt_contact_delivery = $("input[name=opt_contact_delivery]:checked").val();		
+	if(!empty(opt_contact_delivery)){
+	   params+="&opt_contact_delivery=" + opt_contact_delivery;
+	}
+	
+	params+= addMerchantParams();
+	
+	processAjax('payNow', params );
+		
+};
+
+/*PAYMENT NEXT STEP*/
+payNowNextStep = function(data){
+	
+	var options = { 
+	  "order_id" : data.details.order_id ,
+	  "total_amount" : data.details.total_amount ,
+	  'message': data.msg					  	  
+	};
+	 	 	
+	switch (data.details.next_step){
+		
+		case "show_home_page":
+		    resetToPage('tabbar.html','none');
+		  break;
+		  
+		case "receipt":		
+		
+		  $graphical = isTrackingGraphical();
+		  		  
+		  if($graphical){
+		  	  showLoader(true,'modal_order_sent');
+		  	  setTimeout(function(){								
+		   	     processAjax('getOrderGraphical','order_id=' + data.details.order_id );
+		      }, 2*1000);		   		   		  	  
+		  } else {
+		  	  showLoader(true,'modal_order_sent');
+		  	  setTimeout(function(){								
+		   	     onsenNavigator.resetToPage('receipt.html',{
+				  	animation : "lift",
+				  	data : options
+				  });  
+				 showLoader(false,'modal_order_sent'); 
+		      }, 2*1000);		   		   		  	  			  
+		  }
+		  
+		  break;
+		
+		case "init_rzr":
+
+		  var options = {
+			  description: data.details.payment_description,
+			  //image: 'https://i.imgur.com/3g7nmJC.png',
+			  currency: data.details.currency_code ,
+			  key:  data.details.provider_credentials.key_id ,
+			  //order_id: data.details.order_id,
+			  amount: data.details.total_amount_by_100 ,
+			  name: data.details.merchant_name,
+			  prefill: {
+			    email: data.details.client_info.email_address ,
+			    contact: data.details.client_info.contact_phone  ,
+			    name: data.details.client_info.first_name + " " + data.details.client_info.last_name
+			  },
+			  theme: {
+			    color: '#F37254'
+			  }
+		};
+		
+		//alert(JSON.stringify(options));  
+									
+		if ( krms_config.debug ){
+			 processAjax('razorPaymentSuccessfull','payment_id=pay_debug_1234566&order_id='+ data.details.order_id );
+		} else {
+			try {
+				RazorpayCheckout.on('payment.success', function(success){
+					//alert('payment_id: ' + success.razorpay_payment_id);
+				    //var orderId = success.razorpay_order_id;
+				    /*var signature = success.razorpay_signature;
+				    alert('orderId: ' + orderId);*/
+				    processAjax('razorPaymentSuccessfull','payment_id='+success.razorpay_payment_id+'&order_id='+ data.details.order_id );
+				});
+				
+				RazorpayCheckout.on('payment.cancel', function(error){
+					/*if(error.code!=2 || error.code!=0){					
+					   showAlert(error.description + ' (Error '+error.code+')');
+					}*/				
+					if(error.code==0 || error.code=="0"){
+						// do nothing
+					} else {
+						showAlert( t(error.description) + "("+ t("Error code") + error.code  +")" );
+					}
+				});
+				RazorpayCheckout.open(options);			
+		   } catch(err) {
+              showAlert(err.message);
+           } 
+		}		
+		break;			
+		
+		case "init_webview":
+		  setStorage("global_receipt_order_id", data.details.order_id );   
+		  setStorage("global_receipt_amount_pay", data.details.total_amount );   
+		  setStorage("global_receipt_message", data.msg );   
+		  		  
+		  payWebview( data.details.redirect_url);	
+		break;
+		
+		case "init_atz":		  
+		  onsenNavigator.pushPage('authorize_form.html',{
+			  	animation : "slide",
+			  	data : {
+			  		order_id : data.details.order_id,
+			  		total_amount : data.details.total_amount
+			  	}
+		  });  
+		break;				
+				
+		default:
+		  showAlert( t("The payment method that you choose is not available in mobileapp") );
+		break;
+	}
+};
+
+
+logout = function(){
+	
+	ons.platform.select('ios'); 
+	ons.notification.confirm( t("Are you sure?") ,{
+		title: dialog_title,
+		id : "dialog_cancel_order",
+		buttonLabels : [ t("Ok"), t("Cancel") ]
+	}).then(function(input) {
+		if (input==0){				
+						
+			
+			if(!isdebug()){
+				social_strategy = getStorage("social_strategy");
+				if(!empty(social_strategy)){
+					switch (social_strategy){
+						case "google_mobile":
+						   window.plugins.googleplus.logout(
+							    function (msg) {
+							      removeStorage("social_strategy");						      
+							    }
+							);
+						break;
+						
+						case "fb_mobile":
+						   fbLogout();
+						break;
+					}
+				}
+			}
+			
+			processDynamicAjax('logout','');
+			removeStorage("user_token");			
+			resetToPage('tabbar.html','none');
+		}
+	});
+	
+};
+
+Pagelogin = function(action){
+	switch(action){
+		case 1:
+		   setStorage("next_step",'show_home_page');
+		break;
+		
+		case 2:
+		   setStorage("next_step",'show_order_list');
+		break;
+	}
+	showPage("login.html");
+};
+
+nextStep = function(next_step){
+	dump("nextStep=>"+next_step);
+	switch (next_step)
+	{
+		case "payment_option":
+		  if (isOrderVerificationEnabled()){
+		  	  replacePage('order_verification.html');
+		  } else {
+		  	  if(!oneTimePayment()){
+		         replacePage('payment_option.html');
+		  	  }
+		  }
+		break;
+		
+		case "show_home_page":
+		  resetToPage('tabbar.html','none');
+		break;
+		
+		case "merchant_menu":		  
+		  processDynamicAjax('verifyCustomerToken','','dummy',"GET",1);		  		  
+		  popPage();		  
+		  merchant_id = $("#restaurant_page .merchant_id").val();
+		  processAjax('getRestaurantInfo', 'merchant_id='+merchant_id, 'GET', 'skeleton1');
+		break;
+		
+		case "show_order_list":		   
+		   popPage();
+		   setTimeout(function(){								
+		   	 document.querySelector('ons-tabbar').setActiveTab(2);
+		   }, 200);		   		   
+		break;
+		
+	}
+};
+
+skip = function(page_id){
+		
+	if(isLocation()){		
+		if ( location_res = getLocationData() ){			
+			resetToPage('tabbar.html','none');
+		} else {
+			showPage("select_location.html");
+		}		
+	} else {
+		if ( lat_res = getCurrentLocation()){		
+		    resetToPage('tabbar.html','none',{
+		    	 lat : lat_res.lat,
+		  	   	 lng : lat_res.lng,
+		    });
+		} else {
+			showPage(page_id);
+		}	
+	}
+	
+};
+
+setAddressBook = function(){
+	$(".frm_address_form_select").validate({
+   	    submitHandler: function(form) {   	
+   	    	
+   	    	setStorage("page_need_refresh",1);
+   	    	setStorage("customer_number", $(".contact_phone").val() );
+   	    	
+   	    	var params = $( ".frm_address_form_select").serialize();
+   	    	params+= "&merchant_id=" + getActiveMerchantID();
+   	    	processAjax('setAddressBook', params ); 
+		}
+   	});
+	$(".frm_address_form_select").submit();
+};
+
+initRaty = function(score){
+	$('.raty-stars-editable').raty({ 
+	   score:score,
+	   readOnly: false, 		
+	   path: 'lib/raty/images',
+	   click: function (score, evt) {	   	   
+	   	   $(".rating").val( score );
+	   }
+   }); 	
+};
+
+initRatyStatic = function(){
+	$('.raty-stars').raty({ 
+		readOnly: true, 
+		score: function() {
+             return $(this).attr('data-score');
+       },
+		path: 'lib/raty/images'
+    });
+};
+
+setClickTab = function(pagename, index){
+	//alert(pagename+"=>"+index);
+	setStorage("click_tab", index);
+	showPage(pagename);
+};
+
+actionSheetOrder = function(order_id, add_review, add_cancel, add_track){
+	if(order_id<=0){
+		showToast( t("invalid order id") );
+		return false;
+	}	
+		
+	actions = [];
+	
+	actions[0] = {
+		 label: t("View Order"),
+	};
+	actions[1] = {
+		 label: t("Re-Order"),
+	};
+	
+	if(add_review){
+		actions[2] = {
+			 label: t("Add Review"),
+		};
+	}
+	
+	if(add_cancel){
+		actions[3] = {
+			 label: t("Cancel Order"),
+		};
+	}
+	
+	if(add_track){
+		actions[4] = {
+			 label: t("Track Order"),
+		};	
+	}
+	
+	actions[5] = {
+		 label: t("Close"),
+		 icon: 'md-close'
+	};
+	
+	//delete actions[ 2 ];
+		
+	ons.openActionSheet({
+	    title: t("What do you want to do") + "?",
+	    cancelable: true,
+	    buttons: actions
+  }).then(function (index) { 
+  	   console.log('index: ', index) 
+  	   switch(index){
+  	   	  case 0: // view receipt
+  	   	    showPage('view_order.html','none',{
+  	   	   	 "order_id": order_id
+  	   	   });
+  	   	  break
+  	   	  
+  	   	  case 1:
+  	   	    processAjax( "ReOrder" , "order_id="+ order_id );
+  	   	  break
+  	   	  
+  	   	  case 2:
+  	   	   showPage('add_review.html','none',{
+  	   	   	 "order_id": order_id
+  	   	   });
+  	   	  break
+  	   	  
+  	   	  case 3:  	   	    
+  	   	    /*ons.platform.select('ios');  	   	     
+  	   	    ons.notification.confirm( t("Are you sure you want to cancel this order?"),{
+				title: t("Cancel this order?") ,		
+				id : "dialog_cancel_order",
+				modifier: " ",			
+				buttonLabels : [ t("Yes") , t("Cancel") ]
+			}).then(function(input) {				
+				if (input==0){
+					processAjax( "CancelOrder" , "order_id="+ order_id );
+				}
+		   });
+		   $(".alert-dialog-footer").removeClass("alert-dialog-footer--rowfooter");*/
+  	   	    
+  	   	    showPage('cancel_order_form.html','none',{
+  	   	   	 "order_id": order_id
+  	   	   });
+			   
+  	   	  break
+  	   	  
+  	   	  case 4:
+  	   	   $graphical = isTrackingGraphical();
+  	   	   if($graphical){
+  	   	   	  processAjax('getOrderGraphical','order_id=' + order_id );
+  	   	   } else {
+	  	   	   showPage('track_history.html','none',{
+	  	   	   	 "order_id": order_id
+	  	   	   });
+  	   	   }
+  	   	  break
+  	   	  
+  	   	  default:
+  	   	  break
+  	   }
+  });
+	
+};
+
+actionSheetFavorites = function(id, merchant_id){
+	
+	actions = [];
+		
+	actions[0] = {
+		 label: t("Remove From Favorites"),
+	};	
+	
+	actions[1] = {
+		 label: t("View Menu"),
+	};	
+	
+	actions[3] = {
+		 label: t("Cancel"),
+		 icon: 'md-close'
+	};
+	
+	ons.openActionSheet({
+	    title: t("What do you want to do") + "?",
+	    cancelable: true,
+	    buttons: actions
+  }).then(function (index) { 
+  	   console.log('index: ', index) 
+  	   if (index==0){  	   	
+  	   	   removeFavorite(id);  	   	
+  	   } else if( index==1){  	   	  
+  	   	  loadMerchant(merchant_id);
+  	   }
+  });
+};
+
+actionSheetCards = function(id){	
+	actions = [];	
+	actions[1] = {
+		 label: t("Edit"),
+	};	
+	actions[2] = {
+		 label: t("Remove"),
+	};	
+	actions[3] = {
+		 label: t("Cancel"),
+		 icon: 'md-close'
+	};
+	
+	ons.openActionSheet({
+	    title: t("What do you want to do") + "?",
+	    cancelable: true,
+	    buttons: actions
+  }).then(function (index) { 
+  	 console.log('index: ', index) 
+  	 switch(index){
+  	 	case 1:
+  	 	  showPage("creditcard_add.html",'slide',{
+  	 	  	cc_id : id
+  	 	  });
+  	 	break;
+  	 	
+  	 	case 2:
+  	 	    ons.platform.select('ios'); 	
+			ons.notification.confirm( t("Are you sure?"),{
+				title: t("Delete credit card") ,		
+				id : "dialog_cancel_order",
+				modifier: " ",			
+				buttonLabels : [ t("Yes") , t("Cancel") ]
+			}).then(function(input) {				
+				if (input==0){
+					processAjax( "DeleteCreditCard" , "id="+ id );
+				}
+		   });
+		   $(".alert-dialog-footer").removeClass("alert-dialog-footer--rowfooter");  
+  	 	break;
+  	 }
+  });
+};
+
+actionSheetBook = function(id){
+	actions = [];	
+	actions[1] = {
+		 label: t("Edit"),
+	};	
+	actions[2] = {
+		 label: t("Remove"),
+	};	
+	actions[3] = {
+		 label: t("Cancel"),
+		 icon: 'md-close'
+	};
+	
+	ons.openActionSheet({
+	    title: t("What do you want to do") + "?",
+	    cancelable: true,
+	    buttons: actions
+  }).then(function (index) { 
+  	   console.log('index: ', index) 
+  	   switch(index)
+  	   {
+  	   	 case 1:
+  	   	    if(isLocation()){
+  	   	    	showPage("address_book_location.html","none",{
+	  	   	    	id:id
+	  	   	    });
+  	   	    } else {
+	  	   	    showPage("address_book.html","none",{
+	  	   	    	id:id
+	  	   	    });
+  	   	    }
+  	   	 break;
+  	   	 
+  	   	 case 2:
+  	   	    ons.platform.select('ios'); 	
+			ons.notification.confirm( t("Are you sure?"),{
+				title: t("Delete this address") ,		
+				id : "dialog_cancel_order",
+				modifier: " ",			
+				buttonLabels : [ t("Yes") , t("Cancel") ]
+			}).then(function(input) {				
+				if (input==0){
+					processAjax( "DeleteAddressBook" , "id="+ id );
+				}
+		   });
+		   $(".alert-dialog-footer").removeClass("alert-dialog-footer--rowfooter");  
+  	   	 break;
+  	   }
+  });
+};
+
+hideDialog = function(element){
+	 dialog = document.getElementById(element);
+	 dialog.hide();
+};
+
+ViewOrder = function(order_id){	
+	showPage('view_order.html','none',{
+	   "order_id": order_id
+	});
+};
+
+removeFavorite = function(id){
+	ons.platform.select('ios'); 
+	
+	ons.notification.confirm( t("Are you sure?"),{
+		title: t("Remove this restaurant?") ,		
+		id : "dialog_cancel_order",
+		modifier: " ",			
+		buttonLabels : [ t("Yes") , t("Cancel") ]
+	}).then(function(input) {				
+		if (input==0){
+			processAjax( "RemoveFavorites" , "id="+ id );
+		}
+   });
+   $(".alert-dialog-footer").removeClass("alert-dialog-footer--rowfooter");  
+};
+
+
+var generateMonth = function(){
+	var x;
+	html='<ons-select name="expiration_month" id="expiration_month" class="expiration_month full_width" >';
+	for (x = 1; x < 13; x++) {
+	    month = str_pad(x,2,"0",'STR_PAD_LEFT');	   
+	    html+='<option value="'+ month + '">'+ month +'</option>';
+	} 
+	html+='</ons-select>';	
+	$(".expiration_month_wrap").html( html );
+};
+
+var generateYear = function(){
+	var x;
+	var d = new Date();
+    var n = d.getFullYear();
+	html='<ons-select name="expiration_yr" id="expiration_yr" class="expiration_yr full_width" >';
+	for (x = 0; x < 13; x++) {
+	    year = n+x;
+	    html+='<option value="'+ year + '">'+ year +'</option>';
+	} 
+	html+='</ons-select>';	
+	$(".expiration_yr_wrap").html( html );
+};
+
+function str_pad (input, pad_length, pad_string, pad_type) {
+    var half = '',
+    pad_to_go;
+
+    var str_pad_repeater = function (s, len) {
+    var collect = '',
+      i;
+
+    while (collect.length < len) {
+      collect += s;
+    }
+    collect = collect.substr(0, len);
+
+    return collect;
+  };
+
+  input += '';
+  pad_string = pad_string !== undefined ? pad_string : ' ';
+
+  if (pad_type != 'STR_PAD_LEFT' && pad_type != 'STR_PAD_RIGHT' && pad_type != 'STR_PAD_BOTH') {
+    pad_type = 'STR_PAD_RIGHT';
+  }
+  if ((pad_to_go = pad_length - input.length) > 0) {
+    if (pad_type == 'STR_PAD_LEFT') {
+      input = str_pad_repeater(pad_string, pad_to_go) + input;
+    } else if (pad_type == 'STR_PAD_RIGHT') {
+      input = input + str_pad_repeater(pad_string, pad_to_go);
+    } else if (pad_type == 'STR_PAD_BOTH') {
+      half = str_pad_repeater(pad_string, Math.ceil(pad_to_go / 2));
+      input = half + input + half;
+      input = input.substr(0, pad_length);
+    }
+  }
+  return input;
 }
 
-function getPage(page_id)
-{	
-	menu.setMainPage('custompage.html', {
-		closeMenu: true,
-		callback: function(index){				
-			callAjax('getPages', "page_id=" + page_id );
-	    }
-	});	
+function CreditCardFormat(value) {
+  var v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '')
+  var matches = v.match(/\d{4,16}/g);
+  var match = matches && matches[0] || ''
+  var parts = []
+  for (i=0, len=match.length; i<len; i+=4) {
+    parts.push(match.substring(i, i+4))
+  }
+  if (parts.length) {
+    return parts.join(' ')
+  } else {
+    return value
+  }
 }
 
-function browseCamera()
-{
-	if(isDebug()){		
-		loader.show();		
-		setTimeout(function(){
-			hideAllModal();
-		 }, 3000);	
+setValue = function(element, value){
+	$(element).val(value);
+};
+
+browseCamera = function(){
+	if(isdebug()){
+		showToast( t("upload will work on actual device") );
+		loaded = 0;	 percent=0; 
+		$("#save_profile_button").attr("disabled",true);		
+		$("#edit_profile ons-fab").attr("disabled",true);
+		$(".progress_wrapper ons-progress-bar").show();
+				
+		$("#edit_profile ons-back-button").attr("disabled",true);		
+		
+		document.querySelector('ons-progress-bar').setAttribute('value', 0);	    
+		test_loader = setInterval(function(){ 
+	       loaded++;
+	       percent = loaded*10;
+	       dump(percent);	       
+	       document.querySelector('ons-progress-bar').setAttribute('value', percent);
+	       if(percent>=100){
+	       	  clearInterval(test_loader);
+	       	  dump("stop");
+	       	  $(".progress_wrapper ons-progress-bar").hide();
+	       	  $("#save_profile_button").attr("disabled",false);	    
+	       	  $("#edit_profile ons-fab").attr("disabled",false);   	  	       	
+	       	  
+	       	  $("#edit_profile img.small_avatar").parent().removeClass("loaded");
+	       	  $("#edit_profile img.small_avatar").parent().addClass("is-loading xsmall-loader");
+	       	  $("#edit_profile img.small_avatar").attr("src", "https://picsum.photos/450/304/?random" );
+	       	  imageLoaded();	       	  
+	       }	       
+	    }, 1000);
 		return;
 	}
 	
-	navigator.camera.getPicture(uploadPhoto, function(){
-		//toastMsg( getTrans("Get photo failed","get_photo_failed") );
-	},{
-	    destinationType: Camera.DestinationType.FILE_URI,
-	    sourceType: Camera.PictureSourceType.PHOTOLIBRARY,
-	    popoverOptions: new CameraPopoverOptions(300, 300, 100, 100, Camera.PopoverArrowDirection.ARROW_ANY)
-    });
-}
+	try {		
+		navigator.camera.getPicture(uploadPhoto, function(){
+			//
+		},{
+		    destinationType: Camera.DestinationType.FILE_URI,
+		    sourceType: Camera.PictureSourceType.PHOTOLIBRARY,
+		    popoverOptions: new CameraPopoverOptions(300, 300, 100, 100, Camera.PopoverArrowDirection.ARROW_ANY)
+	    });
+		
+    } catch(err) {
+       alert(err.message);       
+    } 
+};
 
-function uploadPhoto(imageURI)
-{
-
+uploadPhoto = function(imageURI){	
 	try {
-	
-		 loader.show();
+					 
+		 $(".progress_wrapper ons-progress-bar").show();
+	     $("#save_profile_button").attr("disabled",true);	  
+	     $("#edit_profile ons-fab").attr("disabled",true);     
+		 
+		 document.querySelector('ons-progress-bar').setAttribute('value', 0);
 		 
 		 var options = new FileUploadOptions();
 		 options.fileKey = "file";
@@ -10182,7 +8152,13 @@ function uploadPhoto(imageURI)
 		 options.mimeType = "image/jpeg";
 		 	 
 		 var params = {};
-		 params.client_token = getStorage("client_token") ;	 
+		 
+		 params.user_token = getStorage("user_token") ;	 
+		 if(!empty(krms_config.ApiKey)){
+		    params.api_key = krms_config.ApiKey;
+		 }
+		 params.lang = getLanguageCode();
+		 		 		 
 		 options.params = params;
 	 
 		 options.chunkedMode = false;	
@@ -10193,15 +8169,14 @@ function uploadPhoto(imageURI)
 		 var ft = new FileTransfer();	 	 	 
 		 
 		 ft.onprogress = function(progressEvent) {
-	     if (progressEvent.lengthComputable) {
-	     	    //toastMsg( "progressEvent=>"+progressEvent.loaded + " - " + progressEvent.total );     	    
+	     if (progressEvent.lengthComputable) {	     	    
 	     	    var loaded_bytes= parseInt(progressEvent.loaded);
 	     	    var total_bytes= parseInt(progressEvent.total);
 	     	    
 	     	    var loaded_percent = (loaded_bytes/total_bytes)*100;	        
 	     	    loaded_percent=Math.ceil(loaded_percent);
-	     	    	       	        
-		        $(".profile_title").html( getTrans("Uploading files",'upload_files') + "... " + loaded_percent+"%" );
+	     	    	       	        		        
+		        document.querySelector('ons-progress-bar').setAttribute('value', loaded_percent);
 		        
 		    } else {	    		    	
 		        //loadingStatus.increment();
@@ -10209,460 +8184,607 @@ function uploadPhoto(imageURI)
 		 };
 		 	 
 		 ft.upload(imageURI, ajax_url+"/UploadProfile", function(result){
-		    //alert(JSON.stringify(result));
-		    /*alert(result.responseCode);
-		    alert(JSON.stringify(result.response));*/  
+		     //alert(JSON.stringify(result));		     
 		    
-		    var response=explode("|",result.response);
-		    toastMsg(response[1]);	
-		    
-		    if ( response[0]=="1" || response[0]==1){	    	
-		    	$(".avatar").attr("src", response[2] );
-		    	setStorage("avatar", response[2] );
-		    	imageLoaded('.img_loaded');
-		    }
-		    
-		    $(".profile_title").html( getTrans("Profile",'profile') );
-		    
-		    setTimeout(function(){
-				hideAllModal();
+		     setTimeout(function(){				
+				$(".progress_wrapper ons-progress-bar").hide();
+	       	    $("#save_profile_button").attr("disabled",false);	
+	       	    $("#edit_profile ons-fab").attr("disabled",false);
 			 }, 2000);
+			 			
+			if( result.responseCode=="200" || result.responseCode==200 ){
+		    
+			    var response=explode("|",result.response);		
+			    /*alert(JSON.stringify(response));*/
+			    showToast(response[1]);
+			    			    			    
+			    if ( response[0]=="1" || response[0]==1){			    	
+			    	
+			    	$("#edit_profile img.small_avatar").parent().removeClass("loaded");
+	       	        $("#edit_profile img.small_avatar").parent().addClass("is-loading xsmall-loader");
+			    	$("#edit_profile img.small_avatar").attr("src", response[2] );			    				    
+	       	        imageLoaded();			    	
+			    	setStorage("profile_avatar", response[2] );			    	
+			    }
+		   
+			} else {
+				showToast( t("upload error :") + result.responseCode);
+			}
 		    
 		 }, function(error){	 	
-		 	 $(".profile_title").html( getTrans("Profile",'profile') );
-		 	 hideAllModal();
-		     toastMsg( getTrans("An error has occurred: Code","error_occured") + " "+ error.code);
+		 	 $(".progress_wrapper ons-progress-bar").hide();
+	       	  $("#save_profile_button").attr("disabled",false);	 
+	       	  $("#edit_profile ons-fab").attr("disabled",false);
+		     showToast( t("An error has occurred: Code") + " "+ error.code);
 		 }, options);
 	 
 	 } catch(err) {
-       alert(err.message);       
+	 	$(".progress_wrapper ons-progress-bar").hide();
+	    $("#save_profile_button").attr("disabled",false);	
+	    $("#edit_profile ons-fab").attr("disabled",false);
+        alert(err.message);       
      } 
-}
+};
 
-function mercapagoSuccess(payment)
+explode = function(sep,string)
 {
-	 if (payment != null){        
-	 	alert(JSON.stringify(payment));     
-        alert(JSON.parse(payment).id);
-    } else {
-        toastMsg("The user did not make the payment");
-    }
-}
-
-function mercapagoFailed(error)
-{
-	toastMsg("Error MercadoPagoPlugin : " + error);
-}
-
-function setTrackView(pagename , campaign_details )
-{
-	
-   var analytics_id = getStorage("analytics_id");
-   var analytics_enabled = getStorage("analytics_enabled");
-			
-   if ( analytics_enabled == 1 && !empty(analytics_id)){
-	   dump('setTrackView=>'+pagename);
-	   try {   	
-	      analytics.sendAppView(pagename, function(){
-	      	 dump("ok");
-	      }, function(){
-	      	 dump("failed");
-	      });		
-	   } catch(err) {
-	      dump(err.message);       
-	   } 
-   }         
-}
-
-function iOSeleven()
-{	
-	if ( device.platform =="iOS"){	
-		version = parseFloat(device.version);		
-		if ( version>=11 ){
-			return true;
-		}
-	}
-	return false;
-}
-
-function cancelCartOrder()
-{
-  if ( cart.length>0 ){		
-	   ons.notification.confirm({
-		  message: getTrans('Cancel current order?','cancel_order') ,	  
-		  title: dialog_title_default ,
-		  buttonLabels: [ getTrans('Yes','yes') ,  getTrans('No','no') ],
-		  animation: 'default', // or 'none'
-		  primaryButtonIndex: 1,
-		  cancelable: true,
-		  callback: function(index) {	  	       
-		  	   if (index==0){	  	   	      	   	  
-					sNavigator.popPage({cancelIfRunning: true}); 
-		  	   }
-		  }
-		});
-  } else {
-  	  sNavigator.popPage({cancelIfRunning: true}); 
-  }
+	var res=string.split(sep);
+	return res;
 }
 
 
+ChangeTimeList = function(){
+	merchant_id = getActiveMerchantID();
+    params = "merchant_id="+ merchant_id;
+    params +="&date="+ $(".date_booking").val();
+    processDynamicAjax("GetMerchantTimeList", params, 'time_select_wrap', 'GET', 1 );
+};
 
-function showPromoPage()
-{
-	if (typeof merhantPopOverMenu === "undefined" || merhantPopOverMenu==null || merhantPopOverMenu=="" ) {	     
+pointsDetails = function(point_type){
+	showPage("points_details.html",'slide',{
+		point_type:point_type
+	});
+};
+
+showLocationDetails = function(display){
+	if(display){
+		$(".search_wrap1").hide();
+		$(".search_wrap2").show();
 	} else {
-		merhantPopOverMenu.hide(); 
-	}	
-	var options = {
-      animation: 'slide',
-      onTransitionEnd: function() {       	 
-      	      	 
-      } 
-    };   
-    sNavigator.pushPage("page-promo.html", options);		
-}
+		$(".search_wrap1").show();
+		$(".search_wrap2").hide();
+	}
+};
 
+identifyLocation = function(){
+	lat = $(".lat").val();
+	lng = $(".lng").val();	 
+	identifyLocationLoader(true);
+	GeocodeLat( lat, lng ) 	;
+};
 
-
-function showReviewsDialog(id)
-{
-	ons.ready(function() {
-	  ons.createDialog('reviews-dialog.html').then(function(dialog) {	  	 
-	  	  $(".review_id").val(id);
-	      dialog.show();
-	      translatePage();
-	  });
-	});
-}
-
-function editReview()
-{
-	dialog_reviews.hide();
-	var id = $(".review_id").val();	
-	var params="&client_token="+ getStorage("client_token")+"&id="+id;
-    params+="&id=" + id;
-    callAjax("getReview",params);	       
-}
-
-function deleteReview()
-{	
-	var id = $(".review_id").val();	
-	ons.notification.confirm({
-	  message: getTrans('Are you sure?','are_you_sure') ,	  
-	  title: dialog_title_default,
-	  buttonLabels: ['Yes', 'No'],
-	  animation: 'default', // or 'none'
-	  primaryButtonIndex: 1,
-	  cancelable: true,
-	  callback: function(index) {	  	
-	    if ( index==0){	    	
-	    	dialog_reviews.hide();
-	        var params="&client_token="+ getStorage("client_token")+"&id="+id;
-	        params+="&id=" + id;
-	        callAjax("deleteReview",params);	       
-	    }
-	  }
-	});	
-}
-
-function updateReview()
-{
-	$.validate({ 	
-	    form : '#frm-edit_review',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	      var params = $( "#frm-edit_review").serialize();	      
-	      params+="&merchant_id=" +  getStorage("merchant_id") ;
-	      params+="&client_token="+ getStorage("client_token");
-	      callAjax("updateReview",params);	       
-	      return false;
-	    }  
-	});
-}
-
-function showPage(pagename)
-{
-	var options = {
-      animation: 'slide',
-      onTransitionEnd: function() {       	  
-      } 
-   };   
-   sNavigator.pushPage(pagename+".html", options);
-}
-
-function showPage2(pagename,animation)
-{
-	var options = {
-      animation: animation,      
-   };   
-   sNavigator.pushPage(pagename+".html", options);
-}
-
-function geoComplete2()
-{
-	dump( "country_code_set=>" + getStorage("country_code_set"));			
-	if ( empty(getStorage("country_code_set")) ){				
-		if(empty(getStorage("mobile_country_code"))){
-		  $("#ss").geocomplete();		
+identifyLocationLoader = function(loading) {
+	if(loading){
+		$(".print_location_address").html( t("identtifying location") + '<ons-progress-bar indeterminate></ons-progress-bar>' );
+		$("#confirm_location").attr("disabled",true); 
+		$("#location_add_details").attr("disabled",true); 
+	} else {
+		$(".print_location_address").html('');
+		$("#confirm_location").attr("disabled",false); 
+		$("#location_add_details").attr("disabled",false); 
+		$("#location_change").attr("disabled",false); 
+	}
+	
+	current_page_id = onsenNavigator.topPage.id;
+	dump("func=>identifyLocationLoader");
+	dump(current_page_id);
+	if(current_page_id=="address_form" || current_page_id=="address_book"){
+		if(loading){			
+			showLoader(true);
+			$("#"+current_page_id + " ons-bottom-toolbar ons-button").attr("disabled",true); 
 		} else {
-		  $("#ss").geocomplete({
-		    country: getStorage("mobile_country_code")
-	      });			 
-	           
-	      setStorage("country_code_set", getStorage("mobile_country_code") );
-	      
-		}				
-	} else {				
-		$("#ss").geocomplete({
-		   country: getStorage("country_code_set")
-	    });	
-	}
-}
-
-function searchByAddress()
-{
-	global_filter_params='';
-	search_mode = getSearchMode();	   
-	var ss = $("#ss").val();
-	/*clear all storage*/ 
-    setStorage("search_address", ss );
-    clearAllStorage();
-    callAjax("initSearch","address="+ urlencode(ss) + "&search_mode=" + search_mode );			   
-}
-
-function searchByName()
-{
-	var ss_restaurant_name = $("#ss_restaurant_name").val();
-	
-	if(empty(ss_restaurant_name)){
-		toastMsg( getTrans("Restaurant name is required","restaurant_name_is_required") );
-		return;
-	}
-	
-	clearAllStorage();
-	if(!empty(getStorage("search_address"))){
-	    search_address = getStorage("search_address");
-	} else  search_address = '';
-	global_filter_params = "&address=" + search_address +  "&stype=1&sname="+ ss_restaurant_name ;
-	callAjax("initSearch","address="+ search_address + "&search_mode=" + search_mode + "&sname="+ ss_restaurant_name + "&stype=1" );			   
-}
-
-function searchByStreet()
-{
-	var ss_street = $("#ss_street").val();
-	
-	if(empty(ss_street)){
-		toastMsg( getTrans("Street name is required","street_required") );
-		return;
-	}
-	
-	clearAllStorage();
-	if(!empty(getStorage("search_address"))){
-	    search_address = getStorage("search_address");
-	} else  search_address = '';
-	global_filter_params = "&address=" + search_address +  "&stype=2&ss_street="+ ss_street ;
-	callAjax("initSearch","address="+ search_address + "&search_mode=" + search_mode + "&ss_street="+ ss_street + "&stype=2" );
-}
-
-function searchByCuisine()
-{
-	var ss_cuisine = $("#ss_cuisine").val();
-	
-	if(empty(ss_cuisine)){
-		toastMsg( getTrans("Cuisine name is required","cuisine_required") );
-		return;
-	}
-	
-	clearAllStorage();
-	if(!empty(getStorage("search_address"))){
-	    search_address = getStorage("search_address");
-	} else  search_address = '';
-	global_filter_params = "&address=" + search_address +  "&stype=3&ss_cuisine="+ ss_cuisine ;
-	callAjax("initSearch","address="+ search_address + "&search_mode=" + search_mode + "&ss_cuisine="+ ss_cuisine + "&stype=3" );
-}
-
-function searchByFoodName()
-{
-	var ss_item_name = $("#ss_item_name").val();
-	
-	if(empty(ss_item_name)){
-		toastMsg( getTrans("Food name is required","foodname_required") );
-		return;
-	}
-	
-	clearAllStorage();
-	if(!empty(getStorage("search_address"))){
-	    search_address = getStorage("search_address");
-	} else  search_address = '';
-	global_filter_params = "&address=" + search_address +  "&stype=4&ss_item_name="+ ss_item_name ;
-	callAjax("initSearch","address="+ search_address + "&search_mode=" + search_mode + "&ss_item_name="+ ss_item_name + "&stype=4" );
-}
-
-/*END CLEAN OF CODE*/
-
-
-
-
-/*4.6 CODE*/
-
-function t(words,words_key){
-	return getTrans(words,words_key);
-}
-
-initPush = function(re_init){
-	
-	try {
-	
-		push = PushNotification.init({
-			android: {
-				sound : "true",
-				clearBadge : "true"
-			},
-		    browser: {
-		        pushServiceURL: 'http://push.api.phonegap.com/v1/push'
-		    },
-			ios: {
-				alert: "true",
-				badge: "true",
-				sound: "true",
-				clearBadge:"true"
-			},
-			windows: {}
-	    });
-	    
-	    push.on('registration', function(data) {   	  	
-	    	/*CHECK IF SAME DEVICE ID*/	    	
-	    	if(re_init){	    		
-		    	old_device_id = getStorage("device_id");
-		    	dump(old_device_id +"=>" + data.registrationId );
-	    		if (old_device_id!=data.registrationId){	    			
-	    			sendPost('reRegisterDevice', "new_device_id="+ data.registrationId);
-	    		}
-	    	} else {	    		
-	    	   setStorage("device_id", data.registrationId ); 	
-	    	}	    	 
-		});
-		
-		 push.on('notification', function(data){     
-	   	   //alert(JSON.stringify(data));   	
-		   if ( data.additionalData.foreground ){
-	    		playSound();
-	       } 
-	                       	  
-	       handleNotification(data);
-	       
-	    });
-	    
-	    PushNotification.createChannel(function(){
-	    	//alert('create channel succces');
-	    }, function(){
-	    	//alert('create channel failed');
-	    },{
-	    	 id: 'kmrs_channel',
-	         description: 'mobile app channel',
-	         importance: 5,
-	         vibration: true,
-	         sound : 'beep'
-	      }
-	    );
-	    
-	    push.on('error', function(e) {      
-	     	 alert(e.message);
-		});
-    
-	} catch(err) {
-       alert(err.message);
-    } 
-};
-
-playSound = function(){		 
-	 try {	 		 	 
-		 url = 'file:///android_asset/www/beep.wav';			 
-		 if(device_platform=="iOS"){
-		 	url = "beep.wav";
-		 }
-		 //alert(url);
-		 my_media = new Media(url,	        
-	        function () {
-	            dump("playAudio():Audio Success");
-	            my_media.stop();
-	            my_media.release();
-	        },	        
-	        function (err) {
-	            dump("playAudio():Audio Error: " + err);
-	        }
-	    );	    
-	    my_media.play({ playAudioWhenScreenIsLocked : true });
-	    my_media.setVolume('1.0');
-    
-    } catch(err) {
-       alert(err.message);
-    } 
-};
-
-handleNotification = function(data){
-	//var push_type = data.additionalData.push_type;	
-	toastMsg(data.title+"\n"+data.message);
-	
-	/*SET THE COUNT FOR NOTIFICATION BADGE*/	
-	setNotificationCount();
-};
-
-fbInit = function(){
-	try {
-		
-		facebookConnectPlugin.getLoginStatus(function(status){
-			//alert(JSON.stringify(status)); 
-			if (status.status=="connected"){			
-				fbRegister( status.authResponse.userID );	
-			} else {
-				fbLogin();
-			}
-		}, function(error){
-		   	onsenAlert( t("an error has occured","an_error_has_occured") + " "+ JSON.stringify(error) );
-		});	
-		
-	} catch(err) {
-       onsenAlert(err.message);
-    } 
-};
-
-fbLogin = function(){	
-	facebookConnectPlugin.login(["public_profile","email"], function(data){
-		//alert(JSON.stringify(data)); 		
-		fbRegister( data.authResponse.userID );		 
-	}, function(error){
-		//alert(JSON.stringify(error)); 		
-		//cancel = error.errorCode  = 4201;		
-		if(error.errorCode!=4201){
-		   onsenAlert( t("an error has occured","an_error_has_occured") + " "+ JSON.stringify(error) );
+			showLoader(false);
+			$("#"+current_page_id +" ons-bottom-toolbar ons-button").attr("disabled",false); 
 		}
+	}
+};
+
+DragLocationLoader = function(loading){	
+	
+	current_page_id = onsenNavigator.topPage.id;
+	dump("func=>DragLocationLoader");
+	dump(current_page_id);
+	
+	if(loading){
+		$("#confirm_location").attr("disabled",true); 
+		$("#location_add_details").attr("disabled",true); 
+		$("#location_change").attr("disabled",true); 
+	} else {
+		$("#confirm_location").attr("disabled",false); 
+		$("#location_add_details").attr("disabled",false); 
+		$("#location_change").attr("disabled",false); 
+	}
+	
+	if(current_page_id=="address_form"){
+		if(loading){			
+			$("#"+current_page_id + " ons-bottom-toolbar ons-button").attr("disabled",true); 
+		} else {
+			$("#"+current_page_id +" ons-bottom-toolbar ons-button").attr("disabled",false); 
+		}
+	}
+};
+
+CurrentLocation = function(){
+	//map_marker = [];
+	map_bounds = [];
+	$(".identify_location_wrap").hide();
+	locateLocation();
+};
+
+ReCurrentLocation = function(){
+	popPage();	
+	setTimeout(function() {		
+       CurrentLocation();
+    }, 100); 
+};
+
+setRecentSearch = function(address, lat, lng, street, city,  state, zipcode, country){
+	
+	if(empty(lat)){
+		showToast( t('invalid latitude') );
+		return false;
+	}
+	if(empty(lng)){
+		showToast( t('invalid longitude') );
+		return false;
+	}
+	
+	popPage();	
+	setTimeout(function() {		
+       $(".print_location_address").html( address );
+	   $(".recent_search_address").val( address );
+	   
+	   map_setLangLngValue( lat , lng );
+	   map_setCenter( lat , lng );
+	   map_moveMarker( 1, lat ,  lng );
+	   
+	   current_page_id = onsenNavigator.topPage.id;
+	   dump("current_page_id=>"+current_page_id);
+	   $("#"+current_page_id +" .street").val( '' );
+	   $("#"+current_page_id +" .city").val( '' );
+	   $("#"+current_page_id +" .state").val( '' );
+	   $("#"+current_page_id +" .zipcode").val( '' );
+	   $("#"+current_page_id +" .country").val( '' );
+	   
+	   
+	   if(!empty(street)){
+	   	  $(".street").val(street);
+	   }
+	   if(!empty(city)){
+	   	  $(".city").val(city);
+	   }
+	   if(!empty(state)){
+	   	  $(".state").val(state);
+	   }
+	   if(!empty(zipcode)){
+	   	  $(".zipcode").val(zipcode);
+	   }
+	   /*if(!empty(location_name)){
+	   	  $(".location_name").val(location_name);
+	   }*/	   
+	   if(!empty(country)){
+	   	  $(".country").val(country);
+	   }
+	   
+    }, 100); 
+};
+
+ReSelectLocation = function(){
+	hideTooltip('.tooltip_home');
+	
+	if(isLocation()){
+		showPage("select_location.html");
+		return;
+	}
+			
+	current_latlng = getCurrentLocation();
+   	if(!empty(current_latlng)){   	    	
+   		showPage("map_select_location.html",'none',{
+   			lat : current_latlng.lat,
+   			lng : current_latlng.lng
+   		});
+   	} else {
+   		showPage("map_select_location.html",'none');
+   	}
+};
+
+AddFavorite = function(){
+	if(isLogin()){ 
+	   merchant_id = getActiveMerchantID();
+	   params = "merchant_id="+ merchant_id;
+	   processAjax('AddFavorite',params);
+	} else {
+	   setStorage("next_step",'merchant_menu');
+	   showPage('login.html');
+	}
+};
+
+favoriteButton = function(is_added){
+	html='';
+	if(is_added){
+	   html+='<ons-toolbar-button onclick="AddFavorite()" modifier="to_text_orange">';
+          html+='<ons-icon icon="ion-android-favorite"  size="22px"></ons-icon>';
+       html+='</ons-toolbar-button>';
+	} else {
+		html+='<ons-toolbar-button onclick="AddFavorite()" >';
+          html+='<ons-icon icon="ion-android-favorite-outline"  size="22px"></ons-icon>';
+       html+='</ons-toolbar-button>';
+	}
+	return html;
+}
+
+loadMerchantWithFood = function(merchant_id, item_id, cat_id){
+	dump("merchant_id=>"+ merchant_id);
+	dump("item_id=>"+ item_id);
+	dump("cat_id=>"+ cat_id);	
+    replacePage('restaurant_page.html','slide',{
+   	   'merchant_id': merchant_id,
+   	   'item_id': item_id,
+   	   'cat_id' : cat_id
+    });
+};
+
+showSearchForm = function(search_string){
+	showPage("search_form.html",'none',{
+		'search_string':search_string
 	});
+};
+
+
+loadTabbar = function(next_step){
+	dump("tabbar =>"+ next_step);
+	switch (next_step){
+		case "map_select_location":
+		case "show_home_page":		   
+		   showHomeOrSelect();
+		  /*if(isLocation()){		  	  
+		  	  showHomeOrSelect();
+		  } else {		 
+			  if ( lat_res = getCurrentLocation()){
+			  	   if(tabbar_loaded){		  
+			  	   	   dump('bringPageTopx');		  	   	   
+			  	   	   resetToPage('tabbar.html','none');
+			  	   } else {
+			  	   	   onsenNavigator.resetToPage("tabbar.html",{
+					  	   animation : "slide" ,  	
+					  	   data : {
+					  	   	  lat : lat_res.lat ,
+					  	   	  lng : lat_res.lng ,
+					  	   	  location_address : lat_res.recent_search_address
+					  	   }
+					   });	  
+			  	   }
+			  } else {
+			  	  resetToPage( "map_select_location.html" );
+			  }
+		  }*/
+		break;
+		
+		case "payment_option":
+		  if (isOrderVerificationEnabled()){
+		  	 showPage('order_verification.html');
+		  } else {
+		     //showPage('payment_option.html');
+		     if(!oneTimePayment()){
+		        replacePage('payment_option.html');
+		     }
+		  }
+		break;
+		
+		case "merchant_menu":
+		  processDynamicAjax('verifyCustomerToken','','dummy',"GET",1);		  		  
+		  popPage();		  
+		  merchant_id = $("#restaurant_page .merchant_id").val();
+		  processAjax('getRestaurantInfo', 'merchant_id='+merchant_id, 'GET', 'skeleton1');		  
+		break;
+				
+		default:
+		  //resetToPage( "map_select_location.html" );
+		  //showSelectLocation();
+		  showHomeOrSelect();
+		break;
+	}
+};
+
+sendOrderSMSCode = function(){	
+    merchant_id = getActiveMerchantID();
+	params = "merchant_id="+ merchant_id;
+	processAjax("sendOrderSMSCode",params,"GET");	
+};
+
+
+redeemPoints = function(){
+	redeem_points = $(".redeem_points").val();
+	if(!empty(redeem_points)){
+		merchant_id = getActiveMerchantID();   
+		params = "points="+redeem_points;		
+   	    params+= "&merchant_id="+ merchant_id;
+   	    params+= "&transaction_type=" + $(".transaction_type").val();
+		processAjax("applyRedeemPoints", params ,'GET', 'normal_loader'   );
+	} else {
+		showToast( t("Please enter points") );
+	}
+};
+
+removePoints = function(){
+	processAjax("removePoints", '' ,'GET', 'normal_loader'  );
+};
+
+applyVoucher = function(){
+	params = 'voucher_name=' + $(".voucher_name").val();
+	merchant_id = getActiveMerchantID();   
+	params+= "&merchant_id="+ merchant_id;
+	params+= "&transaction_type=" + $(".transaction_type").val();
+	processAjax('applyVoucher', params );
+};
+
+removeVoucher = function(){
+	processAjax('removeVoucher', '' );
+};
+
+applyTips = function(tips){
+	params = 'tips=' + tips;
+	merchant_id = getActiveMerchantID();   
+	params+= "&merchant_id="+ merchant_id;
+	params+= "&transaction_type=" + $(".transaction_type").val();
+	processAjax('applyTips', params ,'GET', 'normal_loader');
+};
+
+removeTip = function(){
+	processAjax('removeTip', '','GET', 'normal_loader' );
+};
+
+browseLink = function(url){
+	if(!empty(url)){
+		if ( !krms_config.debug ){
+		   browse_inapp = cordova.InAppBrowser.open( url  , '_blank', 'location=no' ); 	
+		} else {
+			window.open(url);
+		}
+	}
+};
+
+payWebview = function(url){
+	if ( !krms_config.debug ){
+		 inapp = cordova.InAppBrowser.open( url  , '_blank', 'location=no' ); 		 
+		 inapp.addEventListener('loadstop', function(event){
+		 	 url = event.url;
+		 	 var res = url.match(/success/gi);
+		 	 if(!empty(res)){
+		 	   inapp.executeScript({
+			      code: "document.documentElement.innerText"
+			   }, function(html) {			   	  
+			   	  inapp.close();
+			   	  
+			      setTimeout(function(){ 			      				   	
+				   	   
+			      	$graphical = isTrackingGraphical();
+			      	
+			      	if($graphical){
+			      		showLoader(true,'modal_order_sent');
+				  	    setTimeout(function(){
+				   	      processAjax('getOrderGraphical','order_id=' + getStorage("global_receipt_order_id") );
+				        }, 2*1000);		   		   		  
+			      	} else {
+				      	var options = { 
+						  "order_id" : getStorage("global_receipt_order_id") ,
+						  "total_amount" : getStorage("global_receipt_amount_pay") ,
+						  'message': getStorage("global_receipt_message")
+						};	
+						onsenNavigator.pushPage('receipt.html',{
+						  	animation : "slide",
+						  	data : options
+						});  
+			      	}
+				   	
+				   }, 1);			   	  			   	  
+			   	  
+			   });
+		 	 }
+		 	 
+		 	 var error = url.match(/error/gi);
+		 	 if(!empty(error)){
+		 	   inapp.executeScript({
+			      code: "document.documentElement.innerText"
+			   }, function(html) {
+			   	  inapp.close();
+			      showAlert(html);
+			   });
+		 	 }
+		 	 
+		 	 var cancel = url.match(/cancel/gi);
+		 	 if(!empty(cancel)){
+		 	 	inapp.close();
+		 	 }
+		 	 
+		 });
+	} else {
+	    window.open(url);
+	}	
+};
+
+checkSelectedCreditCard = function(){
+	selected = $('#select_creditcards input[name=cc_id]:checked').val();			
+	if(empty(selected)){
+		showToast( t("Please select your credit card or add your new credit card") );
+	} else {
+		payNow();
+	}
+};
+
+setSelectedCards = function(){
+	selected = $('#select_payondelivery input[name=card_id]:checked').val();	
+	if(empty(selected)){
+		showToast( t("Please select card on the list") );
+	} else {
+		payNow("&selected_card="+selected);
+	}
+};
+
+EnabledPush = function(){
+	var enabled_push = $("input[name=enabled_push]:checked").val();
+	if(empty(enabled_push)){
+		enabled_push='';
+	}	
+	processAjax('savePushSettings', "enabled_push="+enabled_push );
+};
+
+enabledSocialLogin = function(){
+	var list = document.getElementById("login_list");
+	html='';
+	   
+	app_settings = getAppSettings();
+	if(app_settings){
+	   enabled_fb = app_settings.mobile2_enabled_fblogin;
+	   enabled_google = app_settings.mobile2_enabled_googlogin;
+	   
+	   if(enabled_fb==1 && enabled_google==1){
+	   	
+	   	    html+='<ons-list-item modifier="nodivider pad_right social_list">';
+		   	  
+		   	  html+='<div class="center_line"><h6>'+ t("Or") +'</h6></div>';
+		   	  
+		       html+='<ons-row>';
+		       		       
+		          html+='<ons-col width="50%" style="text-align:center;">';		          
+		          html+='<ons-button modifier="blue_button no_shadow" onclick="fbLogin();" >';
+			        html+='<div class="table">';
+			          html+='<div class="col" style="width:15%;"><ons-icon icon="fa-facebook-square" size="23px"></ons-icon></div>';
+			          html+='<div class="col">' + t("Facebook") +'</div>';
+			        html+='</div>';
+			      html+='</ons-button>';		         
+		          html+='</ons-col>';          
+		          
+		          html+='<ons-col style="text-align:center;">';		          
+		           html+='<ons-button modifier="darker_orange_button no_shadow" onclick="GLogin();" >';
+			        html+='<div class="table">';
+			          html+='<div class="col" style="width:15%;"><ons-icon icon="fa-google-plus-g" size="23px"></ons-icon></div>';
+			          html+='<div class="col">'+  t("Google+") +'</div>';
+			        html+='</div>';
+			      html+='</ons-button>';		          
+		          html+='</ons-col>';		          
+		          
+		       html+='</ons-row>';
+		    html+='</ons-list-item>';  
+	   	
+	    } else if(enabled_fb==1){
+	   	  html+='<ons-list-item modifier="nodivider pad_right social_list">';
+	   	  html+='<div class="center_line"><h6>'+ t("Or") +'</h6></div>';
+	   	  
+	   	  html+='<ons-row>';
+	   	  html+='<ons-col style="text-align:center;">';		          
+          html+='<ons-button modifier="blue_button no_shadow" style="width:100%;" onclick="fbLogin();" >';
+	        html+='<div class="table auto">';
+	          html+='<div class="col" style="width:15%;"><ons-icon icon="fa-facebook-square" size="23px"></ons-icon></div>';
+	          html+='<div class="col">' + t("Facebook") +'</div>';
+	        html+='</div>';
+	      html+='</ons-button>';		         
+          html+='</ons-col>'; 
+		  html+='</ons-row>';
+	   	  
+	   	  html+='</ons-list-item>';
+	   	  
+	   } else if(enabled_google==1){
+	      html+='<ons-list-item modifier="nodivider pad_right social_list">';
+	   	  html+='<div class="center_line"><h6>'+ t("Or") +'</h6></div>';
+	   	  
+	   	  html+='<ons-row>';
+   	         html+='<ons-col style="text-align:center;">';		          
+	           html+='<ons-button modifier="darker_orange_button no_shadow" style="width:100%;" onclick="GLogin();" >';
+		        html+='<div class="table auto google">';
+		          html+='<div class="col" style="width:15%;"><ons-icon icon="fa-google-plus-g" size="23px"></ons-icon></div>';
+		          html+='<div class="col">'+  t("Google+") +'</div>';
+		        html+='</div>';
+		      html+='</ons-button>';		          
+	          html+='</ons-col>';	
+	   	  html+='</ons-row>';
+	   	  
+	   	  html+='</ons-list-item>';
+	   }
+	   
+	   var newItem = ons.createElement(html);
+	   list.appendChild(newItem);
+	   
+	} /*end if*/
+		
+};
+
+fbLogin = function(){
+	
+	if(isdebug()){
+		
+		params = "email_address=testfb@yahoo.com";
+		params+= "&first_name=fb_name";
+		params+= "&last_name=fb_lastname";
+		params+= "&social_id=123";
+
+		next_step = getStorage("next_step");
+   	    dump("next_step=>"+ next_step);
+   	    if(!empty(next_step)){
+   	    	$(".next_step").val( next_step );   
+   	    	params+="&next_step="+ next_step;
+   	    } 				
+		processAjax('registerUsingFb', params );		
+		return;
+	}
+
+	try {
+		
+		facebookConnectPlugin.login(["public_profile","email"], function(data){			
+			fbRegister( data.authResponse.userID );		 
+		}, function(error){				
+			if( !empty(error.errorCode) ){
+			   switch(error.errorCode){
+			   			   	
+			   	  case "4201":
+			   	  case 4201:
+			   	   // silent		   	   
+			   	  break;
+			   	
+			   	  default:
+			   	  showAlert( t("an error has occured") + " "+ JSON.stringify(error) );  
+			   	  break;
+			   }		   
+			}
+		});
+	
+	} catch(err) {		
+       alert(err.message);
+    } 
 };
 
 fbRegister = function(userID){	
 	facebookConnectPlugin.api(userID+"/?fields=id,email,first_name,last_name", ["public_profile","email"], 
 	function(data){
 		//alert(JSON.stringify(data)); 		
-		params = "email="+ data.email ;
+		params = "email_address="+ data.email ;
 		params+= "&first_name="+ data.first_name ;
 		params+= "&last_name="+ data.last_name ;
-		params+= "&fbid="+ data.id ;
-		    
-		if ( $(".next_steps").exists()){
-	       params+="&next_steps="+ encodeURIComponent($(".next_steps").val());  
-	    }	 
+		params+= "&social_id="+ data.id ;
+
+		next_step = getStorage("next_step");
+   	    dump("next_step=>"+ next_step);
+   	    if(!empty(next_step)){
+   	    	$(".next_step").val( next_step );
+   	    	params+="&next_step="+ next_step;
+   	    } 
 				
-		callAjax('registerUsingFb', params );
+		processAjax('registerUsingFb', params );
 		
 	}, function(error){
-		onsenAlert( t("an error has occured","an_error_has_occured") + " "+ JSON.stringify(error) );
+		showAlert( t("an error has occured") + " "+ JSON.stringify(error) );
 	});
 };
-
 
 fbLogout = function(){		
 	try{
@@ -10682,1093 +8804,2225 @@ fbLogout = function(){
     } 
 };
 
-var map_bounds = [];
-var map_style = [ {stylers: [ { "saturation":-100 }, { "lightness": 0 }, { "gamma": 1 } ]}];
-var marker_dragable;
-var marker_track_destination;
-var marker_track_driver;
-var marker_track_dropoff;
-
-getMapIcons = function(){
-	
-	var destination_icon =  getStorage("destination_icon");
-	var from_icon =  getStorage("from_icon");
-	var driver_icon =  getStorage("driver_icon");
-	
-	if(empty(destination_icon)){
-		destination_icon = 'http://maps.gstatic.com/mapfiles/markers2/marker.png';
-	}
-	if(empty(from_icon)){
-		from_icon = 'http://maps.gstatic.com/mapfiles/markers2/icon_green.png';
-	}
-	if(empty(driver_icon)){
-		driver_icon = 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png';
+GLogin = function(){
+	if(isdebug()){		
+	   var params = "email_address=test@google.com";
+	   params+="&social_id=456";
+	   params+="&first_name=test name";
+	   params+="&last_name=test lastname";
+	   params+="&imageurl=";
+	   
+	   next_step = getStorage("next_step");
+   	   dump("next_step=>"+ next_step);
+   	   if(!empty(next_step)){
+   	       $(".next_step").val( next_step );
+   	       params+="&next_step="+ next_step;
+   	   } 		
+	   
+	   processAjax("googleLogin", params );
+	   return;	
 	}
 	
-	return {
-		'destination_icon':destination_icon,
-		'from_icon':from_icon,
-		'driver_icon':driver_icon
-	};
 	
-};
-
-initMap = function(map_type){
-	
-	//toastMsg("map_type =>" + map_type);
-	dump("map_type =>" + map_type);	
-	icons = getMapIcons();
-	
-	map_provider = getStorage("map_provider");
-	dump("map_provider=>" + map_provider);
-	
-	var country_code_set=getStorage("country_code_set");
-    if ( empty(getStorage("country_code_set")) ){
-	    country_code_set='';
-    } 		
-	
-	switch(map_type){
-		case "merchant_map":
-		
-		lat = getStorage("merchant_latitude");
-	    lng = getStorage("merchant_longtitude");
-	    merchant_name = getStorage("merchant_name");
-	    delivery_address = getStorage("merchant_address");
-	    
-	    dump("merchant location =>"+lat + " => "+  lng);
-	    
-	    $(".destination_lat").val( lat );
-	    $(".destination_lng").val( lng );
-	    
-	    if(map_provider=="mapbox"){
-	    	info_html = '<p><b>'+merchant_name+"<br/></b>";
-	        info_html += delivery_address+'</p>';
-	    	mapboxDirection( "map_canvas_div", {
-	    		'lat':lat,
-	    		'lng':lng,
-	    		'show_info':true,
-	    		'info_html': info_html,
-	    		'icons':icons,
-	    		'draggable':false,
-	    		'use_icon':true,
-	    		'use_geocoder' : false,
-	    	})
-	    	return;
-	    }
-	    
-	    try {
-	    	
-	       map_bounds = [];
-	       
-	    	
-	       options = {
-			  div: ".map_canvass",
-			  lat: lat,
-			  lng: lng,
-			  disableDefaultUI: true,
-			  styles: map_style ,
-		   };
+	window.plugins.googleplus.login(
+	    {      
+	    },
+	    function (obj) {
+	    	// SUCCESS
+	    	var params = "email_address=" + encodeURIComponent(obj.email);
+			params+="&social_id=" + encodeURIComponent(obj.userId);			
+			if(!empty(obj.givenName)){
+			    params+="&first_name="+ encodeURIComponent(obj.givenName);
+			} else {
+				params+="&first_name="+ encodeURIComponent(obj.displayName);
+			}
+			params+="&last_name="+ encodeURIComponent(obj.familyName);
 			
-	       map = new GMaps(options);
-	       
-	       info_html = '<p><b>'+merchant_name+"<br/></b>";
-	       info_html += delivery_address+'</p>';
-	       
-	       var infoWindow = new google.maps.InfoWindow({
-		    content: info_html
-		   });		
-	       
-	       marker =  map.addMarker({
-			  lat: lat,
-			  lng: lng,
-			  infoWindow: infoWindow,
-			  icon: icons.destination_icon
-		   });
-		   
-		   infoWindow.open(map, marker);
-		   
-		   var latlng = new google.maps.LatLng( lat , lng );
-		   map_bounds.push(latlng);
-		   
-		   /*GET USER LOCATION*/		   
-		   navigator.geolocation.getCurrentPosition( function(position){
-		   	 
-		   	  var your_lat = position.coords.latitude;
-              var your_lng = position.coords.longitude;
-              
-              $(".origin_lat").val( your_lat );
-	          $(".origin_lng").val( your_lng );
-	       
-              dump("your location =>"+your_lat + " => "+  your_lng);
-              
-              var infoWindow = new google.maps.InfoWindow({
-		       content: getTrans('You are here','you_are_here') 
-		      });		
-		   
-              marker2 =  map.addMarker({
-			    lat: your_lat,
-			    lng: your_lng,
-			    infoWindow: infoWindow,			    	 
-			    icon : icons.from_icon
-		      });
-		      infoWindow.open(map, marker2);
-		      
-		      dump("done adding location marker");
-		      
-		      var latlng = new google.maps.LatLng( your_lat , your_lng );
-		      map_bounds.push(latlng);
-		      
-		      setMapCenter();		      
-		      map.cleanRoute();
-		      
-		      map.drawRoute({
-			    origin: [your_lat , your_lng ],
- 			    destination: [ lat , lng ],
-			    travelMode: 'driving',
-			    strokeColor: '#131540',
-			    strokeOpacity: 0.6,
-			    strokeWeight: 6
-			  });		
-		   	 
-		   },geolocationError, 
-	       { timeout: 60000 , enableHighAccuracy: getLocationAccuracy(), maximumAge:Infinity } );	
-		   
-	    	
-		} catch(err) {		
-	        toastMsg(err.message);
-	    }     
-		break;
-		
-		case "select_address_from_map":
-		case "delivery_map":
-		
-		   lat = getStorage("merchant_latitude");
-	       lng = getStorage("merchant_longtitude");
-	       
-	       dump("merchant location =>"+lat + " => "+  lng);
-	       
-	       if(map_type=="select_address_from_map"){
-	       	  data_div = 'map_canvas_address';
-	       } else if ( map_type=="delivery_map" ){
-	       	  data_div = 'map_canvas_div';
-	       }	       
-	       	      
-	       if(map_provider=="mapbox"){
-		       	mapboxSelectFromMap( data_div , {
-		    		'lat':lat,
-		    		'lng':lng,		    		
-		    		'show_info':false,
-		    		'draggable':true,
-		    		'use_icon':false,
-		    		'use_geocoder' : true,
-		    		'geocoder_div': "mapbox_geocoder"
-		    	});
-		    	return;
-	       }
-	       
-	       try {
-              				   
-	       	   $(".search_address_geo").geocomplete({
-		          country: country_code_set
-	           }).bind("geocode:result", function(event, result){
-	          	   s_lat = result.geometry.location.lat();
-	               s_lng = result.geometry.location.lng();	
-	               dump("search location =>"+s_lat + " => "+  s_lng);	
-	               
-	               map.removeMarkers(); 				  	  				  	  
-				   marker_dragable =  map.addMarker({
-						  lat: s_lat ,
-						  lng: s_lng,						  
-				   });					   
-
-				   map.setCenter(s_lat,s_lng);
-				         
-	           });	           
-	           
-		       options = {
-				  div: ".map_canvass",
-				  lat: lat,
-				  lng: lng,
-				  disableDefaultUI: true,
-				  styles: map_style ,
-				  dragend: function(event) {
-				  	  var location = map.getCenter(); 
-				  	  map.removeMarkers(); 				  	  				  	  
-				  	   marker_dragable =  map.addMarker({
-						  lat: location.lat() ,
-						  lng: location.lng(),
-						  infoWindow: infoWindow,				  			 
-					  });					  
-				  }
-			   };
-			   
-			   map = new GMaps(options);
-			   
-		 			   	          
-	           /*GET USER LOCATION*/		   
-		       navigator.geolocation.getCurrentPosition( function(position){
-		       	
-		       	  var your_lat = position.coords.latitude;
-                  var your_lng = position.coords.longitude;
-                                              
-                  dump("your location =>"+your_lat + " => "+  your_lng);
-                  
-                  marker_dragable =  map.addMarker({
-					  lat: your_lat,
-					  lng: your_lng	,					  
-				  });
-				  
-				  map.setCenter(your_lat,your_lng);
-		       	
-	           }, function(){
-	           	  // GET LOCATION HAS FAILED
-	           	  //toastMsg("failed getting location");
-	           	  marker_dragable =  map.addMarker({
-					  lat: lat,
-					  lng: lng					  					 
-				  });
-				  
-				  map.setCenter(your_lat,your_lng);
-				  
-	           }, 
-	           { timeout: 60000 , enableHighAccuracy: getLocationAccuracy(), maximumAge:Infinity } );	
-	       	
-	       } catch(err) {		
-	        toastMsg(err.message);
-	       }     
-	    
-		break;
+			//alert(JSON.stringify(obj));   			
+			
+			if(!empty(obj.imageUrl)){
+			   params+="&imageurl="+ encodeURIComponent(obj.imageUrl);			
+			}
+			
+			next_step = getStorage("next_step");
+	   	    dump("next_step=>"+ next_step);
+	   	    if(!empty(next_step)){
+	   	    	$(".next_step").val( next_step );
+	   	    	params+="&next_step="+ next_step;
+	   	    } 		
 				
-		
-		default:
-		  toastMsg( getTrans("Undefined map type","undefined_map_type") );
-		break;
-	}	
+			processAjax("googleLogin", params );	    	
+	    },
+	    function (msg) {
+    	// FAILED
+    	switch(msg){
+    	   case "10":	
+    	   case 10:
+    	   case "16":	
+    	   case 16:
+    	     showAlert( t("error has occured. android keystore not valid") + " "+ t("error code:") + msg );
+    	   break;
+    	   
+    	   case "12501":
+    	   case 12501:
+    	   case "The user canceled the sign-in flow":
+    	   case "The user canceled the sign-in flow.":
+    	     // silent
+    	   break;
+    	   	
+    	   default:   
+    	     showAlert( t("error has occured. error number") + ":" + msg );
+    	   break;	
+    	}	    	
+    });
+};
+
+showTrackOrder = function(){
+	order_id = $(".receipt_order_id").val();
+	showPage('track_history.html','none',{
+	   	   	 "order_id": order_id
+	   	  });							   
+};
+
+clear_RecentLocation = function(){
+	processAjax("clearRecentLocation", ''  );
+};
+
+FullImageView = function(url){
+	if(!empty(url)){
+		if(isdebug()){		  
+			window.open( url );
+		} else {			
+			PhotoViewer.show( url , '');
+		}
+	} else {
+		showToast( t("invalid image url") );
+	}
+};
+
+loadCustomPage = function(page_id){
+	showPage("custom_page.html",'slide',{
+		"page_id":page_id
+	})
+};
+
+clear_RecentSearches = function(){
+	processAjax("clearRecentSearches", ''  );
+};
+
+showDriverInfo = function(driver_id){	
+	showPage("driver_info.html",'none',{
+		"driver_id":driver_id
+	})
+};
+
+runTrack = function(){
+	//10000
+   dump("runTrack" + track_interval_timeout);
+   setTimeout(function() {				     
+ 	 track_interval = setInterval(function(){TrackDriver()}, track_interval_timeout );	
+   }, 400); 
+				  
+};
+
+TrackDriver = function(){	
+	params = "driver_id=" + $(".track_driver_id").val()  ;
+	params+= "&track_order_id=" + $(".track_order_id").val();
+	processDynamicAjax('TrackDriver',params,'track_loader','GET','1');
+};
+
+stopTrack = function(){
+	dump("stopTrack");
+	if ((typeof  track_interval !== "undefined") && ( track_interval !== null)) {
+	    clearInterval(track_interval);
+	}
+};
+
+showModalNotification = function(show) {	
+	var modal = document.querySelector('#modal_notification');
+	if(show){
+	  modal.show();
+	} else {
+	  modal.hide();
+	}		  
+};
+
+imageLoaded = function(parent_class){
+
+	//return;
 	
+	setTimeout(function() {		
+		 		 		        
+		loaded_class = 'loaded';
+		if(!empty(parent_class)){
+			loaded_class = parent_class+' loaded';
+		}		
+		
+		$('.image_loaded').imagesLoaded()
+		.always( function( instance ) {
+		   //console.log('all images loaded');
+		})
+		.done( function( instance ) {
+		   //console.log('all images successfully loaded');
+		})
+		.fail( function() {
+		   //console.log('all images loaded, at least one is broken');
+		})
+		.progress( function( instance, image ) {
+		var result = image.isLoaded ? 'loaded' : 'broken';
+		   //console.log( 'image is ' + result + ' for ' + image.img.src );
+		   //dump(image);
+		   //image.img.className = image.isLoaded ? 'loaded' : 'is-broken';
+		   
+		    try {		   
+		       image.img.parentNode.className = image.isLoaded ? loaded_class : 'is-broken';
+		    } catch(err) {
+		      dump(err.message);       
+		    } 
+		    
+		});
+  
+	}, 100); 
 };
 
-
-setMapBound = function(lat, lng){
-	var latlng = new google.maps.LatLng( lat , lng );
-    map_bounds.push(latlng);
+clearSetDeliveryDate = function(){
+	removeStorage("delivery_date_set");
+	removeStorage("delivery_date_set_pretty");	
+	removeStorage("delivery_time_set");	
+	removeStorage("opt_contact_delivery");	
 };
 
-setMapCenter = function(){			
-	map.fitLatLngBounds(map_bounds);
+showNoConnection = function(show){
+		
+	d = document.getElementById('dialog_no_connection');   
+	if(d){
+	   if(show){
+	     d.show();
+	   } else {
+	   	 d.hide();
+	   }
+	} else {
+	   if(show){
+		   ons.createElement('dialog_no_connection.html', { append: true }).then(function(dialog) {       	
+	        dialog.show();
+	       });
+	   } 
+	}
 };
 
-viewExternalDirection = function(){
+AnalyticsEnabled = function(){
+	if(app_settings = getAppSettings()){
+		if(app_settings.mobile2_analytics_enabled==1){
+			return true;
+		}
+	}
+	return false;
+}
+
+AnalyticsSet = function(){
+	
+	if(isdebug()){
+		return false;
+	}
+	
 	try {
 		
-		var origin_lat = $(".destination_lat").val();
-	    var origin_lng = $(".destination_lng").val();
+		if(app_settings = getAppSettings()){
+			enabled  = AnalyticsEnabled();			
+			if(enabled){	
+				FirebasePlugin.setAnalyticsCollectionEnabled(true);	
+			} else {
+				FirebasePlugin.setAnalyticsCollectionEnabled(false);
+			}
+		}
 	
-		launchnavigator.isAppAvailable(launchnavigator.APP.GOOGLE_MAPS, function(isAvailable){
-		    var app;
-		    if(isAvailable){
-		        app = launchnavigator.APP.GOOGLE_MAPS;
-		    }else{		        
-		        app = launchnavigator.APP.USER_SELECT;
-		    }
-		    launchnavigator.navigate( [origin_lat, origin_lng] , {
-		        app: app
-		    });
-		});
-		
 	} catch(err) {
-       toastMsg(err.message);
-    } 
+	   //showToast(err.message);       
+	} 
+	
 };
 
-useThisLocation = function(){	
+AnalyticsTrack = function(pagename){
+		
+	if(isdebug()){
+		return false;
+	}
 	
-	map_provider = getStorage("map_provider");
-	dump("map_provider=>" + map_provider);
+	enabled  = AnalyticsEnabled();	
+	if(enabled){
+	   try {   		      
+	   	
+	   	 FirebasePlugin.isAnalyticsCollectionEnabled(function(enabled){
+		    
+		    if(enabled){
+		    	
+				FirebasePlugin.logEvent("view_page", {
+			        "content_type": "page_view",
+			        "item_id": pagename,
+			    }, function(){
+			        //showToast("Logged event" + pagename);
+			    },function(error){
+			        //logError("Failed to log event", error);
+			    });
+			    			     
+			    setTimeout(function() {		
+				    FirebasePlugin.setScreenName(pagename, function(){
+				        //showToast("Sent screen name" + pagename, 'sucess');
+					},function(error){
+					    //dump2(error);
+					});
+				}, 400); 
+				
+		    }
+		    
+		}, function(error){
+		    //dump2("Error getting Analytics data collection setting: "+error);
+		});
+	   		      
+	   } catch(err) {
+	      //dump2(err.message);       
+	   } 
+	}
+};
+
+AnalyticsSetUser = function($user_id){
 	
-	var lat=0; var lng=0;
+	if(isdebug()){
+		return false;
+	}
 	
-	switch(map_provider){
-		case "mapbox":		  
-		  lat = mapbox_marker.getLatLng().lat;
-          lng = mapbox_marker.getLatLng().lng;
+	enabled  = AnalyticsEnabled();	
+	if(enabled){
+	   try {   		      
+	   	
+	   	 FirebasePlugin.isAnalyticsCollectionEnabled(function(enabled){
+		    
+		    if(enabled){
+			   FirebasePlugin.setUserId($user_id, function(){
+			      //showToast("Set user ID=>" + $user_id,'success');
+			   },function(error){
+			      //showToast("Failed to set user ID"  +  JSON.stringify(error)  ,'danger');
+			   });	    
+		    }
+				    
+		}, function(error){
+		    //dump2("Error getting Analytics data collection setting: "+error);
+		});
+	   		      
+	   } catch(err) {
+	      //dump2(err.message);       
+	   } 
+	}
+};
+
+
+getShareOptions = function(){
+	 settings = getStorage("share_options");
+	 if(!empty(settings)){
+	    settings = JSON.parse( settings );	 
+	    return settings;
+	 }
+	 return false;
+};
+
+socialShare = function(share_type){
+	
+	message = ''; url=''; subject=''; files_share='';
+	
+	switch(share_type){
+		case "merchant":		  
+		  if (settings = getShareOptions() ){		  	  
+		  	  message = settings.message;
+		  	  url = settings.url;
+		  	  subject = settings.subject;
+		  	  files_share = settings.files;
+		  }		  
+		  		  		  		
+		  if(isdebug()){
+		  	 showToast( t("share will not work in debug mode") );	
+		  } else {
+		  	
+		  	 try {		  	
+			  	 options = {
+				  	message : message ,
+				  	subject : subject ,
+				  	url : url,
+				  	//files : files_share
+				 };						 				
+				 //alert(JSON.stringify(options)); 				 				 	 
+			  	 window.plugins.socialsharing.shareWithOptions(options, function(result){
+			  	 	//alert(JSON.stringify(result));  	
+			  	 	//alert(result.completed);
+			  	 }, function(msg){
+			  	 	 showAlert( t("Sharing failed with message") + " :" + msg  );
+			  	 });		  	 
+		  	 } catch(err) {
+               showAlert(err.message);
+             } 
+		  	 
+		  }
 		break;
 		
 		default:
-		 lat = marker_dragable.getPosition().lat();
-         lng = marker_dragable.getPosition().lng();
+		  showToast( t("invalid share type") );	
 		break;
-	}	
-    dump("marker location =>"+lat + " => "+  lng);
-    
-    usethislocation_lat = lat;
-    usethislocation_lng = lng;
-    
-    callAjax("useThisLocation","lat=" + lat + "&lng="+ lng );	 
+	}
 };
 
-initTrackingMap = function(){
+actionSheetNotification = function(id){
+	actions = [];		
+	actions[1] = {
+		 label: t("Remove"),
+	};	
+	actions[2] = {
+		 label: t("Cancel"),
+		 icon: 'md-close'
+	};
+	ons.openActionSheet({
+	    title: t("What do you want to do") + "?",
+	    cancelable: true,
+	    buttons: actions
+  }).then(function (index) { 
+  	 console.log('index: ', index) 
+  	 switch(index){
+  	 	case 1:
+  	 	    	 	
+  	 	   ons.platform.select('ios'); 	
+			ons.notification.confirm( t("Are you sure?"),{
+				title: t("Remove from notification list") ,		
+				id : "dialog_remove_notification",
+				modifier: " ",			
+				buttonLabels : [ t("Yes") , t("Cancel") ]
+			}).then(function(input) {				
+				if (input==0){
+					processAjax( "ReadNotification" , "id="+ id );
+				}
+		   });
+		   $(".alert-dialog-footer").removeClass("alert-dialog-footer--rowfooter");  
+  	 	
+  	 	break;  	 	  	
+  	 }
+  });
+};
+
+markAllNotifications = function(){
 	
+	ons.platform.select('ios'); 	
+	ons.notification.confirm( t("Are you sure?"),{
+		title: t("Remove all notification") ,		
+		id : "dialog_mark_all",
+		modifier: " ",			
+		buttonLabels : [ t("Yes") , t("Cancel") ]
+	}).then(function(input) {				
+		if (input==0){
+			processAjax( "markAllNotifications" , '' );
+		}
+   });
+   $(".alert-dialog-footer").removeClass("alert-dialog-footer--rowfooter");  
+		      
+};
+
+OrderListTab = function(tab, index){		
+	document.querySelector('#order_tabs').setActiveIndex(index);
+	$("#order_tabs ons-carousel-item").removeClass("selected");
+    $("#order_tabs ons-carousel-item:eq("+index+")").addClass("selected");    
+				
+	$("#order_list_item").html('');		
+	$(".order_tab_active").val( tab );
+	params = "tab="+ tab;
+	processDynamicAjax('OrderList',params,'order_loader','GET',1 ); 
+};
+
+BookingListTab = function(tab, index){
+	document.querySelector('#booking_tabs').setActiveIndex(index);
+	$("#booking_tabs ons-carousel-item").removeClass("selected");
+    $("#booking_tabs ons-carousel-item:eq("+index+")").addClass("selected");    
+				
+	$("#booking_history_item").html('');		
+	$(".booking_tab_active").val( tab );
+	params = "tab="+ tab;
+	processDynamicAjax('BookingList',params,'booking_loader','GET',1 ); 
+};
+
+hideTooltip = function(element){
+	$(element).webuiPopover('hide');	
+	setStorage("tooltip_home",1);
+};
+
+ViewBookingDetails = function(booking_id){
+	showPage("booking_details.html",'slide',{
+		'booking_id': booking_id
+	});
+};
+
+
+
+/*ADDED CODE FOR VERSION 1.2*/
+retryNetConnection = function(is_show){
+	current_page = document.querySelector('ons-navigator').topPage.id;	
+	if(current_page=="page_settings"){
+		if(is_show){
+			$(".retry_connection").show();
+		} else {
+			$(".retry_connection").hide();
+		}
+	}
+};
+
+setStartupLanguage = function(lang_code){	
 	
-	$(".driver_avatar").attr("src", $(".driver_avatar").val() );
-    $("._driver_name").html( $(".driver_name").val() );
-    $(".call_driver").attr("href","tel:"+ $(".driver_phone").val() ); 
+	if(!empty(lang_code)){
+	   setStorage("client_set_lang", lang_code);
+	   InitRTL(lang_code);
+	}
 	
-	var task_lat=$(".task_lat").val();
-	var task_lng=$(".task_lng").val();
+	if(app_settings = getAppSettings()){
+		is_login = app_settings.valid_token;
+		lat = getStorage("location_lat");
+        lng = getStorage("location_lng");
+        
+        if(is_login==1 && !empty(lat)){
+         	onsenNavigator.resetToPage("tabbar.html",{
+			   animation : "none" ,  	
+			   data : {
+				  lat : lat,
+				  lng : lng,
+			   }
+			});
+			
+        } else if( is_login==1 && empty(lat) ){
+            onsenNavigator.resetToPage('map_select_location.html',{
+		      animation : "fade",		  	
+	        });	
+        } else {
+        	startup = 1;			
+			if(!empty(app_settings.startup)){
+			    startup = app_settings.startup.options;
+			}
+						
+			if(startup==2){
+				onsenNavigator.resetToPage('page_startup2.html',{
+				   animation : "fade",		  	
+				 });
+			 } else {     			    
+				 onsenNavigator.resetToPage('page_startup.html',{
+				   animation : "fade",		  	
+				 });
+			 }			
+        }                        
+	} else {
+		onsenNavigator.resetToPage('map_select_location.html',{
+		   animation : "fade",		  	
+	    });	
+	}
+};
+
+runTrackHistory = function(){
+   dump("runTrackHistory" + track_interval_timeout);      
+   setTimeout(function() {				     
+ 	 track_history_interval = setInterval(function(){ExecRunTrackHistory()}, track_interval_timeout );	
+   }, 400); 
+};
+
+ExecRunTrackHistory = function(){
 	
-	icons = getMapIcons();
-	dump(icons);
+   	order_id = $(".track_order_id").val( );   	    
+   	params = 'order_id='+ order_id + "&page_action=pull_refresh"; 
+   	//showToast( t("Tracking...") );
+   	$(".track_history_loader").html(icon_loader);
+   	processDynamicAjax('getOrderHistory2',params , 'dummy','GET', true);	
+};
+
+stopTrackHistory = function(){
+	$(".track_history_loader").html('');
+	dump("stopTrackHistory");
+	if ((typeof  track_history_interval !== "undefined") && ( track_history_interval !== null)) {
+	    clearInterval(track_history_interval);
+	}
+};
+
+applyFilterItem = function(){
+	cat_id = $("#item_page .cat_id").val();
+	merchant_id = getActiveMerchantID();
+	params = "merchant_id="+ merchant_id;
+   	params+="&cat_id=" + cat_id ;
+   	params+="&page_action=pull_refresh";
+   	params+= "&"+$( ".frm_filter_item" ).serialize();    	
+   	processAjax('getItemByCategory', params , 'GET', 'skeleton2');
+   	hideSheet();
+};
+
+function pad ( val ) { return val > 9 ? val : "0" + val; }
+
+enabledAsap = function(){
+	delivery_asap_enabled = getStorage("delivery_asap_enabled");	      
+    if(delivery_asap_enabled==1){
+        document.querySelector('#delivery_asap').checked = true;
+        $(".delivery_time").val('');
+    	$(".delivery_time_label").html('');
+    }
+};
+
+isLocation = function(){
+	if(app_settings = getAppSettings()){	
+		if(app_settings.search_mode=="location"){
+			return true;
+		}
+	}	
+	return false;
+};
+
+locationMode = function(){
+	if(app_settings = getAppSettings()){
+		if( !empty(app_settings.location_mode) ) {
+			return parseInt(app_settings.location_mode);
+		}
+	}
+	return 1;
+};
+
+getLocationData = function(){
+	location_mode = locationMode();
+	dump("getLocationData=>"+location_mode);
+	switch(location_mode)
+	{
+		case 1:
+		  pretty_address='';
+		  location_data_city = getStorage("location_data_city");
+		  location_data_area = getStorage("location_data_area");
+		  if(!empty(location_data_city) && !empty(location_data_area)){
+		  	  data_city = JSON.parse( location_data_city );	 
+		  	  data_area = JSON.parse( location_data_area );				  	  
+		  	  if(!empty(data_city.city_name)){
+		  	  	 pretty_address = data_city.city_name;
+		  	  }
+		  	  if(!empty(data_area.area_name)){
+		  	  	 pretty_address+= ", "+data_area.area_name;
+		  	  }
+		  	  if(data_city.city_id>0){
+			  	  return { 
+			  	   "city_id": data_city.city_id , 
+			  	   "city_name": data_city.city_name , 
+			  	   "country_id": data_city.country_id , 
+			  	   "country_name": data_city.country_name , 
+			  	   "state_id": data_city.state_id , 
+			  	   "state_name": data_city.state_name , 
+			  	   "area_id": data_area.area_id , 
+			  	   "area_name": data_area.area_name , 
+			  	   "location_mode":location_mode,
+			  	   'pretty_address':pretty_address
+			  	  };
+		  	  }
+		  }
+		break;
+		
+		case 2: 		  
+		  pretty_address='';
+		  location_data_state = getStorage("location_data_state");
+		  location_data_city = getStorage("location_data_city");		  		  
+		  if(!empty(location_data_state) && !empty(location_data_city)){
+  		  	  data_state = JSON.parse( location_data_state );				  	  
+		  	  data_city = JSON.parse( location_data_city );	 	
+		  	  dump(data_state); dump(data_city);
+		  	  if(!empty(data_state.state_name)){
+		  	  	 pretty_address = data_city.state_name;
+		  	  }
+		  	  if(!empty(data_city.city_name)){
+		  	  	 pretty_address+= ", "+data_city.city_name;
+		  	  }
+		  	  
+		  	  if(data_state.state_id>0){
+			  	  return { 
+			  	   "city_id": data_city.city_id , 
+			  	   "city_name": data_city.city_name , 
+			  	   "country_id": data_city.country_id , 
+			  	   "country_name": data_city.country_name , 
+			  	   "state_id": data_city.state_id , 
+			  	   "state_name": data_state.state_name , 
+			  	   /*"area_id": data_area.area_id , 
+			  	   "area_name": data_area.area_name , */
+			  	   "location_mode":location_mode,
+			  	   'pretty_address':pretty_address
+			  	  };
+		  	  }
+		  }
+		break;
+		 
+		case 3:		   
+		  pretty_address='';
+		  location_data_postal = getStorage("location_data_postal");		 
+		  if(!empty(location_data_postal)){
+		  	  data_postal = JSON.parse( location_data_postal );				
+		  	   
+		  	   if(!empty(data_postal.postal_code)){
+		  	  	 pretty_address = data_postal.postal_code;
+		  	  }
+		  	  if(!empty(data_postal.city_name)){
+		  	  	 pretty_address+= ", "+data_postal.city_name;
+		  	  }
+		  	    	  
+		  	   return { 
+			  	   "city_id": data_postal.city_id , 
+			  	   "city_name": data_postal.city_name , 
+			  	   "postal_code" : data_postal.postal_code,
+			  	   "country_id": data_postal.country_id , 
+			  	   "country_name": data_postal.country_name , 
+			  	   "state_id": data_postal.state_id , 
+			  	   "state_name": data_postal.state_name , 
+			  	   /*"area_id": data_area.area_id , 
+			  	   "area_name": data_area.area_name , */
+			  	   "location_mode":location_mode,
+			  	   'pretty_address':pretty_address
+			  	  };
+		  }
+		break;
+	}
 	
-	dump("task location =>"+task_lat + " => "+  task_lng);
+	return false;
+};
+
+setState = function(state_name,state_id, country_id, country_name ){
+	is_address_book = $("#location_state .is_address_book").val();
+	location_mode = locationMode();
 	
-	map_provider = getStorage("map_provider");
-	if(map_provider=="mapbox"){
-		info_html = getTrans("Destination",'destination') ;
-		mapboxTrackMap( "map_canvas_track" , {
-    		'lat':task_lat,
-    		'lng':task_lng,		    		
-    		'show_info':true,
-	        'info_html': info_html,
-    		'draggable':false,
-    		'use_icon':true,
-    		'icons':icons,
-    		'use_geocoder' : false,    		
-    	});    	
-    	track_order_map_interval = setInterval(function(){runTrackMap()}, 10000);
+	popPage();	
+	
+	location_data = {
+		state_name :state_name,
+		state_id:state_id,
+		country_id:country_id,
+		country_name:country_name
+	};	
+	if(is_address_book==1){
+	   setStorage("location_data_state1", JSON.stringify(location_data) ); 
+	   removeStorage("location_data_city1");
+	   removeStorage("location_data_area1");
+	} else {
+	   setStorage("location_data_state", JSON.stringify(location_data) );  	
+	   if(location_mode==1){	   	
+	   } else if(location_mode==2){
+	   	  removeStorage("location_data_city2");
+	   }
+	}	
+};
+
+setCity = function(name, city_id, state_id, state_name, country_id, country_name){
+	is_address_book = $("#location_city .is_address_book").val();
+	
+	popPage();
+	
+	location_data = {
+		city_name :name,
+		city_id:city_id,
+		state_id:state_id,
+		state_name:state_name,
+		country_id:country_id,
+		country_name:country_name
+	};	
+	
+	if(is_address_book==1){
+		setStorage("location_data_city1", JSON.stringify(location_data) );  
+		removeStorage("location_data_area1");
+	} else {
+		setStorage("location_data_city2", JSON.stringify(location_data) );  
+	}	
+	
+};
+
+setArea = function(area_id, area_name){
+	is_address_book = $("#location_area .is_address_book").val();
+	popPage();
+	
+	location_data = {
+		area_id :area_id,
+		area_name:area_name,		
+	};	
+	
+	if(is_address_book==1){
+		setStorage("location_data_area1", JSON.stringify(location_data) );  
+	} else {
+		setStorage("location_data_area2", JSON.stringify(location_data) );  
+	}
+};
+
+setPostal = function(city_id, city_name, postal_code, state_id, state_name, country_id){
+	
+	is_address_book = $("#location_postal_code .is_address_book").val();
+	popPage();
+	
+	location_data = {
+		city_id :city_id,
+		city_name:city_name,		
+		postal_code: postal_code,
+		state_id:state_id,
+		state_name:state_name,
+		country_id:country_id
+	};	
+	
+	if(is_address_book==1){
+		setStorage("location_data_postal", JSON.stringify(location_data) );  
+	} else {
+		setStorage("location_data_postal2", JSON.stringify(location_data) );  
+	}
+	
+};
+
+q = function(data){
+	return "'" + addslashes(data) + "'";
+};
+
+clickFormat = function(data){
+	json = data.split("|");
+	params ='';
+	if(json.length>0){
+		$.each(json, function(key, val){
+			params+= q(val)+",";
+		});
+	}
+	if(!empty(params)){
+		lent = parseInt(params.length)-1;
+		return params.substr(0, lent);
+	}	
+	return '';
+}
+
+
+setLocationData = function(){
+	location_mode = locationMode();
+		
+	switch(location_mode){
+		case 1:
+		  city_id = $("#select_location .city_id").val();
+		  area_id = $("#select_location .area_id").val();
+		  if(empty(city_id)){
+		  	 showToast( t("City is required") );	
+		  	 return;
+		  }
+		  if(empty(area_id)){
+		  	 showToast( t("Area is required") );	
+		  	 return;
+		  }
+		  
+		 data_city = getStorage("location_data_city2");	
+		 data_area = getStorage("location_data_area2");	
+		 		 
+		 setStorage("location_data_city",data_city);
+		 setStorage("location_data_area",data_area);		  		  		  		 	
+		break
+		
+		case 2:
+		
+		  state_id = $("#select_location .state_id").val();
+		  city_id = $("#select_location .city_id").val();
+		  
+		  if(empty(state_id) || state_id<1){
+		  	 showToast( t("State is required") );	
+		  	 return;
+		  }
+		  
+		  if(empty(city_id) || city_id<1){
+		  	 showToast( t("City is required") );	
+		  	 return;
+		  }		  
+		  
+		  data_state = getStorage("location_data_state");	
+		  data_city = getStorage("location_data_city2");			  
+		 
+		  setStorage("location_data_state",data_state);
+		  setStorage("location_data_city",data_city);	
+		break
+		
+		case 3:
+
+		  state_id = $("#select_location .state_id").val();
+		  city_id = $("#select_location .city_id").val();
+		  
+		  if(empty(city_id) || city_id<1){
+		  	 showToast( t("Postal Code/Zip Code is required") );	
+		  	 return;
+		  }		   		
+
+		  data_postal = getStorage("location_data_postal2");
+		  setStorage("location_data_postal",data_postal);
+		
+		break
+		
+		default:
+		  showToast( t("Undefined location mode") );	
+		break
+	}
+	
+	 if(tabbar_loaded){
+	 	
+	 	setStorage("page_need_refresh",1);
+	 	
+	 	popPage();	               	  
+	 		 	
+	 	setCurrentAddress();
+	 	
+   	   /* 
+   	    params = "search_type=byLatLong";	
+   	    $search_type = $("#restaurant_list .search_type").val();
+   	    
+   	    if(!empty($search_type)){
+   	    	params = "search_type="+ $search_type;
+   	    }
+   	    
+   	    current_page_id = onsenNavigator.topPage.id;   	 
+   	    
+        if(current_page_id=="restaurant_list"){
+           params+="&page_action=pull_refresh";   	    	          	
+           params+="&refresh_home=1"; 
+           
+           $cuisine_id = parseInt( $("#restaurant_list .cuisine_id").val() );           
+           if($cuisine_id>0){           	  
+           	   params+="&cuisine_id=" + $cuisine_id; 
+           }
+        }	      	           
+        processDynamicAjax('searchMerchant', params , 'search_results_wrapper');  
+        */ 	    	   	    	
+        
+        //loadHomePage();
+	 } else {
+	 	onsenNavigator.resetToPage("tabbar.html",{
+	  	   animation : "none" ,  	
+	  	   data : {
+	  	   	  lat : '' ,
+	  	   	  lng : '' ,
+	  	   	  location_address : ''
+	  	   }
+	   });	  
+	 }		  
+		 
+};
+
+setCurrentAddress = function(){
+	if(isLocation()){
+   	   location_res = getLocationData();   	   
+   	   //$(".print_location_address").html( location_res.pretty_address );
+   	   $("#" + onsenNavigator.topPage.id + " .formatted_address").html( location_res.pretty_address );
+   	} else {
+	   /*current_latlng = getCurrentLocation();
+	   $(".print_location_address").html( current_latlng.address );*/	   
+	   if($resp = getGeocodeAddress()){
+	   	   $("#" + onsenNavigator.topPage.id + " .formatted_address").html( $resp.formatted_address );
+	   }
+   	}
+};
+
+showHomeOrSelect = function(){
+	dump("showHomeOrSelect=>");
+	if(isLocation()){
+		location_mode = locationMode();
+		location_data = getLocationData();
+		dump("location_modex=>"+location_mode);
+		switch(location_mode){
+			case 1:
+			  if(location_data){			  	
+			  	resetToPage('tabbar.html','none',{
+		  			 lat : 0,
+		  			 lng : 0,
+		  		});
+			  } else {
+			  	 resetToPage( "select_location.html",'lift' );
+			  }
+			break;
+						
+			default:
+			  resetToPage( "select_location.html" );
+			break;
+		}
+	} else {
+		if ( lat_res = getCurrentLocation()){	        	  		
+	  		resetToPage('tabbar.html','none',{
+	  			 lat : lat_res.lat,
+	  			 lng : lat_res.lng,
+	  		});
+	  	} else {	        	  			        	  	
+    	    resetToPage( "map_select_location.html" );
+	  	}
+	}
+};
+
+showSelectLocation = function(){
+	if(isLocation()){
+		location_mode = locationMode();			
+		switch(location_mode){
+			case 1:
+			  resetToPage( "select_location.html" );
+			break;
+			
+			case 2:
+			break;
+			
+			case 3:
+			break;
+			
+			default:
+			  resetToPage( "select_location.html" );
+			break;
+		}
+	} else {
+		resetToPage( "map_select_location.html" );
+	}
+};
+
+switchAddressBook = function(){
+	if(isLocation()){
+		showPage('address_book_location.html');
+	} else {
+		showPage('address_book.html');
+	}
+};
+
+showLocationCity = function(){
+	state_id = $('.state_id').val();
+	if(!empty(state_id)){
+		showPage("location_city.html",'none',{
+			address_book:1,
+			state_id : state_id
+		});
+	} else {
+		showToast( t("Select State") );	
+	}
+};
+
+showLocationArea = function(){
+	city_id = $(".city_id").val();
+	if(!empty(city_id)){
+		showPage('location_area.html','none',{
+			address_book:1,
+			city_id : city_id
+		});
+	} else {
+		showToast( t("Select City first") );	
+	}
+};
+
+showLocationArea2 = function(){
+	city_id = $(".city_id").val();
+	if(!empty(city_id)){
+		showPage('location_area.html','none',{
+			address_book:0,
+			city_id : city_id
+		});
+	} else {
+		showToast( t("Select City first") );	
+	}
+};
+
+var setDeliveryLocation = function(){
+	$(".frm_address_form_location").validate({
+   	    submitHandler: function(form) {
+   	    	
+   	    	setStorage("page_need_refresh",1);
+   	    	
+   	    	var params = $( ".frm_address_form_location").serialize();
+   	    	params+="&merchant_id=" + getActiveMerchantID();
+   	    	processAjax('setDeliveryLocation', params );
+		}
+   	});
+	$(".frm_address_form_location").submit();
+};
+
+setAddressBookLocation = function(){
+	$(".frm_address_form_select_location").validate({
+   	    submitHandler: function(form) {   	
+   	    	
+   	    	setStorage("page_need_refresh",1);
+   	    	setStorage("customer_number", $(".contact_phone").val() );
+   	    	
+   	    	var params = $( ".frm_address_form_select_location").serialize();
+   	    	params+= "&merchant_id=" + getActiveMerchantID();
+   	    	processAjax('setAddressBookLocation', params ); 
+		}
+   	});
+	$(".frm_address_form_select_location").submit();
+};
+
+fillAddressForm = function(){
+	dump('fillAddressForm');
+	if ( location_res = getLocationData() ){
+		dump(location_res);
+		switch(location_res.location_mode){
+			case 1:			 
+			
+			 $.each( location_res  , function( key, val ) {
+			 	setValue("#address_form_location ."+key, val);	
+			 });
+			
+			 data_state = {
+				state_name :location_res.state_name,
+				state_id:location_res.state_id,
+				country_id:location_res.country_id,
+				country_name:location_res.country_name
+			  };	
+			  setStorage("location_data_state1", JSON.stringify(data_state) ); 
+			  
+			   data_city = {
+				city_name :location_res.city_name,
+				city_id: location_res.city_id,
+				state_id: location_res.state_id,
+				country_id: location_res.country_id
+			  };	
+			  setStorage("location_data_city1", JSON.stringify(data_city) ); 
+				  
+			  data_area = {
+					area_id : location_res.area_id,
+					area_name: location_res.area_name,		
+		      };	
+		      setStorage("location_data_area1", JSON.stringify(data_area) ); 
+			  
+			break;
+			
+			case 2:
+			break;
+			
+			case 3:
+			break;
+		}
+	}
+};
+
+recheckLocationMap = function(element){
+	$(element).webuiPopover('hide');	
+	current_latlng = getCurrentLocation();
+   	if(!empty(current_latlng)){   	    	
+   		showPage("map_select_location.html",'none',{
+   			lat : current_latlng.lat,
+   			lng : current_latlng.lng
+   		});
+   	} else {
+   		showPage("map_select_location.html",'none');
+   	}
+};
+
+recheckLocationClose = function(element){
+	$(element).webuiPopover('hide');
+	setStorage("recheck_location",1);
+};
+
+recheckLocation = function(){
+	
+	tooltip_home = getStorage("tooltip_home");
+	recheck_location = getStorage("recheck_location");
+	
+	if(!empty(tooltip_home && empty(recheck_location))){
+		setTimeout(function() {		 
+			 close_button='<ons-button modifier="bluebutton_small" onclick="recheckLocationClose(\'.tooltip_home\');" >';
+			 close_button+=t("NO, THANKS");
+			 close_button+='</ons-button>';
+			 
+			 enabled_button='<ons-button modifier="whitebutton_small" onclick="recheckLocationMap(\'.tooltip_home\');" >';
+			 enabled_button+=t("ENABLED LOCATION");
+			 enabled_button+='</ons-button>';
+			 
+			 $('.tooltip_home').webuiPopover({   	     	
+		     	content:'<p>'+t('Where are you?')+'</p><p class="small">'+t('Enabled your location to find fantastic food nearby')+'</p><br/>'+ close_button + enabled_button,
+		     	backdrop:false,	     	
+		     	offsetLeft:90
+		   	});
+		   	$('.tooltip_home').webuiPopover('show');   	
+	   	}, 1000); 
+	}
+	
+	/*return;
+	
+	if( isdebug() ){
+		
+		setTimeout(function() {									
+		
+			GMaps.geolocate({
+				success: function(position) {
+					re_your_lat = position.coords.latitude;
+		  	        re_your_lng = position.coords.longitude;
+		  	        //alert(re_your_lat+"=>"+re_your_lng);	  	        
+		  	        if ( lat_res = getCurrentLocation()){
+		  	        	//alert(lat_res.lat+"==="+lat_res.lng);
+		  	        	data_recheck = "new_lat="+ re_your_lat;
+		  	        	data_recheck+= "&new_lng="+ re_your_lng;
+		  	        	data_recheck+= "&old_lat="+ lat_res.lat;
+		  	        	data_recheck+= "&old_lng="+ lat_res.lng;	  	        	
+		  	        	processDynamicAjax('recheckLocation', data_recheck );
+		  	        }
+		  	        
+				},
+				error: function(error) {
+			     showToast('Geolocation failed: '+error.message);
+			    },
+			    not_supported: function() {
+			      showToast("Your browser does not support geolocation");
+			    },
+			    always: function() {	    
+			      showLoader(false);
+			    }
+			});
+		
+		}, 1500); 
+	}*/
+};
+
+getCartTheme = function(){
+	cart_theme = 1;
+	if(app_settings = getAppSettings()){	
+		if(!empty(app_settings.cart_theme)){
+			if(app_settings.cart_theme>0){
+		       cart_theme = app_settings.cart_theme;
+			}
+		}
+	} 
+	return cart_theme;
+};
+
+setCartTheme = function(){	
+	cart_theme = getCartTheme();			
+	switch(cart_theme){
+		case "2":		  
+		  $("ons-fab.cart_fab").remove();
+		  html_basket_count = $(".basket_count").html();
+		  if(empty(html_basket_count)){
+		     $(".basket_count").html('<ons-icon icon="md-spinner" size="13px" spin></ons-icon>');
+		     $(".basket_total").html('<ons-icon icon="md-spinner" size="13px" spin></ons-icon>');
+		  }
+		break;
+		
+		default:		 		  
+		  $("ons-bottom-toolbar.basket_toolbar").remove();
+		  $("ons-fab.fab_floating_category").remove();
+		break;
+	}
+	
+};
+
+setBasket = function(data){
+	$(".basket_count").html(data.basket_count);
+	$(".basket_total").html(data.basket_total);
+	setStorage("basket_count", data.basket_count);
+	setStorage("basket_total", data.basket_total);
+};
+
+ReSetBasket = function(){
+	cart_theme = getCartTheme();
+	if(cart_theme==2){		
+		basket_count = getStorage("basket_count");
+		basket_total = getStorage("basket_total");
+		if(!empty(basket_count)){
+			setBasket({
+				basket_count:basket_count,
+				basket_total:basket_total
+			});
+		} else {		
+			getCartCount();
+		}
+	} else {
+		getCartCount();
+	}
+};
+
+clearBasket = function(){
+  cart_theme = getCartTheme();
+  if(cart_theme==2){
+  	 setBasket({
+  	 	basket_count:"",
+  	 	basket_total:""
+  	 });
+  }    
+};
+
+showFloatingCategory = function(){
+   destroyList('floating_category_list');
+   fab_dialog = document.getElementById('floating_category');
+   if (fab_dialog) {
+   	   setFloatingCategory('floating_category_list');
+       fab_dialog.show();
+   } else {
+    ons.createElement('floating_category.html', { append: true })
+      .then(function(fab_dialog) {
+         setFloatingCategory('floating_category_list');
+         fab_dialog.show();
+      });
+   }
+};
+
+showItemPageFloating = function(cat_id, page_type){
+	document.getElementById("floating_category").hide();
+	if(page_type=="1"){
+	  showItemPage(cat_id);
+	} else {
+	  reloadItemPage(cat_id);	
+	}
+}
+
+setCloseMerchant = function(){
+	cart_theme = getCartTheme();
+	merchant_open_status = $("#restaurant_page .merchant_open_status").val();	
+	if(merchant_open_status=="close"){
+
+	  current_page_id = onsenNavigator.topPage.id;
+	  switch(current_page_id){
+	  	case "item_details":
+	  	   $("ons-bottom-toolbar ons-button").attr("disabled",true);	
+	  	break;
+	  }	  
+		
+	  if(cart_theme==2){
+	     $('.basket_toolbar ons-button').attr("disabled",true);
+	  }
+	}
+};
+
+
+/*1.4*/
+initStartUpBanner = function(){
+	interval = 3000;
+	if(app_settings = getAppSettings()){    	
+    	if(app_settings.startup.startup_auto_scroll==1){    		
+    		interval = parseInt(app_settings.startup.startup_interval)+0;        		
+    		if(interval<=0){
+			   interval = 3000;
+			}
+			if (isNaN(interval)){
+				interval = 3000;
+			}					
+			startup_banner_interval = setInterval(function(){AutoStartUpBanner()}, interval );    		 	
+    	}
+    }
+};
+
+AutoStartUpBanner = function(){
+	dump("StartUpBannerAutoScroll");
+	var total_banner = 0;
+	var startup_banner_index = $(".startup_banner_index").val();
+	startup_banner_index = parseInt(startup_banner_index)+0;
+	if(settings = getAppSettings()){
+		total_banner  = app_settings.startup.banner.length;
+		total_banner = parseInt(total_banner)-1;
+	}
+	dump("total_banner=>"+total_banner);
+	var scroll_banner = document.getElementById('startup_carousel');
+		
+	if(startup_banner_index>=total_banner){
+	   scroll_banner.setActiveIndex(0);
+	   $(".startup_banner_index").val(0);
+	} else {	
+	   scroll_banner.next();
+	}
+};
+
+StopStartUpBanner = function(){
+    dump("StopStartUpBanner");
+    if ((typeof  startup_banner_interval !== "undefined") && ( startup_banner_interval !== null)) {
+	    clearInterval(startup_banner_interval);	  
+    }
+};
+
+
+/*1.4*/
+
+preCheckout = function(){
+	
+	transaction_type = $(".transaction_type").val();
+	if(empty(transaction_type)){
+		showToast( t("Please select transaction type") );
 		return;
 	}
-		
-	options = {
-	  div: "#map_canvas_track",
-	  lat: task_lat,
-	  lng: task_lng ,
-	  disableDefaultUI: true,
-	  styles: map_style ,
-    };       
-    
-    setMapBound(task_lat,task_lng);
 	
-    map = new GMaps(options);
-    
-    infoWindow =  createInfoWindow( getTrans("Destination",'destination') ) ;
-    
-    marker_track_destination =  map.addMarker({
-	  lat: task_lat,
-	  lng: task_lng,
-	  infoWindow: infoWindow,
-	  icon: icons.destination_icon
-	});
-	
-	infoWindow.open(map, marker_track_destination);
-	
-	/*DRIVER LOCATION*/
-	driver_lat = $(".driver_lat").val();
-	driver_lng = $(".driver_lng").val();
-	
-	if(!empty(driver_lat)){	
-		infoWindow =  createInfoWindow( getTrans("Courier",'courier') );    
-		marker_track_driver =  map.addMarker({
-		  lat: driver_lat,
-		  lng: driver_lng,
-		  infoWindow: infoWindow,
-		  icon: icons.driver_icon
-		});		
-		
-		infoWindow.open(map, marker_track_driver);
-		
-		setMapBound(driver_lat,driver_lng);
-	}	
-	
-	/*DROPOFF LOCATION*/
-	dropoff_lat = $(".dropoff_lat").val();
-	dropoff_lng = $(".dropoff_lng").val();
-	
-	if(!empty(dropoff_lat)){	
-		infoWindow =  createInfoWindow( getTrans("Dropoff",'dropoff') );    
-		marker_track_dropoff =  map.addMarker({
-		  lat: dropoff_lat,
-		  lng: dropoff_lng,
-		  infoWindow: infoWindow,		  
-		  icon: icons.from_icon
-		});				
-		infoWindow.open(map, marker_track_dropoff);		
-		setMapBound(dropoff_lat,dropoff_lng);
-	}	
-	
-	
-	/*DRAW ROUTE*/
-	if(!empty(driver_lat)){
-		if(!empty(dropoff_lat)){
-		  map.drawRoute({
-		    origin: [driver_lat , driver_lng ],
-			destination: [ dropoff_lat , dropoff_lng ],
-		    travelMode: 'driving',
-		    strokeColor: '#131540',
-		    strokeOpacity: 0.6,
-		    strokeWeight: 6
-		  });		
+	switch (transaction_type){
+		case "delivery":
+		  var street = $(".delivery_address").val();
+		  if(empty(street)){
+		  	 showAlert( t("Please enter delivery address") );
+		  	 return ;
+		  }
 		  
-		  map.drawRoute({
-		    origin: [dropoff_lat , dropoff_lng ],
-			destination: [ task_lat , task_lng ],
-		    travelMode: 'driving',
-		    strokeColor: '#131540',
-		    strokeOpacity: 0.6,
-		    strokeWeight: 6
-		  });				  		  
-		} else {
-		   map.drawRoute({
-		    origin: [driver_lat , driver_lng ],
-			destination: [ task_lat , task_lng ],
-		    travelMode: 'driving',
-		    strokeColor: '#131540',
-		    strokeOpacity: 0.6,
-		    strokeWeight: 6
-		  });		
-		}
-	}
-		
-	setMapCenter();		
-	track_order_map_interval = setInterval(function(){runTrackMap()}, 10000);
-};
-
-createInfoWindow = function(info_html){
-	return new google.maps.InfoWindow({
-	      content: info_html
-	});	
-};
-
-ReInitTrackingMap = function(data){
-	dump(data);
-	
-	map_provider = getStorage("map_provider");
-	dump("map_provider=>" + map_provider);
-	
-	switch(map_provider){
-		case "mapbox":
-		    var newLatLng = new L.LatLng( data.driver_lat, data.driver_lng );
- 	        mapbox_marker_track[0].setLatLng(newLatLng); 
- 	        latlng = [data.driver_lat,data.driver_lng];
-		    mapbox_bounds.push( latlng );			
-		    centerMapbox();		    
+		  var delivery_asap_val = false;
+		  var delivery_asap = document.getElementById('delivery_asap');		  		  
+		  if(!empty(delivery_asap)){
+		  	  delivery_asap_val = delivery_asap.checked;
+		  }
+		  
+		  //alert(delivery_asap_val);
+		  
+		  required_delivery_time = $(".required_delivery_time").val();
+		  if(required_delivery_time==1 && delivery_asap_val == false){
+		  	  delivery_time_set = getStorage("delivery_time_set");		  
+			  if(empty(delivery_time_set)){
+			  	 showAlert( t("Delivery time is required") );
+			  	 return;
+			  }
+		  }
+		  
+		  /*CHECK MINIMUM ORDER TABLE*/
+		  min_delivery_order = parseFloat($(".min_delivery_order").val());		  
+		  //alert(min_delivery_order);
+		  if(min_delivery_order>0.0001){
+		  	 cart_sub_total = parseFloat($(".cart_sub_total").val());		  	 
+		  	// alert(cart_sub_total);
+		  	 if(min_delivery_order>cart_sub_total){
+		  	 	showAlert( t("Sorry but Minimum order is") +" "+ prettyPrice(min_delivery_order) );
+			  	return;
+		  	 }
+		  }
+		  
 		break;
 		
-		default:
-		   marker_track_driver.setPosition( new google.maps.LatLng( data.driver_lat , data.driver_lng ) );	       
-		break;
-	}
-	
-    track_order_map_interval = setInterval(function(){runTrackMap()}, 10000);		
-    
-};
-
-loadOrderDetails = function(){
-   var options = {
-      animation: 'slide',
-      order_id : $(".order_option_order_id").val(),
-      onTransitionEnd: function() {         	   	 
-      } 
-   };   
-   sNavigator.pushPage("order_details.html", options);
-};
-
-requestCancelOrder = function(){
-	var page = sNavigator.getCurrentPage();	 
-    order_id = page.options.order_id
-    
-    ons.notification.confirm({
-	  message: getTrans("Are you sure","are_you_sure") +"?",	  
-	  title: dialog_title_default ,
-	  buttonLabels: [ getTrans('Yes','yes') ,  getTrans('No','no') ],
-	  animation: 'default', 
-	  primaryButtonIndex: 1,
-	  cancelable: true,
-	  callback: function(index) {
-	      if(index<=0){
-	      	 callAjax("requestCancelOrder", "order_id=" +  order_id );	
-	      }
-	  }
-	});
-};
-
-showPopUpOptions = function(action_type){	
-	
-	setStorage("popup_options_action" , action_type  );
-	
-	if (typeof dialog_popup_options === "undefined" || dialog_popup_options==null || dialog_popup_options=="" ) { 	    
-		ons.createDialog('popup_options.html').then(function(dialog) {
-	        dialog.show();	        
-	        translatePage();
-	    });		    
-	} else {
-		dump('already init');
-		dialog_popup_options.show();		
-	    loadOptionList();
-	}	
-};
-
-displayOptionsList = function(data){
-	dump(data);
-	var htm='';
-	htm+='<ons-list>';
-	$.each( data.list, function( key, val ) {
-		htm+='<ons-list-item modifier="tappable" onclick="setOptionValue(' + "'" + key + "'," + "'" + val + "'"  + ');" >';
-		   htm+= '<span class="small-font-dim">'+val+'</span>';
-		htm+='</ons-list-item>';
-	});
-	htm+='</ons-list>';	
-	createElement('options_list',htm);	
-	translatePage();
-};
-
-setOptionValue = function(key, value){
-	
-	dump(key+"=>"+value);
-	option_type = getStorage("popup_options_action");
-	dump(option_type);
-	switch(option_type){
-		case "DateList":
-		  $(".delivery_date").val(key);
-		  $(".cart_delivery_date_value").html(value);
+		case "pickup":
+		  delivery_time_set = getStorage("delivery_time_set");		  
+		  if(empty(delivery_time_set)){
+		  	 showAlert( t("Pickup time is required") );
+		  	 return;
+		  }
 		break;
 		
-		case "TimeList":
-		  $(".delivery_time").val(key); 
-		  $(".cart_delivery_time_value").html(value);
+		case "dinein":
+		  delivery_time_set = getStorage("delivery_time_set");		  
+		  if(empty(delivery_time_set)){
+		  	 showAlert( t("Dine in time is required") );
+		  	 return;
+		  }
 		break;
-	}
-	dialog_popup_options.hide();
-};
-
-loadOptionList = function(){	
-    $(".options_list").html('');
-	params = "option_type=" + getStorage("popup_options_action");
-	params+= "&merchant_id=" + getStorage('merchant_id');
-	params+= "&delivery_date=" + $(".delivery_date").val();
-	callAjax("loadOptionList", params );				   
-};
-
-showReviewForm = function(){
-	var options = {
-      animation: 'slide',      
-      order_id: $(".order_option_order_id").val()
-   };   
-   sNavigator.pushPage("addReviews.html", options);
-};
-
-saveAddressBookLocation = function(){
-	
-	$.validate({ 	
-	    form : '#frm_addressbook_location',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {     	      
-	      var params = $( "#frm_addressbook_location").serialize();	      	      
-	      params+="&client_token="+ getStorage("client_token");
-	      callAjax("saveAddressBookLocation",params);	       
-	      return false;
-	    }  
-	});
-	
-};
-
-deleteAddressBookLocation = function(){
-	
-	ons.notification.confirm({
-	  message: getTrans('Delete this records?','delete_this_records') ,	  
-	  title: dialog_title_default,
-	  buttonLabels: ['Yes', 'No'],
-	  animation: 'default', // or 'none'
-	  primaryButtonIndex: 1,
-	  cancelable: true,
-	  callback: function(index) {
-	  	dump(index);
-	    if ( index==0){
-	    	var id=$(".id").val();		
-	        var params="&client_token="+ getStorage("client_token")+"&id="+id;
-	        callAjax("deleteAddressBookLocation",params);	       
-	    }
-	  }
-	});	
-};
-
-showAddressBookLocation = function(){
-	
-	if (typeof popup_address_location === "undefined" || popup_address_location==null || popup_address_location=="" ) { 	    
-		ons.createDialog('popup_address_location.html').then(function(dialog) {
-	        dialog.show();	        
-	        translatePage();
-	    });		    
-	} else {
-		dump('already init');
-		popup_address_location.show();	    
-		getAddressBookLocation();
 	}	
 	
-};
-
-getAddressBookLocation = function(){
-	var params="client_token="+ getStorage("client_token");
-    callAjax("getAddressBookLocation",params);	
-};
-
-setAddressLocation = function(id){
-	var params="client_token="+ getStorage("client_token") +"&id="+ id;
-    callAjax("setAddressLocation",params);	
-};
-
-
-pushUnregister = function(){
-	dump("pushUnregister");
-	try {	
-		push.unregister(function(){			
-			dump('unregister ok');
-			setStorage("push_unregister",1);
-		},function(error) {   	   	   	   	   
-			dump('unregister error');
-	    });		
+	var params  = '';
+	params = "transaction_type="+transaction_type;	
 		
-	} catch(err) {
-       alert(err.message);       
-    } 
-};
-
-checkDeviceRegister = function(){	
-	push_unregister = getStorage("push_unregister");
-	dump("push_unregister => "+ push_unregister);
-	if (typeof push_unregister === "undefined" || push_unregister==null || push_unregister=="" || push_unregister=="null" ) {
-		// do nothing
-	} else {
-		if(push_unregister==1){
-			dump("Registered again");
-			initPush(true);
-		}
-	}
-};
-
-
-sendPost = function(action,params){
-		
-	try {
-		
-		params+="&lang_id="+getStorage("default_lang");
-		params+="&lang="+getStorage("default_lang");
-		if(!empty(krms_config.APIHasKey)){
-			params+="&api_key="+krms_config.APIHasKey;
-		}
-		
-		params+="&app_version="+ app_version;
-		
-		var device_id=getStorage("device_id");
-		if(!empty(device_id)){
-			params+="&device_id="+device_id;
-		}
-		
-		if (isDebug()){
-	  	  params+="&device_platform=Android";
-	    } else {
-	  	  params+="&device_platform="+ encodeURIComponent(device.platform);
-	    }	 
-		
-	    client_token = getStorage("client_token");
-	    if(!empty(client_token)){
-	       params+="&client_token="+ client_token;
-	    }
-	    	
-		//alert(ajax_url+"/"+action+"?"+params);
-		
-		var send_post_ajax = $.ajax({
-		  url: ajax_url+"/"+action, 
-		  method: "GET",
-		  data: params,
-		  dataType: "jsonp",
-		  timeout: 20000,
-		  crossDomain: true,
-		  beforeSend: function( xhr ) {       
-	      }
-	    });
-	    
-	    send_post_ajax.done(function( data ) {
-	    	 //alert(JSON.stringify(data));
-	    	 if(data.code==1){
-	    	 	setStorage("device_id", data.details ); 
-	    	 	removeStorage("push_unregister");
-	    	 } else {    	 
-	    	 	// do nothing	
-	    	 }
-	    });
-	    
-	    send_post_ajax.always(function() {        
-	    	send_post_ajax=null;   
-	    });
-	          
-	    /*FAIL*/
-	    send_post_ajax.fail(function( jqXHR, textStatus ) {    	
-	    	send_post_ajax=null;   	    	
-	    });    
-    
-    } catch(err) {
-       alert(err.message);       
-    } 
-};
-
-initAutoLocation = function(){
-	mobile_auto_location = getStorage("mobile_auto_location");
-	gps_turn = getStorage("gps_turn");
-	dump("gps_turn=>"+gps_turn);
-	if(mobile_auto_location==1 && gps_turn!=1){
-	   getCurrentLocation();
-	}
-};
-
-setTrackingAccount = function(){
-	
-	try {
-				
-		var analytics_id = getStorage("analytics_id");
-		var analytics_enabled = getStorage("analytics_enabled");
-				
-		if ( analytics_enabled == 1 && !empty(analytics_id)){		
-			analytics = navigator.analytics;
-			analytics.setTrackingId(analytics_id);
-		}
-		
-	} catch(err) {
-       alert(err.message);       
-    } 	 
-};
-
-showNotificationPage = function(){	
-	menu.setMainPage('notifications.html',{
-		closeMenu:true,
-	    animation: 'slide',
-	});
-};
-
-setNotificationCount = function(){	
-	current_count = getStorage("notification_count");
-	if (typeof current_count === "undefined" || current_count==null || current_count=="" || current_count=="null" ) {
-		current_count =1;
-	} else current_count++;
-		
-	setStorage("notification_count",current_count);	
-	setNotificationDisplay();
-};
-
-clearNotificationCount = function(){
-	removeStorage("notification_count");
-};
-
-setNotificationDisplay = function(){
-	current_count = getStorage("notification_count");	
-	if (typeof current_count === "undefined" || current_count==null || current_count=="" || current_count=="null" ) {		
-		setTimeout(function(){ 
-		    $(".notification_count").html( '' );
-	     }, 100);
-	} else {
-		dump('set number =>' + current_count);		
-		 setTimeout(function(){ 
-		    $(".notification_count").html( current_count );
-	     }, 100);
-	}
-};
-
-openWindow = function(url){	
-   if(!isDebug()){			    		
-		var iab = cordova.InAppBrowser;
-		iab.open( url  , '_system');  
-	} else {
-	    window.open(url);
-	}
-};
-
-
-proceedPaymentOptions = function(){
-	
-	var lat=0; var lng=0
-	map_provider = getStorage("map_provider");
-	
-	switch(map_provider){
-		case "mapbox":
-		   lat = mapbox_marker.getLatLng().lat;
-          lng = mapbox_marker.getLatLng().lng;
-		break;
-		
-		default:
-		  lat = marker_dragable.getPosition().lat();
-          lng = marker_dragable.getPosition().lng();
-		break;
-	}
-		
-    $(".google_lat").val( lat );
-    $(".google_lng").val( lng );    
-	sNavigator.popPage({cancelIfRunning: true}); 
-};
-
-toogleTimewrap = function(){
-	$(".delivery_time_wrap").toggle();
-};
-
-
-var inapp;
-
-payWebview = function(url){
-	if(!isDebug()){	
-		 inapp = cordova.InAppBrowser.open( url  , '_blank', 'location=no' ); 		 
-		 inapp.addEventListener('loadstop', function(event){
-		 	 url = event.url;
-		 	 var res = url.match(/success/gi);
-		 	 if(!empty(res)){
-		 	   inapp.executeScript({
-			      code: "document.documentElement.innerText"
-			   }, function(html) {
-			   	  //alert(html);
-			   	  inapp.close();
-			   	  
-			      setTimeout(function(){ 
-			      				   	
-				   	   amount_to_pay = getStorage("global_receipt_amount_pay");
-				   	   receipt_msg = html;
-				   	   
-				       var options = {
-					      animation: 'slide',
-					      onTransitionEnd: function() { 						      	  
-					      	  displayMerchantLogo2( getStorage("merchant_logo") ,
-					      	                       amount_to_pay ,
-					      	                      'page-receipt');
-					      	  $(".receipt-msg").html( receipt_msg ); 
-					      } 
-					   };     
-					   sNavigator.pushPage("receipt.html", options);				
-				   	
-				   }, 1);			   	  			   	  
-			   	  
-			   });
-		 	 }
-		 	 
-		 	 var error = url.match(/error/gi);
-		 	 if(!empty(error)){
-		 	   inapp.executeScript({
-			      code: "document.documentElement.innerText"
-			   }, function(html) {
-			   	  inapp.close();
-			      onsenAlert(html);
-			   });
-		 	 }
-		 	 
-		 	 var cancel = url.match(/cancel/gi);
-		 	 if(!empty(cancel)){
-		 	 	inapp.close();
-		 	 }
-		 	 
-		 });
-	} else {
-	    window.open(url);
-	}	
-};
-
-showEnterMobile = function(){
-	
-	if (typeof dialog_enter_mobile === "undefined" || dialog_enter_mobile==null || dialog_enter_mobile=="" ) { 	    
-		ons.createDialog('enter_mobile.html').then(function(dialog) {
-	        dialog_enter_mobile.show();
-	        initIntelInputs();
-	        translatePage();
-	    });	
-	} else {
-		dialog_enter_mobile.show();		
-	}	
-};
-
-submitMobile = function(){	
-	$.validate({ 	
-	    form : '#frm-enter_mobile',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {  
-	      var params = $( "#frm-enter_mobile").serialize();	       
-	      params+="&merchant_id="+ $(".global_merchant_id").val();
-	      callAjax("requestSMSCode",params);			       
-	      return false;
-	    }  
-	});
-};
-
-validateOrderSMS = function(){
-	$.validate({ 	
-	    form : '#frm-validate-order-sms',    
-	    borderColorOnError:"#FF0000",
-	    onError : function() {      
-	    },	    
-	    onSuccess : function() {  
-	      var params = $( "#frm-validate-order-sms").serialize();	       	      
-	      callAjax("validateOrderSMS",params);			       
-	      return false;
-	    }  
-	});
-};
-
-var ajax_process;
-var timer2;
-
-processAjax = function(action, params){	
-	
-	params+="&lang_id="+getStorage("default_lang");
-	params+="&lang="+getStorage("default_lang");
-	
-	if(!empty(krms_config.APIHasKey)){
-		params+="&api_key="+urlencode(krms_config.APIHasKey);
+	delivery_date_set = getStorage("delivery_date_set");
+	if(!empty(delivery_date_set)){
+	   params +='&delivery_date=' + delivery_date_set;
 	}
 	
-	params+="&app_version="+ app_version;
-	
-	var device_id=getStorage("device_id");
-	if(!empty(device_id)){
-		params+="&device_id="+device_id;
+	delivery_time_set = getStorage("delivery_time_set");
+	if(!empty(delivery_time_set)){
+	   params +='&delivery_time=' + delivery_time_set;	
 	}
 	
-	if (isDebug()){
-  	  params+="&device_platform=Android";
-    } else {
-  	  params+="&device_platform="+ encodeURIComponent(device.platform);
-    }	 
+	params+="&merchant_id=" + getActiveMerchantID();	
 	
-    client_token = getStorage("client_token");
-    if(!empty(client_token)){
-       params+="&client_token="+ client_token;
+	processAjax("preCheckout", params );
+	
+};
+
+InitRTL = function(code){	
+	if(!empty(code)){
+		if(app_settings = getAppSettings()){
+			lang_rtl = app_settings.lang_rtl;	
+			if(!empty(lang_rtl)){		
+				if(lang_rtl.length>0){
+					if(in_array(code, lang_rtl)){
+						$("body").addClass("RTL");
+						return;
+					} 
+				}
+			}
+		}	
+	}
+	$("body").removeClass("RTL");
+};
+
+isRTL = function(code){
+	if(!empty(code)){
+		if(app_settings = getAppSettings()){
+			if ((typeof  app_settings.lang_rtl !== "undefined") && ( app_settings.lang_rtl !== null)) {
+				lang_rtl = app_settings.lang_rtl;			
+				if(lang_rtl.length>0){
+					if(in_array(code, lang_rtl)){					
+						return true;
+					} 
+				}
+			}
+		}	
+	}
+	return false;
+}
+
+function in_array(needle, haystack, argStrict) {
+    var key = '', strict = !!argStrict;
+    if (strict) {
+        for (key in haystack) {
+            if (haystack[key] === needle) {
+                return true;
+            }
+        }
     }
-      
-	//dump(ajax_url+"/"+action+"?"+params);
-	var ajax_uri = ajax_url+"/"+action + "/?json=1&lang="+ getStorage("default_lang");
-	
-	ajax_process = $.ajax({
-	  url: ajax_uri,
-	  method: "POST" ,
-	  data: params ,
-	  dataType: "json",
-	  timeout: 20000,	  
-	  crossDomain: true,
-	  beforeSend: function( xhr ) {
-         dump("before send ajax");     
-         
-         clearTimeout(timer2);         
-         if(ajax_process != null) {	
-         	 ajax_process.abort();
-             clearTimeout(timer2); 
-         } else {
-         	
-         	switch (action){
-         		case "searchByCategory":
-         		case "searchByItem":
-         		   $(".no_results").html( spinner );
-         		break;
-         		
-         		default:
-         		loader.show();
-         		break;
-         	}         	
-         	
-         	timer2 = setTimeout(function() {		
-         		if(ajax_process != null) {		
-				   ajax_process.abort();
-         		}
-         		hideAllModal();	
-				onsenAlert( getTrans('Request taking lot of time. Please try again','request_taking_lot_time') );
-	        }, 20000 ); 
-         }
-      }
-    });  
-    
-    ajax_process.done(function( data ) {
-    	dump("ajax done");
-    	dump(data);
-    	if ( data.code==1){
-    		//GOOD
-    		switch (action){
-    			case "checkOrderSMSSettings":
-    			   smsOrderTemplate();
-    			break;
-    			    			
-    			case "getTranzilaCCList":    			  
-    			  $(".frm-tranzila2").show();
-    			  html='';
-    			  $.each( data.details.list, function( key, val ) {
-    			  	  html+=privateRowWithRadio("id",key,val);
-    			  });    			  
-    			  createElement('tranzila_card_list',html);    			  
-    			break;
-    			
-    			case "searchByCategory":
-    			  $(".no_results").html('');
-    			  CategoryListSmall( data.details.list );
-    			break;
-    			
-    			case "searchByItem":
-    			  $(".no_results").html('');
-    			  ItemListSmall( data.details.list );
-    			break;
-    		}
-    	} else {
-    		//FAILED
-    		switch (action){
-    			case "checkOrderSMSSettings":
-    			break;
-    			
-    			case "searchByCategory":
-    			case "searchByItem":   
-    			$(".no_results").html( data.msg );
-    			break;
-    			
-    			case "getTranzilaCCList":
-    			  $(".frm-tranzila2").hide();
-    			  toastMsg( data.msg );    			  
-    			break;
-    		}
-    	}
-    });
-    
-     /*ALWAYS*/
-    ajax_process.always(function() {
-        dump("ajax always");
-        hideAllModal();		
-        ajax_process=null;  
-        clearTimeout(timer2);
-    });
-          
-    /*FAIL*/
-    ajax_process.fail(function( jqXHR, textStatus ) {
-    	dump("failed ajax " + textStatus );
-    	clearTimeout(timer2);    	
-    	if(textStatus!="abort"){
-    	  toastMsg( getTrans("Failed","failed") + ": " + textStatus );
-    	}      
-    });     
-   
-};
-	  
-function CreditCardFormat(value) {
-  var v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '')
-  var matches = v.match(/\d{4,16}/g);
-  var match = matches && matches[0] || ''
-  var parts = []
-  for (i=0, len=match.length; i<len; i+=4) {
-    parts.push(match.substring(i, i+4))
-  }
-  if (parts.length) {
-    return parts.join(' ')
-  } else {
-    return value
-  }
-}
-								  
-setFocus = function(element){	
-	$("#"+element).focus();
+    else {
+        for (key in haystack) {
+            if (haystack[key] == needle) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
-destroyList = function(element){
-	dump("destroyList");
-	dump(element);
-	$("#"+ element +" ons-list-item").remove();	
+setSortPromoFood = function(){
+	var sort_fields = $('#sort_food_promo input[name=sortby]:checked').val();		
+	var sort_by = $( "#sort_food_promo .sort_asc_desc" ).val();
+	hideSheet();	
+	$(".sort_fields").val( sort_fields );	
+	$(".sort_by").val( sort_by );	
+	params = $( ".frm_promo_food" ).serialize();   
+   	processAjax('foodPromo',params,'GET','skeleton6');	   	
 };
+
+loadMerchantWithFood2 = function(merchant_id, item_id, cat_id){
+	dump("merchant_id=>"+ merchant_id);
+	dump("item_id=>"+ item_id);
+	dump("cat_id=>"+ cat_id);	
+    showPage('restaurant_page.html','slide',{
+   	   'merchant_id': merchant_id,
+   	   'item_id': item_id,
+   	   'cat_id' : cat_id
+    });
+};
+
+SetoneTimePayment = function(data){
+	if(data.details.payment_list_count<=1){	  	        	  	 
+	   $.each(data.details.payment_list, function(ontime_key, ontime_val){	        	  	 	
+	  	 	$(".one_time_payment").val( ontime_key );	        	  	 	
+	   });	        	  	 
+	}     					
+};
+
+oneTimePayment = function(){
+   one_time_payment = $(".one_time_payment").val();
+   if(!empty(one_time_payment)){
+   	  switch (one_time_payment){
+ 		case "ocr":
+ 		  showPage("select_creditcards.html");
+ 		  return true;
+ 		break;
+ 		
+ 		case "pyr":
+ 		  showPage("select_payondelivery.html");
+ 		  return true;
+ 		break;
+ 		
+ 		default:
+ 		  initPayment();
+ 		  return true;
+ 		break;
+ 	}			
+   }
+   return false;
+};
+
+
+autoFillAddressForm = function(){
+   dump("func autoFillAddressForm");
+   if(isLocation()){
+   	   //
+   } else {
+	   if(geocoded_address = getGeocodeAddress()){	   	  
+	   	  current_page_id = onsenNavigator.topPage.id;
+	   	  $("#"+current_page_id +" .street").val( geocoded_address.street );
+	   	  $("#"+current_page_id +" .city").val( geocoded_address.city );
+	   	  $("#"+current_page_id +" .state").val( geocoded_address.state );
+	   	  $("#"+current_page_id +" .zipcode").val( geocoded_address.zipcode );
+	   }
+   }
+};
+
+var needRefresh = function(){	 
+	 $need_refresh = false;	 
+	 $page_need_refresh = parseInt(getStorage("page_need_refresh"));
+	 if($page_need_refresh==1){
+	 	$need_refresh = true;
+	 	
+	 	$page_id = getCurrentPage();
+	 	if($page_id=="tabbar"){
+	 	    removeStorage("page_need_refresh");
+	 	}
+	 }
+  	 return $need_refresh;
+};
+
+initAutoCarousel = function(){
+	dump("initAutoCarousel");
+	setTimeout(function() {				     
+      home_interval = setInterval(function(){runAutoCarousel(auto_carousel_name)}, 4000 );   
+    }, 100);    
+};
+
+runAutoCarousel = function(data){
+	
+	carousel_page_id = onsenNavigator.topPage.id;
+	dump("runAutoCarousel=>"+ carousel_page_id);	
+	active_index_tab = document.querySelector('ons-tabbar').getActiveTabIndex();
+	
+	if(carousel_page_id!="tabbar" || data.length<=0 || active_index_tab!=0){
+		StopAutoCarousel();
+		return;
+	}
+			
+	$.each( data  , function( key, carousel_name ) {		
+		dump("carousel_name=>"+carousel_name);
+		karousel[key] = document.getElementById(carousel_name);
+		var total_carousel = parseInt(karousel[key].itemCount);		
+		
+		if (typeof active_carousel[key] === "undefined" || active_carousel[key]==null ) {	
+			active_carousel[key] = 1;
+		}
+				
+		dump("total_carousel=>"+ total_carousel );
+		dump("active_carousel=>"+ active_carousel[key] );
+		
+		if(active_carousel[key]>=total_carousel){
+			dump("end carousel");	
+			active_carousel[key]=0;					
+			setTimeout(function(){ 
+				 karousel[key].setActiveIndex(0);
+		    }, 4000);
+		} else {
+			dump("move carousel");		
+			active_carousel[key]++;	
+			karousel[key].next();
+		}
+		
+	});
+};
+
+StopAutoCarousel = function(){
+    dump("StopAutoCarousel");
+    if ((typeof  home_interval !== "undefined") && ( home_interval !== null)) {
+    	clearInterval(home_interval);	  
+    }	
+};
+
+setOptDelivery = function(){
+	opt_contact_delivery = $("input[name=opt_contact_delivery]:checked").val();		
+	if(empty(opt_contact_delivery)){
+		opt_contact_delivery='';
+	}
+	setStorage("opt_contact_delivery", opt_contact_delivery );
+};
+
+
+showManualTip = function(){
+	var dialog = document.getElementById('dialog_tip');   
+     if (dialog) {     	 
+     	 dialog.show();
+    } else {
+       ons.createElement('dialog_tip.html', { append: true }).then(function(dialog) {       	
+        dialog.show();
+      });
+    }
+};
+
+actionSheetBooking = function(booking_id,can_cancel){
+	
+	 action_sheet = [];
+	 	 
+	 action_sheet[0] = t('View details');
+	 if(can_cancel=="cancel_booking"){
+	    action_sheet[1] = t('Cancel booking');
+	 }
+	
+	 ons.openActionSheet({
+       title: t("BOOKING"),
+	    cancelable: true,
+	    buttons: action_sheet
+	  }).then(function (index) { 
+	  	  switch(index){
+	  	  	case 0:
+	  	  	 ViewBookingDetails(booking_id);
+	  	  	break;
+	  	  	
+	  	  	case 1:
+	  	  	    ons.platform.select('ios');  
+			    ons.notification.confirm( t("Are you sure?") ,{
+					title: t("CANCEL BOOKING"),					
+					buttonLabels : [ t("Yes"), t("Cancel") ]
+				}).then(function(input) {
+					if (input==0){			
+						processAjax('cancelBooking', 'booking_id=' + booking_id );
+					}
+				});
+	  	  	break;	  	  		  	  
+	  	  }
+	  });
+  
+};
+
+showRestaurantListByTag = function(search_type,banner_id){
+   onsenNavigator.pushPage("restaurant_list.html",{
+  	   animation : "slide" ,  	
+  	   data : {
+  	   	  "search_type" : search_type,
+  	   	  "banner_id": banner_id
+  	   }
+   });  
+};
+
+EnabledSubcribe = function(){
+	try {
+		var subscribe_topic = $("input[name=subscribe_topic]:checked").val();
+		if(empty(subscribe_topic)){
+			subscribe_topic=0;
+		}	
+		
+		if(subscribe_topic>0){
+			window.FirebasePlugin.subscribe("broadcast", function(){		        
+		        processAjax('saveSubsribe', "subscribe_topic="+subscribe_topic );
+		    },function(error){
+		        showToast( t("Failed to subscribe to alert") , error);
+		    });
+		} else {
+			window.FirebasePlugin.unsubscribe("broadcast", function(){		        
+		        processAjax('saveSubsribe', "subscribe_topic="+subscribe_topic );
+		    },function(error){
+		        showToast( t("Failed to subscribe to alert") , error);
+		    });
+		}		
+	
+	} catch(err) {
+       showToast(err.message);       
+    } 
+};
+
+/*FIREBASEX  */
+
+initFirebasex = function(){
+	try {	
+			   
+	    window.FirebasePlugin.onMessageReceived(function(data) {
+	        try{	         		        	
+	        	//showToast(data.title+"\n"+data.body);
+	        	handlePushReceive(data);
+	        }catch(e){
+	            dump("Exception in onMessageReceived callback: "+e.data);
+	        }
+	
+	    }, function(error) {
+	        dump("Failed receiving FirebasePlugin message", error);
+	    });
+	    
+	    window.FirebasePlugin.onTokenRefresh(function(token){	        
+	        device_id = token;
+	        setStorage("device_id", token );	        
+	    }, function(error) {
+	        dump("Failed to refresh token");
+	    });
+	    	     	    
+	     checkNotificationPermission(false);	
+	     	     	     
+	     if(cordova.platformId === "android"){
+	     	initAndroid();
+	     }else if(cordova.platformId === "ios"){
+	     	initIos();
+	     }
+	    
+	} catch(err) {
+       alert(err.message);       
+    } 
+};
+
+var initIos = function(){
+    window.FirebasePlugin.onApnsTokenReceived(function(token){        
+        //
+    }, function(error) {
+        dump("Failed to receive APNS token");
+    });
+};
+
+var checkNotificationPermission = function(requested){
+    window.FirebasePlugin.hasPermission(function(hasPermission){
+        if(hasPermission){            
+            getToken();
+        }else if(!requested){            
+            window.FirebasePlugin.grantPermission(checkNotificationPermission.bind(this, true));
+        }else{            
+            alert("Notifications won't be shown as permission is denied");
+        }
+    });
+};
+
+var getToken = function(){
+    window.FirebasePlugin.getToken(function(token){        
+        device_id = token;
+        setStorage("device_id", token );        
+    }, function(error) {
+        dump("Failed to get FCM token");
+    });
+};
+
+initAndroid = function(){
+	var customChannel  = {
+		id: "mobile2_channel",
+		name: "mobile2 app channel",
+		sound: "beep",
+		vibration: [300, 200, 300],
+		light: true,
+	    lightColor: "0xFF0000FF",
+	    importance: 4,
+	    badge: true, 
+	    visibility: 1
+	};
+	
+	 window.FirebasePlugin.createChannel(customChannel,
+        function() {            
+            window.FirebasePlugin.listChannels(
+                function(channels) {
+                    if(typeof channels == "undefined") return;
+                    for(var i=0;i<channels.length;i++) {                        
+                    }
+                },
+                function(error) {
+                    dump('List channels error: ' + error);
+                }
+            );
+        },
+        function(error) {
+            showToast("Create channel error", error);
+        }
+    );    
+        
+};
+
+function subscribe(){
+	try {
+		
+	    window.FirebasePlugin.subscribe("broadcast", function(){
+	        //showToast("Subscribed to topic");
+	    },function(error){
+	        //showToast("Failed to subscribe to alert", error);
+	    });
+	    
+    } catch(err) {
+       dump(err.message);       
+    } 
+}
+
+function unsubscribe(){
+	try {
+	    window.FirebasePlugin.unsubscribe("broadcast", function(){
+	        //showToast("Unsubscribed from topic");
+	    },function(error){
+	        //showToast("Failed to unsubscribe from alert", error);
+	    });
+    } catch(err) {
+       dump(err.message);       
+    } 
+}
+
+
+
+/*END FIREBASEX  */
+
+getOperational = function(){
+	if(app_settings = getAppSettings()){   	   	    	   	
+   	  if(app_settings.enabled_operating_hours==1){
+   	  	setTimeout(function(){ 
+		   processDynamicAjax("getOperational", "" , "temp_loader"); 
+		}, 100);   	  	 
+   	  }   	   
+    }   	    
+};
+
+closeApp = function(){
+	 if(isdebug()){
+	 	showToast( t("Close app") );
+	 	return;
+	 }
+	 if (navigator.app) {
+	   navigator.app.exitApp();
+	 } else if (navigator.device) {
+	   navigator.device.exitApp();
+	 } else {
+	   window.close();
+	 }
+};
+
+directQty = function($item_id, $object , $action_type , $category_id , $row_id ){
+	
+	var parent = $object.parent().parent();	
+	var ons_input = parent.find("ons-input");
+	var value = ons_input.val();
+	if (isNaN(ons_input.val())){
+		value=0;
+	}
+	if (empty(value)){
+		value=0;
+	}
+	
+	if($action_type==1){
+	   value = parseInt(value) + 1;
+	} else {
+	   value = parseInt(value) - 1;
+	}
+	
+	$params="item_id="+ $item_id;
+	
+	if (value>=1){
+		ons_input.val( value );		
+		$params+="&qty="+ value;
+	} else {		
+		ons_input.val( 0 );
+		$params+="&qty="+ 0;
+	}
+		
+	if ((typeof  $category_id !== "undefined") && ( $category_id !== null)) {
+		$params+="&category_id="+ $category_id;
+	}	
+	if ((typeof  $row_id !== "undefined") && ( $row_id !== null)) {
+		$params+="&row_id="+ $row_id;
+	}	
+				
+	if(value>=0){
+	  processAjax("directAddCart", $params ,"post","normal_loader");
+	}
+	
+};
+
+getCurrentPage = function(){
+	return document.querySelector('ons-navigator').topPage.id;
+};
+
+socialSharing = function( $message, $subject, $url){
+	
+	 if(isdebug()){
+		showToast( t("share will not work in debug mode") );
+		return;
+	 }
+		  	 
+	 try {		  	
+	  	 options = {
+		  	message : $message ,
+		  	subject : $subject ,
+		  	url : $url,		  	
+		 };						 						
+	  	 window.plugins.socialsharing.shareWithOptions(options, function(result){	  	 	
+	  	 }, function(msg){
+	  	 	 showAlert( t("Sharing failed with message") + " :" + msg  );
+	  	 });		  	 
+  	 } catch(err) {
+       showAlert(err.message);
+     } 
+};
+
+homeSwitchViewAll = function(){
+	$type  = 'icon';
+	if(app_settings = getAppSettings()){
+		if ((typeof  app_settings.home_view_all !== "undefined") && ( app_settings.home_view_all !== null)) {
+			if ((typeof  app_settings.home_view_all.type !== "undefined") && ( app_settings.home_view_all.type !== null)) {
+				$type  = app_settings.home_view_all.type;
+			}		
+		}
+	}
+	switch($type){
+		case "words":
+		  $(".list_view_all").html( t(app_settings.home_view_all.label) );
+		break;
+		
+		default:
+		  $(".list_view_all").html( '<ons-icon icon="ion-ios-arrow-right" size="22px" class="button--to_text_orange" ></ons-icon>' );
+		break;
+	}
+};
+
+initStar = function($score, $classname, $field_name ){
+	$( $classname ).raty({ 
+	   score:$score,
+	   readOnly: false, 		
+	   path: 'lib/raty/images',
+	   click: function (score, evt) {	   	   
+	   	   $( $field_name ).val( score );
+	   }
+   }); 	
+};
+
+initAppRateCountDown = function(){	
+	
+	try {
+		
+		dump("initAppRateCountDown");
+		
+		$count_session = getStorage("count_session");	
+		if ((typeof  $count_session !== "undefined") && ( $count_session !== null)) {
+			$count_session = parseInt($count_session) +1;
+		} else $count_session = 1;
+		
+		setStorage("count_session", $count_session);	
+		
+		if($count_session>=10){
+			setStorage("count_session", 0);
+			setTimeout(function(){ 
+				
+				 if(app_settings = getAppSettings()){	
+				   if ((typeof  app_settings.app_rating !== "undefined") && ( app_settings.app_rating !== null)) {		
+				   	
+				   	    $only_user_login = true;
+				   	    
+				   	    if ((typeof  app_settings.app_rating.only_user_login !== "undefined") && 
+				   	    ( app_settings.app_rating.only_user_login !== null)) {
+							if(app_settings.app_rating.only_user_login==1){		
+								if(!isLogin()){					
+									$only_user_login = false;
+								}
+							}
+					    }
+										   	
+				   	   if(app_settings.app_rating.enabled==1 && $only_user_login == true){
+			 	          rateApp();
+				   	   }
+				   }
+				 }
+			}, 2000);
+		}
+		
+	} catch(err) {
+       //
+    } 
+};
+
+rateApp = function(){
+	
+	$ios_id = ''; $android_id =''; $fedback_email = '';
+	if(app_settings = getAppSettings()){
+	  if ((typeof  app_settings.app_rating !== "undefined") && ( app_settings.app_rating !== null)) {
+	  	  $ios_id = app_settings.app_rating.ios_id;
+	  	  $android_id = app_settings.app_rating.android_id;
+	  	  $fedback_email = app_settings.app_rating.email;
+	  } else {
+	  	  showToast("Rating not available at the moment", 'danger');
+	  }
+	  
+	  if ((typeof  app_settings.app_rating.only_user_login !== "undefined") && ( app_settings.app_rating.only_user_login !== null)) {
+			if(app_settings.app_rating.only_user_login==1){		
+				if(!isLogin()){					
+					showToast("Please login to rate the app", 'danger');
+					return;
+				}
+			}
+		}
+	  
+	}
+	/*end if*/
+		
+	try {
+								
+		AppRate.preferences = {
+		  displayAppName: BuildInfo.name,
+		  usesUntilPrompt: 5,
+		  promptAgainForEachNewVersion: false,
+		  reviewType: {
+		    ios: 'AppStoreReview',
+		    android: 'InAppBrowser'
+		  },
+		  storeAppURL: {
+		    ios: $ios_id,
+		    android: 'market://details?id='+$android_id,
+		    /*windows: 'ms-windows-store://pdp/?ProductId=<the apps Store ID>',
+		    blackberry: 'appworld://content/[App Id]/',
+		    windows8: 'ms-windows-store:Review?name=<the Package Family Name of the application>'*/
+		  },
+		  customLocale: {
+		    title: t("Would you mind rating %@?"),
+		    message: t("It won't take more than a minute and helps to promote our app. Thanks for your support!"),
+		    cancelButtonLabel: t("No, Thanks"),
+		    laterButtonLabel: t("Remind Me Later"),
+		    rateButtonLabel: t("Rate It Now"),
+		    yesButtonLabel: t("Yes!"),
+		    noButtonLabel: t("Not really"),
+		    appRatePromptTitle: t('Do you like using %@'),
+		    feedbackPromptTitle: t('Mind giving us some feedback?'),
+		  },
+		  callbacks: {
+		    handleNegativeFeedback: function(){
+		      window.open('mailto:'+ $fedback_email,'_system');
+		    },
+		    onRateDialogShow: function(callback){
+		      //
+		    },
+		    onButtonClicked: function(buttonIndex){
+		      //
+		    }
+		  },
+		  openUrl: AppRate.preferences.openUrl
+		};
+		
+		AppRate.promptForRating();
+				
+	} catch(err) {
+       dump2("Rating only work in actaul device error : "+err.message);
+    } 
+};
+
+
+verifyPhone = function(){
+	try {
+				
+		var myphone = $(".myphone").val();
+		var timeOutDuration = 60;
+		var fakeVerificationCode = '123456';
+		var awaitingSms = false;
+		
+				
+		FirebasePlugin.verifyPhoneNumber(function(credential) {
+				
+			//dump2(credential);
+			$(".logs").append( JSON.stringify(credential) );
+		    $(".logs").append( "\n" );		        
+						
+		    if(credential.instantVerification){
+		        if(awaitingSms){
+		            awaitingSms = false;	            
+		        }			       
+		        signInWithCredential(credential);
+		    }else{
+		        awaitingSms = true;	        
+		        dump2('SMS WAITING');
+		    }
+		    
+		}, function(error) {
+		    dump2("Failed to verify phone number: " + JSON.stringify(error));
+		}, myphone, timeOutDuration, fakeVerificationCode);
+			
+	} catch(err) {
+       dump2( err.message );
+    } 
+};
+
+FirebaseVerifyPhone = function(mobile_number){
+	try {
+		
+		var timeOutDuration = 60;
+		var fakeVerificationCode = '123456';
+		var awaitingSms = false;
+		$firebase_otp_attempt = 0;
+		
+		FirebasePlugin.verifyPhoneNumber(function(credential) {
+						
+			$firebase_otp_credentials = credential;
+			
+			if(credential.instantVerification){
+				if(awaitingSms){
+		           awaitingSms = false;	            
+		        }
+			} else {
+				awaitingSms = true;	        		        
+			}
+			
+			if(awaitingSms){
+				//dump2("WAITING SMS");
+			} else {
+				$firebase_otp_attempt++;
+				$(".firebase_otp_attempt").val( $firebase_otp_attempt );														
+				signInWithCredential(credential,$firebase_otp_attempt,true);
+			}
+				
+		}, function(error) {
+		    showToast("Failed to verify phone number: " + JSON.stringify(error) ,'danger');
+		}, mobile_number, timeOutDuration, fakeVerificationCode);
+	
+	} catch(err) {	   
+       showToast( err.message ,'danger');
+    } 
+};
+
+function signInWithCredential(credential , $firebase_otp_attempt , $auto_fill_code){	
+    FirebasePlugin.signInWithCredential(credential, function() {        
+        showToast( t("Verification successful") ,'success' );
+        
+        if($auto_fill_code){
+	        $page_id = getCurrentPage();
+	        $code = $("#" + $page_id + " .code").val('****');        
+        }
+        
+        submitForm('.frm_verify','verifyCode');
+    }, function(error) {
+    	if($firebase_otp_attempt>=2){    	   	  
+           showAlert( JSON.stringify(error)  , "danger");                      
+    	}    	
+    });
+}
+
+verificationMethod = function(){
+	$page_id = getCurrentPage();
+	$verification_type  = $("#"+ $page_id + " .verification_type" ).val();	
+	switch ($verification_type){
+		case "verification_firebase_otp":		  
+		  $code = $("#" + $page_id + " .code").val();		  
+		  $firebase_otp_credentials.code = $code;
+		  //dump2($firebase_otp_credentials);
+		  signInWithCredential($firebase_otp_credentials,2,false);
+		break;
+		
+		default:
+		  submitForm('.frm_verify','verifyCode');
+		break;
+	}
+};
+
+verificationResendCode = function(){
+	$page_id = getCurrentPage();
+	$verification_type  = $("#"+ $page_id + " .verification_type" ).val();	
+	switch ($verification_type){
+		case "verification_firebase_otp":		  		    
+		    $contact_phone = $("#" + $page_id + " .contact_phone").val();
+			FirebaseVerifyPhone( $contact_phone );
+		break;
+		
+		default:
+		  resendCode();
+		break;
+	}
+};
+
+handlePushReceive = function(data){
+	if(cordova.platformId === "android"){
+		showToast( data.title+"\n"+data.body, 'success');		
+	} else {		
+		if ((typeof  data.aps.alert.title !== "undefined") && ( data.aps.alert.title !== null)) {
+		    showToast( data.aps.alert.title +"\n"+ data.aps.alert.body , 'success');   	
+		}
+	}
+};
+
+runTrackGraphical = function(){
+   dump("runTrackGraphical" + track_interval_timeout);
+   setTimeout(function() {				     
+ 	 track_graphic_interval = setInterval(function(){TrackOrderGraphical()}, track_graphic_interval_timeout );	
+   }, 100); 
+};
+
+stopTrackGraphical = function(){
+	dump("stopTrackGraphical");
+	if ((typeof  track_graphic_interval !== "undefined") && ( track_graphic_interval !== null)) {
+	    clearInterval(track_graphic_interval);
+	}
+};
+
+TrackOrderGraphical = function(){	
+	$page_id = getCurrentPage();
+	
+	if($page_id!="graphical_tracking"){
+		stopTrackGraphical();
+		return false;
+	}
+	
+	params='';
+	params+= "&track_order_id=" + $("#"+ $page_id +" .receipt_order_id").val();
+	processDynamicAjax('TrackOrderGraphical',params,'track_loader','GET','1');
+};
+
+callMerchant = function(){
+	$page_id = getCurrentPage();
+	$phone = $("#"+ $page_id + " .receipt_contact").val();
+	if ((typeof  $phone !== "undefined") && ( $phone !== null)) {		
+		window.open("tel:"+ $phone);
+	} else {
+		showToast( t("Cannot call merchant") ,'danger' );	
+	}
+};
+
+isTrackingGraphical = function(){
+	$graphical = false;
+	if(app_settings = getAppSettings()){		  
+	  	 if ((typeof app_settings.enabled_graphical_tracking !== "undefined") && ( app_settings.enabled_graphical_tracking !== null)) {	 
+	  	    $graphical = app_settings.enabled_graphical_tracking;
+	  	 }
+	}
+	return $graphical;
+};
+
+/*END OF SCRIPT*/
